@@ -1,24 +1,22 @@
-import React from "react";
-import { Link } from "wouter";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useMutation } from "@tanstack/react-query";
 import { 
   Activity, 
   Brain, 
   Check, 
   ChevronRight, 
-  Clock, 
   Heart, 
   LayoutDashboard, 
   MessageSquare, 
-  ShieldCheck, 
-  Smartphone, 
   Users, 
-  Zap 
+  Zap,
+  X,
+  Loader2
 } from "lucide-react";
 
 import heroDashboardImg from "../assets/hero-dashboard.png";
 
-// Animation variants
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
@@ -28,16 +26,172 @@ const staggerContainer = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.2
-    }
+    transition: { staggerChildren: 0.2 }
   }
 };
 
+function SignupModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () => void; plan: string }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: async (data: { email: string; name: string; plan: string }) => {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok && res.status !== 200) throw new Error(json.message);
+      return json;
+    },
+    onSuccess: () => {
+      setSuccess(true);
+      setErrorMsg("");
+    },
+    onError: (err: Error) => {
+      setErrorMsg(err.message);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    mutation.mutate({ email, name, plan });
+  };
+
+  const planLabels: Record<string, string> = {
+    kickstart: "The Kickstart — 7-Day Free Trial",
+    committed: "The Committed — Annual Plan",
+    transformation: "The Transformation — VIP Access",
+  };
+
+  const handleClose = () => {
+    setSuccess(false);
+    setEmail("");
+    setName("");
+    setErrorMsg("");
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={handleClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.3 }}
+            className="glass-card rounded-2xl p-8 w-full max-w-md relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-white transition-colors"
+              data-testid="button-close-modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {success ? (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 mx-auto mb-4">
+                  <Check className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">You're in!</h3>
+                <p className="text-slate-400" data-testid="text-success-message">Check your email for next steps to get started with RxFit.ai.</p>
+                <button
+                  onClick={handleClose}
+                  className="mt-6 btn-primary px-6 py-3 rounded-full text-sm"
+                  data-testid="button-close-success"
+                >
+                  Got it
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-2">Get Started with RxFit.ai</h3>
+                  <p className="text-sm text-slate-400">{planLabels[plan] || plan}</p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      data-testid="input-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="you@email.com"
+                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      data-testid="input-email"
+                    />
+                  </div>
+
+                  {errorMsg && (
+                    <p className="text-sm text-red-400" data-testid="text-error">{errorMsg}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={mutation.isPending}
+                    className="w-full btn-primary py-4 rounded-xl text-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                    data-testid="button-submit-signup"
+                  >
+                    {mutation.isPending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        {plan === "transformation" ? "Request Strategy Call" : "Start Free Trial"}
+                        <ChevronRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function LandingPage() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState("kickstart");
+
+  const openSignup = (plan: string) => {
+    setSelectedPlan(plan);
+    setModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
       
+      <SignupModal isOpen={modalOpen} onClose={() => setModalOpen(false)} plan={selectedPlan} />
+
       {/* Sticky Navbar */}
       <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-white/5">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
@@ -52,7 +206,11 @@ export default function LandingPage() {
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           </div>
-          <button className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20">
+          <button
+            onClick={() => openSignup("kickstart")}
+            className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20"
+            data-testid="button-nav-trial"
+          >
             Start Free Trial
           </button>
         </div>
@@ -60,7 +218,6 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 overflow-hidden">
-        {/* Background Gradients */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-teal-500/10 blur-[120px] rounded-full -z-10" />
         <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-orange-500/5 blur-[100px] rounded-full -z-10" />
 
@@ -86,20 +243,24 @@ export default function LandingPage() {
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <button className="btn-primary w-full sm:w-auto px-8 py-4 rounded-full text-lg shadow-xl shadow-teal-500/20 flex items-center justify-center gap-2 group">
+              <button
+                onClick={() => openSignup("kickstart")}
+                className="btn-primary w-full sm:w-auto px-8 py-4 rounded-full text-lg shadow-xl shadow-teal-500/20 flex items-center justify-center gap-2 group"
+                data-testid="button-hero-trial"
+              >
                 Start Your Free Trial
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
-              <button className="w-full sm:w-auto px-8 py-4 rounded-full text-lg font-medium text-slate-300 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2">
+              <a
+                href="#features"
+                className="w-full sm:w-auto px-8 py-4 rounded-full text-lg font-medium text-slate-300 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+                data-testid="link-how-it-works"
+              >
                 See How It Works
-              </button>
+              </a>
             </motion.div>
             
-            <motion.div 
-              variants={fadeIn}
-              className="pt-16 relative"
-            >
-               {/* Hero Image / Dashboard Mockup */}
+            <motion.div variants={fadeIn} className="pt-16 relative">
                <div className="relative mx-auto max-w-4xl rounded-xl border border-white/10 shadow-2xl shadow-teal-900/50 bg-slate-900/50 backdrop-blur-sm overflow-hidden group">
                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10" />
                  <img 
@@ -108,14 +269,13 @@ export default function LandingPage() {
                    className="w-full h-auto object-cover opacity-90 group-hover:scale-105 transition-transform duration-700"
                  />
                  
-                 {/* Floating UI Elements for depth */}
                  <div className="absolute bottom-10 left-10 z-20 glass-card p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
                     <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400">
                       <Activity className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xs text-slate-400">Recovery Score</div>
-                      <div className="text-lg font-bold text-white">92% <span className="text-xs font-normal text-emerald-400">↑ 4%</span></div>
+                      <div className="text-lg font-bold text-white" data-testid="text-recovery-score">92% <span className="text-xs font-normal text-emerald-400">↑ 4%</span></div>
                     </div>
                  </div>
 
@@ -139,7 +299,6 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 text-center">
           <p className="text-sm font-medium text-slate-500 uppercase tracking-widest mb-8">Works seamlessly with your favorite gear</p>
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-             {/* Simple text logos for now, normally would be SVGs */}
              <span className="text-xl font-bold text-white">OURA</span>
              <span className="text-xl font-bold text-white">GARMIN</span>
              <span className="text-xl font-bold text-white">WHOOP</span>
@@ -270,7 +429,7 @@ export default function LandingPage() {
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-slate-300 mb-2">The Kickstart</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-white">$49</span>
+                        <span className="text-4xl font-bold text-white" data-testid="text-price-kickstart">$49</span>
                         <span className="text-slate-500">/mo</span>
                      </div>
                      <div className="mt-4 inline-block px-3 py-1 rounded-full bg-teal-500/10 text-teal-400 text-xs font-bold border border-teal-500/20">
@@ -288,7 +447,11 @@ export default function LandingPage() {
                         <Check className="w-5 h-5 text-teal-500 shrink-0" /> Weekly Coach Check-in
                      </li>
                   </ul>
-                  <button className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors">
+                  <button
+                    onClick={() => openSignup("kickstart")}
+                    className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors"
+                    data-testid="button-signup-kickstart"
+                  >
                      Start Free Trial
                   </button>
                </div>
@@ -302,7 +465,7 @@ export default function LandingPage() {
                      <div className="mb-6">
                         <h3 className="text-xl font-bold text-white mb-2">The Committed</h3>
                         <div className="flex items-baseline gap-1">
-                           <span className="text-5xl font-bold text-white">$490</span>
+                           <span className="text-5xl font-bold text-white" data-testid="text-price-committed">$490</span>
                            <span className="text-slate-500">/yr</span>
                         </div>
                         <p className="text-xs text-slate-400 mt-2">Paid upfront. Save $98/year.</p>
@@ -332,7 +495,11 @@ export default function LandingPage() {
                         </div>
                      </div>
 
-                     <button className="btn-secondary w-full py-4 rounded-xl shadow-lg shadow-orange-500/20">
+                     <button
+                       onClick={() => openSignup("committed")}
+                       className="btn-secondary w-full py-4 rounded-xl shadow-lg shadow-orange-500/20"
+                       data-testid="button-signup-committed"
+                     >
                         Claim Annual Offer
                      </button>
                   </div>
@@ -343,7 +510,7 @@ export default function LandingPage() {
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-slate-300 mb-2">The Transformation</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-white">$997</span>
+                        <span className="text-4xl font-bold text-white" data-testid="text-price-transformation">$997</span>
                         <span className="text-slate-500">/one-time</span>
                      </div>
                      <div className="mt-4 inline-block px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700">
@@ -364,7 +531,11 @@ export default function LandingPage() {
                         <Check className="w-5 h-5 text-white shrink-0" /> Lifetime Community Access
                      </li>
                   </ul>
-                  <button className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors">
+                  <button
+                    onClick={() => openSignup("transformation")}
+                    className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors"
+                    data-testid="button-signup-transformation"
+                  >
                      Book a Strategy Call
                   </button>
                </div>
@@ -382,7 +553,7 @@ export default function LandingPage() {
                  "I've tried every app out there. RxFit is different because <span className="text-teal-400 font-bold">my coach actually sees the data</span>. When I had a bad sleep week, she adjusted my workouts automatically. That consistency changed everything."
               </p>
               <div className="flex items-center justify-center gap-4">
-                 <div className="w-12 h-12 rounded-full bg-slate-700" /> {/* Avatar Placeholder */}
+                 <div className="w-12 h-12 rounded-full bg-slate-700" />
                  <div className="text-left">
                     <div className="font-bold text-white">Michael R.</div>
                     <div className="text-sm text-slate-500">Software Executive</div>
