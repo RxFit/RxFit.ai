@@ -3,50 +3,51 @@
 
 @plugin "tailwindcss-animate";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   
-  /* RxFit.ai Theme Colors */
-  /* Background: #0F172A (Slate 900) */
-  --color-background: hsl(222 47% 11%); 
-  --color-foreground: hsl(210 40% 98%);
+  /* Biological Asset Management Theme */
+  /* Background: Off-White Paper #F9FAFB */
+  --color-background: hsl(210 20% 98%); 
+  --color-foreground: hsl(220 13% 18%); /* Dark Charcoal */
 
-  --color-card: hsl(222 47% 11% / 0.5);
-  --color-card-foreground: hsl(210 40% 98%);
-  --color-popover: hsl(222 47% 11%);
-  --color-popover-foreground: hsl(210 40% 98%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 13% 18%);
+  
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 13% 18%);
 
-  /* Primary Accent: Teal #2DD4BF */
-  --color-primary: hsl(168 64% 50%);
-  --color-primary-foreground: hsl(222 47.4% 11.2%);
+  /* Primary: Deep Corporate Navy #0F172A */
+  --color-primary: hsl(222 47% 11%);
+  --color-primary-foreground: hsl(210 40% 98%);
 
-  /* Secondary Accent: Coral #FB923C */
-  --color-secondary: hsl(24 95% 61%);
+  /* Secondary Accent: Muted Metallic Gold #C5A065 */
+  --color-secondary: hsl(37 47% 58%);
   --color-secondary-foreground: hsl(222 47.4% 11.2%);
 
-  --color-muted: hsl(217 33% 17%);
-  --color-muted-foreground: hsl(215 20.2% 65.1%);
+  /* Functional: Sage Green (Health) */
+  --color-success: hsl(142 16% 45%);
+  /* Functional: Burnt Orange (Alerts) */
+  --color-warning: hsl(24 95% 50%);
 
-  --color-accent: hsl(217 33% 17%);
-  --color-accent-foreground: hsl(210 40% 98%);
+  --color-muted: hsl(210 40% 96.1%);
+  --color-muted-foreground: hsl(215 16.3% 46.9%); /* Cool Grey */
 
-  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-accent: hsl(210 40% 96.1%);
+  --color-accent-foreground: hsl(222 47.4% 11.2%);
+
+  --color-destructive: hsl(0 84.2% 60.2%);
   --color-destructive-foreground: hsl(210 40% 98%);
 
-  --color-border: hsl(217 33% 17%);
-  --color-input: hsl(217 33% 17%);
-  --color-ring: hsl(168 64% 50%);
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-input: hsl(214.3 31.8% 91.4%);
+  --color-ring: hsl(222 47% 11%);
 
-  --color-chart-1: hsl(220 70% 50%);
-  --color-chart-2: hsl(160 60% 45%);
-  --color-chart-3: hsl(30 80% 55%);
-  --color-chart-4: hsl(280 65% 60%);
-  --color-chart-5: hsl(340 75% 55%);
+  --font-serif: "Libre Baskerville", serif;
+  --font-sans: "Inter", sans-serif;
 }
 
 @layer base {
@@ -55,32 +56,55 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif font-bold text-primary tracking-tight;
   }
 }
 
 @layer utilities {
-  .glass-card {
-    @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-xl;
+  .paper-card {
+    @apply bg-white border border-slate-200 shadow-sm transition-all;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   }
   
-  .glass-card-hover {
-    @apply transition-all duration-300 hover:bg-slate-900/60 hover:border-teal-500/30 hover:shadow-2xl hover:shadow-teal-500/10;
+  .paper-card-hover {
+    @apply hover:shadow-md hover:border-slate-300 transition-shadow duration-300;
   }
 
-  .text-gradient-teal {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-emerald-400;
+  .gold-accent-top {
+    @apply border-t-4 border-t-secondary;
   }
 
-  .text-gradient-coral {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-rose-400;
+  .navy-accent-top {
+    @apply border-t-4 border-t-primary;
+  }
+
+  .text-gold {
+    color: hsl(37 47% 58%);
+  }
+
+  .bg-gold-subtle {
+    background-color: hsl(37 47% 58% / 0.1);
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-900 font-bold hover:shadow-lg hover:shadow-teal-500/20 transition-all hover:scale-105;
+    @apply bg-primary text-primary-foreground font-medium px-6 py-2 rounded-md hover:bg-slate-800 transition-colors shadow-sm;
   }
 
   .btn-secondary {
-    @apply bg-gradient-to-r from-orange-400 to-rose-400 text-slate-900 font-bold hover:shadow-lg hover:shadow-orange-400/20 transition-all hover:scale-105;
+    @apply bg-white text-primary border border-slate-200 font-medium px-6 py-2 rounded-md hover:bg-slate-50 transition-colors shadow-sm;
+  }
+
+  .btn-gold {
+    @apply bg-secondary text-white font-medium px-6 py-2 rounded-md hover:bg-yellow-600 transition-colors shadow-sm;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors text-sm font-medium;
+  }
+  
+  .sidebar-link-active {
+    @apply bg-slate-800 text-white border-l-2 border-secondary;
   }
 }

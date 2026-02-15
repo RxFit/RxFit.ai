@@ -1,0 +1,85 @@
+Task: I need you to design the UI/UX for a web app with a specific "Executive Health" aesthetic. I call this aesthetic "Biological Asset Management." It should feel like a blend of a high-end private banking portal and a medical research dashboard.
+
+Please avoid standard fitness app tropes (neon colors, aggressive fonts, dark mode). Instead, implement a design system based on "Medical-Grade Luxury" using the following pillars:
+
+
+
+1. Color Palette & Backgrounds
+
+The Canvas (Background): A stark, clinical White (#FFFFFF) or a very subtle "Paper" Off-White (#F9FAFB). This must feel clean and sterile but premium.
+
+Primary Brand Color (Authority): A deep, corporate Navy Blue (approx. #1C2B39 or #0F172A). Use this for primary navigation, headers, and active states.
+
+Secondary Accent (Luxury): A muted Metallic Gold/Bronze (approx. #C5A065 or #D4AF37). Use this sparingly for "Premium" badges, progress bars, and high-value data points.
+
+
+
+Functional Accents:
+
+Growth/Health: A calm, natural Sage Green (not neon lime).
+
+Alerts: A sophisticated Burnt Orange (not bright red).
+
+Text Colors:
+
+Headings: Dark Charcoal (#111827).
+
+Body: Cool Grey (#4B5563).
+
+
+
+2. Typography & Text Hierarchy
+
+Headings (The "Harvard Business Review" Look): Use a high-readability, authoritative Serif font for major section headers to give it an editorial feel (Suggested: Merriweather, Playfair Display, or Libre Baskerville).
+
+UI & Data (The "Clinical" Look): Use a clean, Swiss-style Sans-Serif for charts, dashboards, and body text. It needs to be extremely legible at small sizes. (Suggested: Inter, Roboto, or Lato).
+
+Tone: The text sizing should be restrained. Avoid massive "shouting" headers. Think "Executive Summary."
+
+
+
+3. UI Components & Shapes
+
+Card Design: Use a "Paper Card" aesthetic. Pure white cards on the off-white background with a very soft, diffused shadow (box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05)).
+
+Detail: Add a thin (3px) Gold or Navy border strip to the top of key cards ("The Weekly Brief," "Vital Signs") to denote importance.
+
+Data Visualization:
+
+Traffic Lights: Use simple colored dots (Sage, Gold, Grey) to indicate status (e.g., Testosterone levels: Optimal vs. Low).
+
+Sparklines: Simple, thin line charts that look like stock market trends.
+
+Progress Bars: Thin, elegant rounded bars.
+
+Icons: Use thin-line, scientifically accurate icons (e.g., a beaker, a DNA helix, a stopwatch) in Slate Grey or Gold. Avoid "cartoony" filled icons.
+
+
+
+4. Layout & Atmosphere
+
+The "Dashboard" Vibe: The interface should utilize a "Sidebar Layout" (Navy Blue sidebar on the left, white content area on the right).
+
+Information Density: High but organized. The user is an executive who wants to see the "bottom line" quickly. Use tables with clean dividers rather than big colorful buttons.
+
+Executive Summary: Every view should have a "Key Insight" or "Signal" box at the top—a distinct container that summarizes the complex data below into one sentence.
+
+
+
+Summary of "Vibe":
+
+If Bloomberg Terminal and a concierge medical clinic had a baby. It communicates Certainty, Precision, and Exclusivity.
+
+Context for You (Why I chose this):
+
+
+
+"Harvard Business Review" Aesthetic: The deck explicitly asks for a "clean PDF/Executive Email" format with an HBR aesthetic.
+
+
+
+Navy & Gold Palette: The deck consistently uses a deep navy blue for headers and footers, and a gold/bronze color for icons (the heart rate monitor, the stopwatch) and diagrams.
+
+
+
+Clean Data Tables: The deck presents benchmarks (Grip strength, VO2 Max) in clean, simple tables, which informs the data-heavy UI direction.
