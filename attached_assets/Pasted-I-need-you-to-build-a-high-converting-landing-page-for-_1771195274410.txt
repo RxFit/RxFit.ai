@@ -1,0 +1,62 @@
+I need you to build a high-converting landing page for a new HealthTech product called "RxFit.ai". 
+
+**Design Reference:** Please structure the layout, pacing, and "Value Stack" aesthetics exactly like thumbnailcreator.com. It should feel like a modern, high-speed SaaS landing page (clean, dark mode or high-contrast light mode, bold typography, sticky CTA).
+
+**The Core Concept:** RxFit.ai is the homebase for health and wellness. It combines the ease of AI data integration (wearables/apps) with the critical success factor: a REAL human personal trainer/accountability coach.
+
+**Target Audience:** Tech-savvy professionals who have "tried it all" (keto, detox, apps) and failed because of a lack of consistency. They are busy, stressed, and want data-driven results without the mental load.
+
+**Copywriting & Tone (Based on "Better YOU" Psychology):**
+Use a tone that is empathetic but authoritative. 
+- Key Themes: "Consistently good vs. occasionally perfect," "Science of Consistency," and moving from "Frustrated/Tired" to "Energetic/Mindful."
+- The Enemy: Complexity, fad diets, and isolation.
+- The Hero: The user, empowered by AI data and Human guidance.
+
+**Page Structure & Content Requirements:**
+
+1. **Hero Section:**
+   - Headline: "Your AI Health Dashboard. Your Human Accountability Coach. One Platform."
+   - Subheadline: "Stop guessing. RxFit.ai syncs with your devices and connects you to a real human coach to turn your data into daily, consistent action."
+   - CTA Button: "Start Your Free Trial"
+
+2. **The Problem/Agitation (The "Old Way"):**
+   - Highlight the cycle of "Start -> Burnout -> Quit." 
+   - Mention "Information Overload" and "Data without Direction."
+
+3. **The Solution (The "RxFit Way"):**
+   - Feature 1: **Centralized AI Hub:** Integrates with Apple Health, Oura, Garmin, etc.
+   - Feature 2: **Real Human Touch:** Not a chatbot. A dedicated coach who sees your data and adjusts your plan daily.
+   - Feature 3: **Mindfulness & Stress:** We track heart rate variability and stress, not just calories.
+
+4. **The "Value Stack" Pricing Section (Crucial):**
+   Create a pricing table with 3 distinct tiers. Use a "Total Value vs. What You Pay" aesthetic if possible.
+
+   * **Tier 1: The Kickstart (Monthly)**
+       * Price: $49/month
+       * Callout: "7-Day Free Trial"
+       * Includes: AI Dashboard access, Weekly Coach Check-in, Device Sync.
+
+   * **Tier 2: The Committed (Annual) - *Highlight this as Best Value***
+       * Price: $490/year (Paid Upfront)
+       * *The Value Stack Bonuses (List these with checkmarks):*
+           * 2 Months FREE (Save $98)
+           * **BONUS:** $150 Credit for a Garmin Heart Rate Monitor (included)
+           * **BONUS:** Advanced "Better YOU" Anti-Diet Course
+           * **BONUS:** Priority Coach Access
+       * CTA: "Claim Annual Offer"
+
+   * **Tier 3: The Transformation (High Ticket)**
+       * Price: $997 (One-time/VIP)
+       * Features: 1-on-1 Deep Dive, Executive Wellness Audit, Daily Live Coaching interaction.
+       * CTA: "Book a Strategy Call" (Do not allow direct checkout).
+
+5. **Social Proof/Trust:**
+   - Include a section for "Works with" logos (Oura, Garmin, Apple Watch, Strava).
+   - Add testimonials focusing on the keyword "Consistency" and "Accountability."
+
+6. **Tech Stack:**
+   - Use React, Tailwind CSS, and Framer Motion for smooth animations.
+   - Ensure the site is fully mobile-responsive.
+
+**Specific Logic:**
+- For the Annual Plan, make it clear that the Garmin Monitor is a credit they claim after signup (to avoid shipping logistics if they don't want it).
