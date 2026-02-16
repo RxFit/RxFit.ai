@@ -118,36 +118,43 @@ const staggerContainer = {
   }
 };
 
-function SignupModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () => void; plan: string }) {
+function SignupModal({ isOpen, onClose, plan, priceId }: { isOpen: boolean; onClose: () => void; plan: string; priceId: string | null }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async (data: { email: string; name: string; plan: string }) => {
-      const res = await fetch("/api/leads", {
+    mutationFn: async (data: { email: string; name: string; plan: string; priceId: string }) => {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       const json = await res.json();
-      if (!res.ok && res.status !== 200) throw new Error(json.message);
+      if (!res.ok) throw new Error(json.message || "Something went wrong");
       return json;
     },
-    onSuccess: () => {
-      setSuccess(true);
-      setErrorMsg("");
+    onSuccess: (data) => {
+      if (data.url) {
+        setIsRedirecting(true);
+        window.location.href = data.url;
+      }
     },
     onError: (err: Error) => {
       setErrorMsg(err.message);
+      setIsRedirecting(false);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    mutation.mutate({ email, name, plan });
+    if (!priceId) {
+      setErrorMsg("Pricing not loaded yet. Please try again.");
+      return;
+    }
+    mutation.mutate({ email, name, plan, priceId });
   };
 
   const planLabels: Record<string, string> = {
@@ -157,10 +164,10 @@ function SignupModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () =
   };
 
   const handleClose = () => {
-    setSuccess(false);
     setEmail("");
     setName("");
     setErrorMsg("");
+    setIsRedirecting(false);
     onClose();
   };
 
@@ -190,75 +197,63 @@ function SignupModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () =
               <X className="w-5 h-5" />
             </button>
 
-            {success ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 mx-auto mb-4">
-                  <Check className="w-8 h-8" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-2">You're in!</h3>
-                <p className="text-slate-400" data-testid="text-success-message">Check your email for next steps to get started with RxFit.ai.</p>
-                <button
-                  onClick={handleClose}
-                  className="mt-6 btn-primary px-6 py-3 rounded-full text-sm"
-                  data-testid="button-close-success"
-                >
-                  Got it
-                </button>
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-white mb-2">Get Started with RxFit.ai</h3>
+              <p className="text-sm text-slate-400">{planLabels[plan] || plan}</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  data-testid="input-name"
+                />
               </div>
-            ) : (
-              <>
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-white mb-2">Get Started with RxFit.ai</h3>
-                  <p className="text-sm text-slate-400">{planLabels[plan] || plan}</p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@email.com"
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  data-testid="input-email"
+                />
+              </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      data-testid="input-name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      placeholder="you@email.com"
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      data-testid="input-email"
-                    />
-                  </div>
+              {errorMsg && (
+                <p className="text-sm text-red-400" data-testid="text-error">{errorMsg}</p>
+              )}
 
-                  {errorMsg && (
-                    <p className="text-sm text-red-400" data-testid="text-error">{errorMsg}</p>
-                  )}
+              <button
+                type="submit"
+                disabled={mutation.isPending || isRedirecting}
+                className="w-full btn-primary py-4 rounded-xl text-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                data-testid="button-submit-signup"
+              >
+                {mutation.isPending || isRedirecting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {isRedirecting ? "Redirecting to checkout..." : "Processing..."}
+                  </>
+                ) : (
+                  <>
+                    {plan === "transformation" ? "Continue to Payment" : "Start Free Trial"}
+                    <ChevronRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
 
-                  <button
-                    type="submit"
-                    disabled={mutation.isPending}
-                    className="w-full btn-primary py-4 rounded-xl text-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                    data-testid="button-submit-signup"
-                  >
-                    {mutation.isPending ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        {plan === "transformation" ? "Request Strategy Call" : "Start Free Trial"}
-                        <ChevronRight className="w-5 h-5" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
+              <p className="text-xs text-slate-500 text-center">
+                Secure checkout powered by Stripe. Cancel anytime.
+              </p>
+            </form>
           </motion.div>
         </motion.div>
       )}
@@ -271,6 +266,23 @@ export default function LandingPage() {
   const [selectedPlan, setSelectedPlan] = useState("kickstart");
   const [blIndex, setBlIndex] = useState(0);
   const [trIndex, setTrIndex] = useState(0);
+  const [priceIds, setPriceIds] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/stripe/products")
+      .then((res) => res.json())
+      .then((data) => {
+        const ids: Record<string, string> = {};
+        for (const product of data.data || []) {
+          const tier = product.metadata?.tier;
+          if (tier && product.prices?.[0]?.id) {
+            ids[tier] = product.prices[0].id;
+          }
+        }
+        setPriceIds(ids);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const blInterval = setInterval(() => {
@@ -293,7 +305,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
       
-      <SignupModal isOpen={modalOpen} onClose={() => setModalOpen(false)} plan={selectedPlan} />
+      <SignupModal isOpen={modalOpen} onClose={() => setModalOpen(false)} plan={selectedPlan} priceId={priceIds[selectedPlan] || null} />
 
       {/* Sticky Navbar */}
       <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-white/5">

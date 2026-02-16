@@ -5,13 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/LandingPage";
+import SuccessPage from "@/pages/SuccessPage";
 
 function Router() {
   return (
     <Switch>
-      {/* Route to Landing Page */}
       <Route path="/" component={LandingPage} />
-      {/* Fallback to 404 */}
+      <Route path="/success" component={SuccessPage} />
       <Route component={NotFound} />
     </Switch>
   );

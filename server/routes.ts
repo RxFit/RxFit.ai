@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -36,6 +39,149 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching leads:", error);
       return res.status(500).json({ message: "Something went wrong." });
+    }
+  });
+
+  app.get("/api/stripe/publishable-key", async (_req, res) => {
+    try {
+      const key = await getStripePublishableKey();
+      return res.json({ publishableKey: key });
+    } catch (error) {
+      console.error("Error getting publishable key:", error);
+      return res.status(500).json({ message: "Failed to get Stripe config." });
+    }
+  });
+
+  app.get("/api/stripe/products", async (_req, res) => {
+    try {
+      let productsData: any[] = [];
+
+      const result = await db.execute(
+        sql`
+          SELECT 
+            p.id as product_id,
+            p.name as product_name,
+            p.description as product_description,
+            p.metadata as product_metadata,
+            pr.id as price_id,
+            pr.unit_amount,
+            pr.currency,
+            pr.recurring,
+            pr.metadata as price_metadata
+          FROM stripe.products p
+          LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+          WHERE p.active = true
+          ORDER BY pr.unit_amount ASC
+        `
+      );
+
+      if (result.rows.length > 0) {
+        const productsMap = new Map();
+        for (const row of result.rows) {
+          const r = row as any;
+          if (!productsMap.has(r.product_id)) {
+            productsMap.set(r.product_id, {
+              id: r.product_id,
+              name: r.product_name,
+              description: r.product_description,
+              metadata: r.product_metadata,
+              prices: [],
+            });
+          }
+          if (r.price_id) {
+            productsMap.get(r.product_id).prices.push({
+              id: r.price_id,
+              unit_amount: r.unit_amount,
+              currency: r.currency,
+              recurring: r.recurring,
+              metadata: r.price_metadata,
+            });
+          }
+        }
+        productsData = Array.from(productsMap.values());
+      } else {
+        const stripe = await getUncachableStripeClient();
+        const products = await stripe.products.list({ active: true, limit: 10 });
+        for (const product of products.data) {
+          const prices = await stripe.prices.list({ product: product.id, active: true });
+          productsData.push({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            metadata: product.metadata,
+            prices: prices.data.map(p => ({
+              id: p.id,
+              unit_amount: p.unit_amount,
+              currency: p.currency,
+              recurring: p.recurring,
+              metadata: p.metadata,
+            })),
+          });
+        }
+      }
+
+      return res.json({ data: productsData });
+    } catch (error) {
+      console.error("Error listing products:", error);
+      return res.status(500).json({ message: "Failed to list products." });
+    }
+  });
+
+  app.post("/api/stripe/checkout", async (req, res) => {
+    try {
+      const { priceId, email, name, plan } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ message: "Price ID is required." });
+      }
+
+      const existing = await storage.getLeadByEmail(email);
+      if (!existing && email) {
+        try {
+          await storage.createLead({ email, name: name || undefined, plan: plan || 'kickstart' });
+        } catch (e) {
+        }
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const priceObj = await stripe.prices.retrieve(priceId);
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      const sessionParams: any = {
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/#pricing`,
+        allow_promotion_codes: true,
+      };
+      sessionParams.mode = priceObj.recurring ? 'subscription' : 'payment';
+
+      if (email) {
+        sessionParams.customer_email = email;
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
+
+      return res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      return res.status(500).json({ message: "Failed to create checkout session." });
+    }
+  });
+
+  app.get("/api/stripe/session/:sessionId", async (req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+      return res.json({
+        status: session.status,
+        customer_email: session.customer_details?.email,
+        payment_status: session.payment_status,
+      });
+    } catch (error) {
+      console.error("Error retrieving session:", error);
+      return res.status(500).json({ message: "Failed to retrieve session." });
     }
   });
 
