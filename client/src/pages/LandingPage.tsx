@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { 
@@ -9,6 +9,10 @@ import {
   Heart, 
   LayoutDashboard, 
   MessageSquare, 
+  Moon,
+  Dumbbell,
+  Flame,
+  TrendingUp,
   Users, 
   Zap,
   X,
@@ -16,6 +20,90 @@ import {
 } from "lucide-react";
 
 import heroDashboardImg from "../assets/hero-dashboard.png";
+
+const bottomLeftNotifications = [
+  {
+    id: "recovery",
+    icon: Activity,
+    iconBg: "bg-orange-500/20",
+    iconColor: "text-orange-400",
+    label: "Recovery Score",
+    value: "92%",
+    badge: "↑ 4%",
+    badgeColor: "text-emerald-400",
+  },
+  {
+    id: "sleep",
+    icon: Moon,
+    iconBg: "bg-indigo-500/20",
+    iconColor: "text-indigo-400",
+    label: "Sleep Analysis",
+    value: "7.8 hrs",
+    badge: "94% quality",
+    badgeColor: "text-indigo-300",
+  },
+  {
+    id: "workout",
+    icon: Dumbbell,
+    iconBg: "bg-teal-500/20",
+    iconColor: "text-teal-400",
+    label: "Today's Workout",
+    value: "Upper Body Push",
+    badge: "Adjusted",
+    badgeColor: "text-teal-300",
+  },
+  {
+    id: "resting-hr",
+    icon: Heart,
+    iconBg: "bg-rose-500/20",
+    iconColor: "text-rose-400",
+    label: "Resting HR",
+    value: "58 bpm",
+    badge: "↓ 3 bpm",
+    badgeColor: "text-emerald-400",
+  },
+];
+
+const topRightNotifications = [
+  {
+    id: "coach-sleep",
+    icon: MessageSquare,
+    iconBg: "bg-teal-500/20",
+    iconColor: "text-teal-400",
+    label: "Coach Sarah",
+    value: '"Great sleep data! Let\'s push..."',
+    isText: true,
+  },
+  {
+    id: "calories",
+    icon: Flame,
+    iconBg: "bg-red-500/20",
+    iconColor: "text-red-400",
+    label: "Daily Calories",
+    value: "2,140 kcal",
+    badge: "On target",
+    badgeColor: "text-emerald-400",
+  },
+  {
+    id: "coach-hrv",
+    icon: MessageSquare,
+    iconBg: "bg-orange-500/20",
+    iconColor: "text-orange-400",
+    label: "Coach Sarah",
+    value: '"HRV is up — time to go heavy!"',
+    isText: true,
+  },
+  {
+    id: "trend",
+    icon: TrendingUp,
+    iconBg: "bg-emerald-500/20",
+    iconColor: "text-emerald-400",
+    label: "Weekly Trend",
+    value: "Consistency: 96%",
+    badge: "Personal best",
+    badgeColor: "text-amber-400",
+  },
+];
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -181,6 +269,21 @@ function SignupModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () =
 export default function LandingPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("kickstart");
+  const [blIndex, setBlIndex] = useState(0);
+  const [trIndex, setTrIndex] = useState(0);
+
+  useEffect(() => {
+    const blInterval = setInterval(() => {
+      setBlIndex((prev) => (prev + 1) % bottomLeftNotifications.length);
+    }, 3500);
+    const trInterval = setInterval(() => {
+      setTrIndex((prev) => (prev + 1) % topRightNotifications.length);
+    }, 4200);
+    return () => { clearInterval(blInterval); clearInterval(trInterval); };
+  }, []);
+
+  const currentBottomLeft = bottomLeftNotifications[blIndex];
+  const currentTopRight = topRightNotifications[trIndex];
 
   const openSignup = (plan: string) => {
     setSelectedPlan(plan);
@@ -267,24 +370,56 @@ export default function LandingPage() {
                    className="w-full h-auto object-cover opacity-90 group-hover:scale-105 transition-transform duration-700"
                  />
                  
-                 <div className="absolute bottom-10 left-10 z-20 glass-card p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
-                    <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400">
-                      <Activity className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-400">Recovery Score</div>
-                      <div className="text-lg font-bold text-white" data-testid="text-recovery-score">92% <span className="text-xs font-normal text-emerald-400">↑ 4%</span></div>
-                    </div>
+                 <div className="absolute bottom-6 left-6 md:bottom-10 md:left-10 z-20">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={`bl-${currentBottomLeft.id}`}
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.5 }}
+                        className="glass-card p-4 rounded-lg flex items-center gap-3"
+                      >
+                        <div className={`w-10 h-10 rounded-full ${currentBottomLeft.iconBg} flex items-center justify-center ${currentBottomLeft.iconColor}`}>
+                          <currentBottomLeft.icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">{currentBottomLeft.label}</div>
+                          <div className="text-lg font-bold text-white" data-testid="text-hero-notif-bl">
+                            {currentBottomLeft.value}
+                            {currentBottomLeft.badge && <span className={`text-xs font-normal ${currentBottomLeft.badgeColor} ml-1`}>{currentBottomLeft.badge}</span>}
+                          </div>
+                        </div>
+                      </motion.div>
+                    </AnimatePresence>
                  </div>
 
-                 <div className="absolute top-10 right-10 z-20 glass-card p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-1000 delay-500">
-                    <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-400">Coach Sarah</div>
-                      <div className="text-sm font-bold text-white">"Great sleep data! Let's push..."</div>
-                    </div>
+                 <div className="absolute top-6 right-6 md:top-10 md:right-10 z-20">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={`tr-${currentTopRight.id}`}
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.5 }}
+                        className="glass-card p-4 rounded-lg flex items-center gap-3"
+                      >
+                        <div className={`w-10 h-10 rounded-full ${currentTopRight.iconBg} flex items-center justify-center ${currentTopRight.iconColor}`}>
+                          <currentTopRight.icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">{currentTopRight.label}</div>
+                          {currentTopRight.isText ? (
+                            <div className="text-sm font-bold text-white max-w-[200px]">{currentTopRight.value}</div>
+                          ) : (
+                            <div className="text-lg font-bold text-white" data-testid="text-hero-notif-tr">
+                              {currentTopRight.value}
+                              {currentTopRight.badge && <span className={`text-xs font-normal ${currentTopRight.badgeColor} ml-1`}>{currentTopRight.badge}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </AnimatePresence>
                  </div>
                </div>
             </motion.div>
