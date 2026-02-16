@@ -372,9 +372,7 @@ export default function LandingPage() {
                   </div>
                   <div className="flex-1 relative">
                      <div className="glass-card p-1 rounded-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <div className="bg-slate-900/80 rounded-xl p-8 h-64 flex items-center justify-center border border-white/5">
-                           <span className="text-slate-600 font-mono">AI Visualization Placeholder</span>
-                        </div>
+                        <img src="/ai-visualization.jpeg" alt="AI Health Data Visualization" className="rounded-xl w-full h-auto object-cover border border-white/5" />
                      </div>
                   </div>
                </div>
