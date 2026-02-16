@@ -301,7 +301,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
              <span className="text-xl font-bold text-white">OURA</span>
              <span className="text-xl font-bold text-white">GARMIN</span>
-             <span className="text-xl font-bold text-white">WHOOP</span>
+             <span className="text-xl font-bold text-white">SnapCalorie</span>
              <span className="text-xl font-bold text-white">Apple Health</span>
              <span className="text-xl font-bold text-white">STRAVA</span>
           </div>
