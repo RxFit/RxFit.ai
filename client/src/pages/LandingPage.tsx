@@ -486,7 +486,7 @@ export default function LandingPage() {
                            <div className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-3">Included Bonuses</div>
                            <ul className="space-y-3">
                               <li className="flex items-start gap-3 text-white text-sm font-medium">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> $150 Credit for Garmin HRM
+                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> $150 Value for Garmin HRM
                               </li>
                               <li className="flex items-start gap-3 text-white text-sm font-medium">
                                  <Check className="w-5 h-5 text-orange-400 shrink-0" /> "Better YOU" Anti-Diet Course
