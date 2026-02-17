@@ -6,6 +6,8 @@ import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
+import { sendLeadEmail, sendWelcomeEmail } from "./emailService";
+import { appendLeadToSheet } from "./sheetsService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -22,6 +24,16 @@ export async function registerRoutes(
       }
 
       const lead = await storage.createLead(parsed);
+
+      sendLeadEmail(parsed.email, parsed.name || '').catch(() => {});
+      appendLeadToSheet({
+        email: parsed.email,
+        name: parsed.name || undefined,
+        plan: parsed.plan || undefined,
+        source: 'lead_capture',
+        status: 'lead',
+      }).catch(() => {});
+
       return res.status(201).json({ message: "You're in! Check your email for next steps.", lead });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -173,10 +185,30 @@ export async function registerRoutes(
   app.get("/api/stripe/session/:sessionId", async (req, res) => {
     try {
       const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId, {
+        expand: ['line_items', 'line_items.data.price.product'],
+      });
+
+      const email = session.customer_details?.email || '';
+      const customerName = session.customer_details?.name || '';
+      const lineItem = session.line_items?.data?.[0];
+      const product = lineItem?.price?.product as any;
+      const planName = product?.name || 'RxFit.ai';
+
+      if (session.payment_status === 'paid' || session.status === 'complete') {
+        sendWelcomeEmail(email, customerName, planName).catch(() => {});
+        appendLeadToSheet({
+          email,
+          name: customerName,
+          plan: planName,
+          source: 'stripe_checkout',
+          status: 'paid',
+        }).catch(() => {});
+      }
+
       return res.json({
         status: session.status,
-        customer_email: session.customer_details?.email,
+        customer_email: email,
         payment_status: session.payment_status,
       });
     } catch (error) {
