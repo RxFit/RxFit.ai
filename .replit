@@ -43,3 +43,8 @@ waitForPort = 5000
 stack = "MOCKUP_JS"
 mockupState = "FULLSTACK"
 integrations = ["stripe:2.0.0", "google-mail:1.0.0", "google-sheet:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+LEADS_SPREADSHEET_ID = "1vkqBUAVduvLvUGehEG0LhhTdhA9SNKwuWIsMnaJsoCA"

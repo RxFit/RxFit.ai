@@ -195,7 +195,7 @@ export async function registerRoutes(
       const product = lineItem?.price?.product as any;
       const planName = product?.name || 'RxFit.ai';
 
-      if (session.payment_status === 'paid' || session.status === 'complete') {
+      if ((session.payment_status === 'paid' || session.status === 'complete') && email) {
         sendWelcomeEmail(email, customerName, planName).catch(() => {});
         appendLeadToSheet({
           email,

@@ -1,26 +1,28 @@
 import { getUncachableGoogleSheetClient } from './sheetsClient';
 
 const SPREADSHEET_ID = process.env.LEADS_SPREADSHEET_ID;
+const SHEET_NAME = 'RxFit Leads';
 
-async function ensureHeaderRow(sheets: any, spreadsheetId: string): Promise<void> {
-  try {
-    const response = await sheets.spreadsheets.values.get({
+async function ensureSheet(sheets: any, spreadsheetId: string): Promise<void> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheetNames = meta.data.sheets?.map((s: any) => s.properties?.title) || [];
+
+  if (!sheetNames.includes(SHEET_NAME)) {
+    await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
-      range: 'Sheet1!A1:F1',
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: SHEET_NAME } } }],
+      },
     });
 
-    if (!response.data.values || response.data.values.length === 0) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: 'Sheet1!A1:F1',
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [['Date', 'Email', 'Name', 'Plan', 'Source', 'Status']],
-        },
-      });
-    }
-  } catch (error) {
-    console.error('Error ensuring header row:', error);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${SHEET_NAME}'!A1:F1`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['Date', 'Email', 'Name', 'Plan', 'Source', 'Status']],
+      },
+    });
   }
 }
 
@@ -39,12 +41,12 @@ export async function appendLeadToSheet(data: {
   try {
     const sheets = await getUncachableGoogleSheetClient();
 
-    await ensureHeaderRow(sheets, SPREADSHEET_ID);
+    await ensureSheet(sheets, SPREADSHEET_ID);
 
     const now = new Date().toISOString();
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A:F',
+      range: `'${SHEET_NAME}'!A:F`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {

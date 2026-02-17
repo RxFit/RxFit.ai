@@ -14,13 +14,17 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `client/src/pages/SuccessPage.tsx` — Post-payment success page with link to app.rxfit.ai
 - `client/src/index.css` — Design system (dark mode SaaS theme with glassmorphism utilities)
 - `shared/schema.ts` — Database schema (users, leads tables)
-- `server/routes.ts` — API routes (leads, Stripe checkout, products, session retrieval)
+- `server/routes.ts` — API routes (leads, Stripe checkout, products, session retrieval, email+sheets triggers)
 - `server/storage.ts` — Database storage interface using Drizzle ORM
-- `server/db.ts` — PostgreSQL connection pool
+- `server/db.ts` — PostgreSQL connection pool (with SSL for production)
 - `server/stripeClient.ts` — Stripe client with Replit connector credentials
 - `server/webhookHandlers.ts` — Stripe webhook processing via stripe-replit-sync
 - `server/seed-products.ts` — Script to create Stripe products/prices (run manually)
-- `server/index.ts` — Express server with Stripe init, webhook route (before express.json), and app startup
+- `server/index.ts` — Express server with Stripe init (graceful failure), webhook route (before express.json), and app startup
+- `server/gmailClient.ts` — Gmail API client via Replit connector
+- `server/emailService.ts` — Automated email service (welcome email after payment, lead nurture email on signup)
+- `server/sheetsClient.ts` — Google Sheets API client via Replit connector
+- `server/sheetsService.ts` — Auto-sync leads to Google Sheets ("RxFit Leads" tab)
 
 ## Stripe Integration
 - **Products:** Kickstart ($49/mo with 7-day trial), Committed ($490/yr), Transformation ($997/yr)
@@ -29,12 +33,19 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **Checkout flow:** Modal collects email/name → creates Stripe Checkout session → redirects to Stripe → returns to /success page
 - **Seed script:** `npx tsx server/seed-products.ts` to create products in Stripe
 
+## Email & Sheets Integrations
+- **Gmail:** Sends branded welcome emails after Stripe checkout and lead signup emails on form submission
+- **Google Sheets:** Auto-syncs all leads to "RxFit Leads" tab in configured spreadsheet (LEADS_SPREADSHEET_ID env var)
+- **Spreadsheet columns:** Date, Email, Name, Plan, Source (lead_capture/stripe_checkout), Status (lead/paid)
+
 ## Key Features
 - Hero section with animated dashboard mockup and rotating notification cards
 - Problem/Agitation section highlighting pain points
 - Solution features section (AI Hub, Human Coach)
 - 3-tier Value Stack pricing with Stripe Checkout
 - Lead capture (saved to PostgreSQL alongside Stripe checkout)
+- Automated welcome emails via Gmail after signup/payment
+- Lead auto-sync to Google Sheets
 - Success page with next steps and link to app.rxfit.ai
 - Testimonial section
 - Mobile responsive
