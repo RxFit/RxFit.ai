@@ -18,7 +18,8 @@ declare module "http" {
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL environment variable is required for Stripe integration.');
+    console.warn('DATABASE_URL not set — skipping Stripe initialization.');
+    return;
   }
 
   try {
@@ -41,7 +42,7 @@ async function initStripe() {
       .catch((err: any) => console.error('Error syncing Stripe data:', err));
   } catch (error) {
     console.error('Failed to initialize Stripe:', error);
-    throw error;
+    console.warn('App will continue running without Stripe integration.');
   }
 }
 

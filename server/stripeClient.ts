@@ -71,6 +71,7 @@ export async function getStripeSync() {
       poolConfig: {
         connectionString: process.env.DATABASE_URL!,
         max: 2,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
       },
       stripeSecretKey: secretKey,
     });
