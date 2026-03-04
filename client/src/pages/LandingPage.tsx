@@ -630,7 +630,7 @@ export default function LandingPage() {
                                  <Check className="w-5 h-5 text-orange-400 shrink-0" /> $150 Value for Garmin HRM
                               </li>
                               <li className="flex items-start gap-3 text-white text-sm font-medium">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Live Nutritional Audit w/ Licensed Nutritionist
+                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Live Audit w/ Licensed Nutritionist
                               </li>
                            </ul>
                         </div>
