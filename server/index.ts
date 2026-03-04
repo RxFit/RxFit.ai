@@ -92,6 +92,20 @@ export function log(message: string, source = "express") {
   );
   app.use(express.urlencoded({ extended: false }));
 
+  app.use('/api/stripe/customer-portal', (req, res, next) => {
+    const allowedOrigins = ['https://app.rxfit.ai', 'https://rxfit.ai'];
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
   app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;

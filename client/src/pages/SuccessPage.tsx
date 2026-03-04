@@ -5,6 +5,7 @@ import { Check, Loader2, ExternalLink } from "lucide-react";
 export default function SuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [email, setEmail] = useState("");
+  const [customerId, setCustomerId] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -19,6 +20,7 @@ export default function SuccessPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.customer_email) setEmail(data.customer_email);
+        if (data.customer_id) setCustomerId(data.customer_id);
         setStatus("success");
       })
       .catch(() => {
@@ -78,7 +80,7 @@ export default function SuccessPage() {
 
             <div className="flex flex-col gap-3">
               <a
-                href="https://app.rxfit.ai"
+                href={customerId ? `https://app.rxfit.ai?cid=${customerId}` : "https://app.rxfit.ai"}
                 className="btn-primary w-full py-4 rounded-xl text-lg flex items-center justify-center gap-2"
                 data-testid="link-go-to-app"
               >

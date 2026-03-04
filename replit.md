@@ -31,6 +31,8 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **Webhook:** Registered before express.json middleware, processes via stripe-replit-sync
 - **Products API:** Falls back to Stripe API if DB sync hasn't populated yet
 - **Checkout flow:** Modal collects email/name → creates Stripe Checkout session → redirects to Stripe → returns to /success page
+- **Customer Portal:** POST `/api/stripe/customer-portal` accepts `customerId` or `email`, creates a Stripe Billing Portal session, returns portal URL. CORS enabled for app.rxfit.ai.
+- **Cross-domain billing:** Success page passes Stripe customer ID (`cid` query param) to app.rxfit.ai for seamless subscription management
 - **Seed script:** `npx tsx server/seed-products.ts` to create products in Stripe
 
 ## Email & Sheets Integrations

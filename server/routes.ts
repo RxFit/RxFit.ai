@@ -191,6 +191,7 @@ export async function registerRoutes(
 
       const email = session.customer_details?.email || '';
       const customerName = session.customer_details?.name || '';
+      const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || '';
       const lineItem = session.line_items?.data?.[0];
       const product = lineItem?.price?.product as any;
       const planName = product?.name || 'RxFit.ai';
@@ -209,11 +210,42 @@ export async function registerRoutes(
       return res.json({
         status: session.status,
         customer_email: email,
+        customer_id: customerId,
         payment_status: session.payment_status,
       });
     } catch (error) {
       console.error("Error retrieving session:", error);
       return res.status(500).json({ message: "Failed to retrieve session." });
+    }
+  });
+
+  app.post("/api/stripe/customer-portal", async (req, res) => {
+    try {
+      const { customerId, email } = req.body;
+      const stripe = await getUncachableStripeClient();
+
+      let resolvedCustomerId = customerId;
+
+      if (!resolvedCustomerId && email) {
+        const customers = await stripe.customers.list({ email, limit: 1 });
+        if (customers.data.length > 0) {
+          resolvedCustomerId = customers.data[0].id;
+        }
+      }
+
+      if (!resolvedCustomerId) {
+        return res.status(400).json({ message: "No customer found. Please provide a valid customer ID or email." });
+      }
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: resolvedCustomerId,
+        return_url: 'https://app.rxfit.ai',
+      });
+
+      return res.json({ url: portalSession.url });
+    } catch (error: any) {
+      console.error("Error creating portal session:", error);
+      return res.status(500).json({ message: "Failed to create billing portal session." });
     }
   });
 
