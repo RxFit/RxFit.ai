@@ -266,7 +266,13 @@ export default function LandingPage() {
   const [selectedPlan, setSelectedPlan] = useState("kickstart");
   const [blIndex, setBlIndex] = useState(0);
   const [trIndex, setTrIndex] = useState(0);
-  const [priceIds, setPriceIds] = useState<Record<string, string>>({});
+  const livePriceIds: Record<string, string> = {
+    kickstart: 'price_1T7lQpFrMqe8QyNbg0YZhqdH',
+    committed: 'price_1T7lWpFrMqe8QyNb3RPDirxj',
+    transformation: 'price_1T7lZ0FrMqe8QyNbUyIUTH0C',
+  };
+
+  const [priceIds, setPriceIds] = useState<Record<string, string>>(livePriceIds);
 
   useEffect(() => {
     fetch("/api/stripe/products")
@@ -279,7 +285,9 @@ export default function LandingPage() {
             ids[tier] = product.prices[0].id;
           }
         }
-        setPriceIds(ids);
+        if (Object.keys(ids).length > 0) {
+          setPriceIds(ids);
+        }
       })
       .catch(() => {});
   }, []);
