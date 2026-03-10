@@ -1,11 +1,4 @@
-t session:", error);/conole.tail -n 50 server/routes.ts
-  grep -n "return httpServer;" server/routes.ts
-    LINE=$(grep -n "return httpServer;" server/routes.ts | head -n 1 | cut -d: -f1)
-head -n $((LINE-1)) server/routes.ts > routes.ts.fix
-  cat /tmp/diag_patch.ts >> routes.ts.fix
-    tail -n +$LINE server/routes.ts | sed '/\/\/ Diagnostic endpoint/,$d' >> routes.ts.fix
-      mv routes.ts.fix server/routes.ts
-        import type { Express } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
