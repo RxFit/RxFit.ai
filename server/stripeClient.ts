@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-let connectionSettings: any;
+let connectionSettings: any;live
 
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
