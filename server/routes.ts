@@ -1,4 +1,4 @@
-tail -n 50 server/routes.ts
+t session:", error);/conole.tail -n 50 server/routes.ts
   grep -n "return httpServer;" server/routes.ts
     LINE=$(grep -n "return httpServer;" server/routes.ts | head -n 1 | cut -d: -f1)
 head -n $((LINE-1)) server/routes.ts > routes.ts.fix
@@ -184,7 +184,7 @@ export async function registerRoutes(
 
       return res.json({ url: session.url });
     } catch (error: any) {
-      console.error("Error creating checkout session:", error);
+      console.error("Error creating checkout session:", { priceId: req.body.priceId, error: error.message, code: error.code, type: error.type });
       return res.status(500).json({ message: "Failed to create checkout session." });
     }
   });
@@ -256,5 +256,28 @@ export async function registerRoutes(
     }
   });
 
+
+  // Diagnostic: check Stripe prices and connection mode
+  app.get("/api/diag/stripe-prices", async (_req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const prices = await stripe.prices.list({ active: true, limit: 100 });
+      const products = await stripe.products.list({ active: true, limit: 100 });
+      const priceDetails = prices.data.map((p: any) => ({
+        id: p.id, product: p.product, unit_amount: p.unit_amount,
+        currency: p.currency, type: p.type, recurring: p.recurring, livemode: p.livemode,
+      }));
+      const productDetails = products.data.map((pr: any) => ({
+        id: pr.id, name: pr.name, livemode: pr.livemode,
+      }));
+      res.json({
+        timestamp: new Date().toISOString(),
+        livemode: prices.data[0]?.livemode ?? 'no prices found',
+        prices: priceDetails, products: productDetails,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   return httpServer;
 }
