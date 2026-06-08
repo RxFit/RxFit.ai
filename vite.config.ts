@@ -1,12 +1,32 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import mdx from "@mdx-js/rollup";
+import remarkGfm from "remark-gfm";
+import remarkFrontmatter from "remark-frontmatter";
+import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+import { remarkBlogMeta } from "./remark-blog-meta";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
 
 export default defineConfig({
   plugins: [
+    { enforce: "pre", ...mdx({
+      remarkPlugins: [
+        remarkGfm,
+        remarkFrontmatter,
+        [remarkMdxFrontmatter, { name: "frontmatter" }],
+        remarkBlogMeta,
+      ],
+      rehypePlugins: [
+        rehypeSlug,
+        [rehypeAutolinkHeadings, { behavior: "wrap" }],
+      ],
+      providerImportSource: "@mdx-js/react",
+    }) },
     react(),
     runtimeErrorOverlay(),
     tailwindcss(),

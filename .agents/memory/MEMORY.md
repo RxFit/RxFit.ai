@@ -1,0 +1,1 @@
+- [MDX ?raw glob is unusable](mdx-raw-glob.md) — @mdx-js/rollup strips the query & compiles; derive reading-time/TOC via a remark plugin instead.

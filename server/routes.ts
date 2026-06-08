@@ -8,6 +8,9 @@ import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { sendLeadEmail, sendWelcomeEmail } from "./emailService";
 import { appendLeadToSheet } from "./sheetsService";
+import fs from "fs";
+import path from "path";
+import matter from "gray-matter";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -141,7 +144,7 @@ export async function registerRoutes(
 
   app.post("/api/stripe/checkout", async (req, res) => {
     try {
-      const { priceId, email, name, plan } = req.body;
+      const { priceId, email, name, plan, clientReferenceId } = req.body;
 
       if (!priceId) {
         return res.status(400).json({ message: "Price ID is required." });
@@ -171,6 +174,10 @@ export async function registerRoutes(
 
       if (email) {
         sessionParams.customer_email = email;
+      }
+
+      if (clientReferenceId && typeof clientReferenceId === 'string') {
+        sessionParams.client_reference_id = clientReferenceId.slice(0, 200);
       }
 
       const session = await stripe.checkout.sessions.create(sessionParams);
@@ -272,5 +279,92 @@ export async function registerRoutes(
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ---- SEO / AEO crawlable endpoints ----
+
+  type BlogMeta = { slug: string; date: string };
+  let postsCache: { data: BlogMeta[]; expires: number } | null = null;
+
+  const readBlogPosts = (): BlogMeta[] => {
+    if (postsCache && postsCache.expires > Date.now()) {
+      return postsCache.data;
+    }
+    const dir = path.resolve(process.cwd(), "content", "blog");
+    let data: BlogMeta[] = [];
+    try {
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith(".mdx"));
+      data = files
+        .map((file) => {
+          const raw = fs.readFileSync(path.join(dir, file), "utf-8");
+          const fm = matter(raw).data as Record<string, any>;
+          const slug = fm.slug || file.replace(/\.mdx$/, "");
+          return { slug, date: fm.date || new Date().toISOString().slice(0, 10) };
+        })
+        .filter((p) => !p.slug.startsWith("_"));
+    } catch (err) {
+      console.error("Error reading blog posts for sitemap:", err);
+    }
+    postsCache = { data, expires: Date.now() + 5 * 60 * 1000 };
+    return data;
+  };
+
+  const getBaseUrl = (req: any) => {
+    const host = req.get("host") || "rxfit.ai";
+    const proto = host.includes("localhost") ? "http" : "https";
+    return `${proto}://${host}`;
+  };
+
+  app.get("/sitemap.xml", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const today = new Date().toISOString().slice(0, 10);
+    const staticUrls = [
+      { loc: "/", lastmod: today, priority: "1.0" },
+      { loc: "/blog", lastmod: today, priority: "0.8" },
+    ];
+    const postUrls = readBlogPosts().map((p) => ({
+      loc: `/blog/${p.slug}`,
+      lastmod: new Date(p.date).toISOString().slice(0, 10),
+      priority: "0.7",
+    }));
+    const urls = [...staticUrls, ...postUrls]
+      .map(
+        (u) =>
+          `  <url>\n    <loc>${baseUrl}${u.loc}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`,
+      )
+      .join("\n");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+    res.header("Content-Type", "application/xml");
+    res.send(xml);
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const body = `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /success
+
+# Explicitly welcome AI crawlers so our content can be cited (AEO/GEO)
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: ${baseUrl}/sitemap.xml
+`;
+    res.header("Content-Type", "text/plain");
+    res.send(body);
+  });
+
   return httpServer;
 }

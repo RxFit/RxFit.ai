@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "S4eKaq5mas-ybVvyre0hr"
+uri = "file://client/public/blog/ai-coach-vs-personal-trainer/hero.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "DiNBwqsZz9P2SjZ94Rdrt"
+uri = "file://client/public/blog/how-to-read-your-hrv/hero.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "aijkaM9fk3rxkXGMEH4dU"
+uri = "file://client/public/blog/accountability-gap-fitness-apps/hero.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "g2JWopJFaCGnuZ_37CVvj"
+uri = "file://client/public/blog/authors/mara-ellison.png"
+type = "image"
+title = "generated_image"

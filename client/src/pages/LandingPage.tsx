@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMutation } from "@tanstack/react-query";
 import { 
   Activity, 
   Brain, 
@@ -14,12 +13,12 @@ import {
   Flame,
   TrendingUp,
   Users, 
-  Zap,
-  X,
-  Loader2
+  Zap
 } from "lucide-react";
 
 import heroDashboardImg from "../assets/hero-dashboard.png";
+import { useSignupModal } from "@/components/SignupModalProvider";
+import SiteFooter from "@/components/SiteFooter";
 
 const bottomLeftNotifications = [
   {
@@ -118,179 +117,10 @@ const staggerContainer = {
   }
 };
 
-function SignupModal({ isOpen, onClose, plan, priceId }: { isOpen: boolean; onClose: () => void; plan: string; priceId: string | null }) {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [isRedirecting, setIsRedirecting] = useState(false);
-
-  const mutation = useMutation({
-    mutationFn: async (data: { email: string; name: string; plan: string; priceId: string }) => {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Something went wrong");
-      return json;
-    },
-    onSuccess: (data) => {
-      if (data.url) {
-        setIsRedirecting(true);
-        window.location.href = data.url;
-      }
-    },
-    onError: (err: Error) => {
-      setErrorMsg(err.message);
-      setIsRedirecting(false);
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("");
-    if (!priceId) {
-      setErrorMsg("Pricing not loaded yet. Please try again.");
-      return;
-    }
-    mutation.mutate({ email, name, plan, priceId });
-  };
-
-  const planLabels: Record<string, string> = {
-    kickstart: "The Kickstart — 7-Day Free Trial",
-    committed: "The Committed — Annual Plan",
-    transformation: "The Transformation — VIP Access",
-  };
-
-  const handleClose = () => {
-    setEmail("");
-    setName("");
-    setErrorMsg("");
-    setIsRedirecting(false);
-    onClose();
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={handleClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="glass-card rounded-2xl p-8 w-full max-w-md relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={handleClose}
-              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-white transition-colors"
-              data-testid="button-close-modal"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold text-white mb-2">Get Started with RxFit.ai</h3>
-              <p className="text-sm text-slate-400">{planLabels[plan] || plan}</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  data-testid="input-name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@email.com"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  data-testid="input-email"
-                />
-              </div>
-
-              {errorMsg && (
-                <p className="text-sm text-red-400" data-testid="text-error">{errorMsg}</p>
-              )}
-
-              <button
-                type="submit"
-                disabled={mutation.isPending || isRedirecting}
-                className="w-full btn-primary py-4 rounded-xl text-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                data-testid="button-submit-signup"
-              >
-                {mutation.isPending || isRedirecting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    {isRedirecting ? "Redirecting to checkout..." : "Processing..."}
-                  </>
-                ) : (
-                  <>
-                    {plan === "transformation" ? "Continue to Payment" : "Start Free Trial"}
-                    <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-
-              <p className="text-xs text-slate-500 text-center">
-                Secure checkout powered by Stripe. Cancel anytime.
-              </p>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
 export default function LandingPage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState("kickstart");
+  const { open: openSignup } = useSignupModal();
   const [blIndex, setBlIndex] = useState(0);
   const [trIndex, setTrIndex] = useState(0);
-  const livePriceIds: Record<string, string> = {
-    kickstart: 'price_1T7lQpFrMqe8QyNbg0YZhqdH',
-    committed: 'price_1T7lWpFrMqe8QyNb3RPDirxj',
-    transformation: 'price_1T7lZ0FrMqe8QyNbUyIUTH0C',
-  };
-
-  const [priceIds, setPriceIds] = useState<Record<string, string>>(livePriceIds);
-
-  useEffect(() => {
-    fetch("/api/stripe/products")
-      .then((res) => res.json())
-      .then((data) => {
-        const ids: Record<string, string> = {};
-        for (const product of data.data || []) {
-          const tier = product.metadata?.tier;
-          if (tier && product.prices?.[0]?.id) {
-            ids[tier] = product.prices[0].id;
-          }
-        }
-        if (Object.keys(ids).length > 0) {
-          setPriceIds(ids);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const blInterval = setInterval(() => {
@@ -305,35 +135,39 @@ export default function LandingPage() {
   const currentBottomLeft = bottomLeftNotifications[blIndex];
   const currentTopRight = topRightNotifications[trIndex];
 
-  const openSignup = (plan: string) => {
-    setSelectedPlan(plan);
-    setModalOpen(true);
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
-      
-      <SignupModal isOpen={modalOpen} onClose={() => setModalOpen(false)} plan={selectedPlan} priceId={priceIds[selectedPlan] || null} />
 
       {/* Sticky Navbar */}
       <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-white/5">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2">
             <img src="/logo.png" alt="RxFit.ai" className="w-8 h-8 rounded-lg object-cover" />
             <span className="text-xl font-bold tracking-tight">RxFit<span className="text-teal-400">.ai</span></span>
-          </div>
+          </a>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="/blog" className="hover:text-white transition-colors" data-testid="link-nav-blog">Blog</a>
           </div>
-          <button
-            onClick={() => openSignup("kickstart")}
-            className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20"
-            data-testid="button-nav-trial"
-          >
-            Start Free Trial
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://app.rxfit.ai"
+              rel="noopener"
+              className="hidden sm:inline-block text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              data-testid="link-nav-login"
+            >
+              Log In
+            </a>
+            <button
+              onClick={() => openSignup("kickstart")}
+              className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20"
+              data-testid="button-nav-trial"
+            >
+              Start Free Trial
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -712,25 +546,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-white/5 bg-slate-950">
-        <div className="container mx-auto px-6">
-           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="flex items-center gap-2">
-                 <img src="/logo.png" alt="RxFit.ai" className="w-6 h-6 rounded object-cover" />
-                 <span className="text-lg font-bold text-slate-300">RxFit.ai</span>
-              </div>
-              <div className="text-slate-500 text-sm">
-                 &copy; {new Date().getFullYear()} RxFit AI. All rights reserved.
-              </div>
-              <div className="flex gap-6 text-sm text-slate-500">
-                 <a href="#" className="hover:text-white transition-colors">Privacy</a>
-                 <a href="#" className="hover:text-white transition-colors">Terms</a>
-                 <a href="#" className="hover:text-white transition-colors">Contact</a>
-              </div>
-           </div>
-        </div>
-      </footer>
+      <SiteFooter />
 
     </div>
   );
