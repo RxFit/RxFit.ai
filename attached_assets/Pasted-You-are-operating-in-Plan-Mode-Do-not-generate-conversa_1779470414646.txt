@@ -1,0 +1,27 @@
+You are operating in Plan Mode. Do not generate conversational filler. Analyze the entire codebase context for the feature/refactor requested above and output a strict, highly structured implementation plan formatted EXACTLY as a `STATE.md` file. 
+
+This file will be read by an autonomous local Node.js dispatcher that feeds tasks one by one to a secondary execution agent. The dispatcher will merge the agent's commit after EVERY task.
+
+RULES FOR THE ASSEMBLY LINE (CRITICAL FOR AGENT OPTIMIZATION):
+1. BATCH BY FILE/DOMAIN: Do not create separate tasks for edits happening in the same file if they are part of the same feature. Group them to minimize commit/merge overhead.
+2. NO STANDALONE PRE-REQS OR VALIDATION: Do not create tasks that are purely "Read this file" or "Run this test." The agent will read the file anyway when it edits it. Instead, embed pre-requisite checks and validation commands directly INSIDE the execution task.
+3. SELF-CONTAINED MILESTONES: Every task must leave the codebase in a compilable, working state. 
+4. You MUST use the exact markdown checklist syntax: `- [ ] ` for every single task.
+
+Format your output STRICTLY using the following schema:
+
+FEATURE: [Task/Feature Name]
+**Status:** IN_PROGRESS
+
+**Global Context & Architecture:**
+[Write a comprehensive 2-3 paragraph summary of the overarching objective, target files, new dependencies, and DB schema changes. I will feed this Global Context to the execution agent alongside every single task so it maintains situational awareness.]
+
+TASKS
+- [ ] TASK 1: [Primary File/Domain Name] - [Actionable Summary]. 
+      * Pre-execution: [Briefly state what to look out for, e.g., "Note the existing <noscript> block on line 29"]. 
+      * Execution: [Detail the exact changes, e.g., "1. Add WebApp JSON-LD. 2. Add Org JSON-LD. 3. Add FAQ JSON-LD"]. 
+      * Validation: [Specific command to run before committing, e.g., "Run tsc --noEmit and ensure 0 errors."]
+- [ ] TASK 2: [Next File/Domain Name] - [Actionable Summary].
+      * Pre-execution: [...]
+      * Execution: [...]
+      * Validation: [...]
