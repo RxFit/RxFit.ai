@@ -48,3 +48,7 @@ integrations = ["stripe:2.0.0", "google-mail:1.0.0", "google-sheet:1.0.0", "gith
 
 [userenv.shared]
 LEADS_SPREADSHEET_ID = "1vkqBUAVduvLvUGehEG0LhhTdhA9SNKwuWIsMnaJsoCA"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
