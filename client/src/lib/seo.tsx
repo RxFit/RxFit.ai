@@ -141,7 +141,7 @@ export function Seo({
         "@type": "Article",
         headline: title,
         description,
-        image: image ? (image.startsWith("http") ? image : `${SITE_URL}${image}`) : `${SITE_URL}/hero-dashboard.png`,
+        image: image ? (image.startsWith("http") ? image : `${SITE_URL}${image}`) : `${SITE_URL}/opengraph.jpg`,
         url: canonical,
         mainEntityOfPage: canonical,
         datePublished: article?.publishedTime,
