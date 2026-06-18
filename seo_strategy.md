@@ -26,5 +26,6 @@
 - (None yet)
 
 ## Notes
-- The site is a Vite + React SPA served by Express.
-- Public routes currently rely on client-side routing (`wouter`) and client-side head updates for most page-specific SEO.
+- The public site is built with Vite + React and served by Express.
+- In-scope public routes are prerendered at build time into static HTML, so Google, social crawlers, and AI crawlers can read route-specific content and metadata without waiting for client-side rendering.
+- `app.rxfit.ai` remains a separate repository and should only be considered for reciprocal cross-domain SEO work, not direct source edits in this repo.
