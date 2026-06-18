@@ -228,6 +228,10 @@ export default function LandingPage() {
                  <img 
                    src={heroDashboardImg} 
                    alt="RxFit AI Dashboard" 
+                   fetchPriority="high"
+                   decoding="sync"
+                   width={1200}
+                   height={750}
                    className="w-full h-auto object-cover opacity-90 group-hover:scale-105 transition-transform duration-700"
                  />
                  
@@ -368,7 +372,7 @@ export default function LandingPage() {
                   </div>
                   <div className="flex-1 relative">
                      <div className="glass-card p-1 rounded-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <img src="/ai-visualization.webp" loading="lazy" alt="AI Health Data Visualization" className="rounded-xl w-full h-auto object-cover border border-white/5" />
+                        <img src="/ai-visualization.webp" loading="lazy" decoding="async" width={800} height={534} alt="AI Health Data Visualization" className="rounded-xl w-full h-auto object-cover border border-white/5" />
                      </div>
                   </div>
                </div>
@@ -394,7 +398,7 @@ export default function LandingPage() {
                   </div>
                   <div className="flex-1 relative">
                      <div className="glass-card p-1 rounded-2xl -rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <img src="/coach-interface.webp" loading="lazy" alt="Coach reviewing health data with client" className="rounded-xl w-full h-auto object-cover border border-white/5" />
+                        <img src="/coach-interface.webp" loading="lazy" decoding="async" width={800} height={534} alt="Coach reviewing health data with client" className="rounded-xl w-full h-auto object-cover border border-white/5" />
                      </div>
                   </div>
                </div>

@@ -133,7 +133,7 @@ export default function BlogPost() {
             </h1>
             <div className="flex items-center gap-4 text-sm text-slate-400 mb-8">
               {fm.authorPhoto ? (
-                <img src={fm.authorPhoto} alt={fm.author} className="w-10 h-10 rounded-full object-cover" />
+                <img src={fm.authorPhoto} alt={fm.author} loading="lazy" className="w-10 h-10 rounded-full object-cover" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-slate-700" />
               )}
@@ -151,7 +151,15 @@ export default function BlogPost() {
 
           {fm.heroImage && (
             <div className="rounded-2xl overflow-hidden border border-white/10 mb-12 max-w-4xl">
-              <img src={fm.heroImage} alt={fm.title} className="w-full h-auto object-cover" />
+              <img
+                src={fm.heroImage}
+                alt={fm.title}
+                fetchPriority="high"
+                decoding="sync"
+                width={1200}
+                height={675}
+                className="w-full h-auto object-cover"
+              />
             </div>
           )}
 
@@ -165,7 +173,7 @@ export default function BlogPost() {
               {/* Author bio + contextual app link */}
               <div className="glass-card rounded-2xl p-6 mt-12 flex gap-4 items-start" data-testid="blog-author-bio">
                 {fm.authorPhoto ? (
-                  <img src={fm.authorPhoto} alt={fm.author} className="w-14 h-14 rounded-full object-cover shrink-0" />
+                  <img src={fm.authorPhoto} alt={fm.author} loading="lazy" className="w-14 h-14 rounded-full object-cover shrink-0" />
                 ) : (
                   <div className="w-14 h-14 rounded-full bg-slate-700 shrink-0" />
                 )}

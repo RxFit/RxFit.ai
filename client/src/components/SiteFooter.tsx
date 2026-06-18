@@ -42,14 +42,14 @@ export default function SiteFooter() {
             </ul>
           </div>
 
-          <div>
+          <nav aria-label="Company">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Company</div>
             <ul className="space-y-3 text-sm text-slate-400">
               <li><Link href="/privacy" className="hover:text-teal-400 transition-colors" data-testid="link-footer-privacy">Privacy</Link></li>
               <li><Link href="/terms" className="hover:text-teal-400 transition-colors" data-testid="link-footer-terms">Terms</Link></li>
               <li><Link href="/contact" className="hover:text-teal-400 transition-colors" data-testid="link-footer-contact">Contact</Link></li>
             </ul>
-          </div>
+          </nav>
         </div>
 
         <div className="mt-12 pt-8 border-t border-white/5 text-center text-sm text-slate-500">
