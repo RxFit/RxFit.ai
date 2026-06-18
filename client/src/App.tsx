@@ -9,6 +9,7 @@ import LandingPage from "@/pages/LandingPage";
 import SuccessPage from "@/pages/SuccessPage";
 import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
+import { PrivacyPage, TermsPage, ContactPage } from "@/pages/LegalPages";
 
 function Router() {
   return (
@@ -17,6 +18,9 @@ function Router() {
       <Route path="/success" component={SuccessPage} />
       <Route path="/blog" component={BlogIndex} />
       <Route path="/blog/:slug" component={BlogPost} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/contact" component={ContactPage} />
       <Route component={NotFound} />
     </Switch>
   );

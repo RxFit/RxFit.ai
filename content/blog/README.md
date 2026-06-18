@@ -28,10 +28,10 @@ recommendedPlan: "kickstart"                  # kickstart | committed | transfor
 
 ## Image conventions
 
-- Hero image: `client/public/blog/<slug>/hero.png` (16:9, e.g. 1200×675), ≤200KB (referenced as `/blog/<slug>/hero.png`).
-- Author photo (optional): `client/public/blog/authors/<author-slug>.png`, square, ≤100KB (referenced as `/blog/authors/<author-slug>.png`).
-- Inline images: keep ≤200KB, always provide descriptive `alt` text.
-- `.jpg` works too — just keep the `heroImage` / `authorPhoto` frontmatter path in sync with the actual file extension.
+- Hero image: `client/public/blog/<slug>/hero.jpg` (16:9, e.g. 1200×675), ≤150KB (referenced as `/blog/<slug>/hero.jpg`). Use optimized JPEG for heroes — they double as the page's `og:image`/`twitter:image`, and JPEG is universally supported by social scrapers (some reject WebP).
+- Author photo (optional): `client/public/blog/authors/<author-slug>.webp`, square ~128×128, ≤10KB (referenced as `/blog/authors/<author-slug>.webp`). Page-only, so WebP is fine.
+- Inline images: keep small (≤150KB), prefer WebP, always provide descriptive `alt` text.
+- Always compress and resize to the rendered dimensions before committing — files in `client/public` are copied as-is (not optimized by Vite). Keep the `heroImage` / `authorPhoto` frontmatter path in sync with the actual file extension.
 
 > Reading time and the on-page table of contents are computed automatically at build
 > time from the post body by the `remarkBlogMeta` plugin (`remark-blog-meta.ts`) — no
@@ -81,9 +81,9 @@ slug: "_my-post"
 date: "2026-01-01"
 author: "Dr. Mara Ellison"
 authorBio: "One-sentence credibility line for the author."
-authorPhoto: "/blog/authors/mara-ellison.png"
+authorPhoto: "/blog/authors/mara-ellison.webp"
 description: "140–160 char summary used for the meta description and social cards."
-heroImage: "/blog/_my-post/hero.png"
+heroImage: "/blog/_my-post/hero.jpg"
 tags: ["AI Coaching"]
 pillar: "AI Coaching"
 targetKeyword: "your target keyword"

@@ -320,6 +320,9 @@ export async function registerRoutes(
     const staticUrls = [
       { loc: "/", lastmod: today, priority: "1.0" },
       { loc: "/blog", lastmod: today, priority: "0.8" },
+      { loc: "/privacy", lastmod: today, priority: "0.3" },
+      { loc: "/terms", lastmod: today, priority: "0.3" },
+      { loc: "/contact", lastmod: today, priority: "0.4" },
     ];
     const postUrls = readBlogPosts().map((p) => ({
       loc: `/blog/${p.slug}`,

@@ -45,9 +45,9 @@ export default function SiteFooter() {
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Company</div>
             <ul className="space-y-3 text-sm text-slate-400">
-              <li><a href="#" className="hover:text-teal-400 transition-colors">Privacy</a></li>
-              <li><a href="#" className="hover:text-teal-400 transition-colors">Terms</a></li>
-              <li><a href="#" className="hover:text-teal-400 transition-colors">Contact</a></li>
+              <li><Link href="/privacy" className="hover:text-teal-400 transition-colors" data-testid="link-footer-privacy">Privacy</Link></li>
+              <li><Link href="/terms" className="hover:text-teal-400 transition-colors" data-testid="link-footer-terms">Terms</Link></li>
+              <li><Link href="/contact" className="hover:text-teal-400 transition-colors" data-testid="link-footer-contact">Contact</Link></li>
             </ul>
           </div>
         </div>
