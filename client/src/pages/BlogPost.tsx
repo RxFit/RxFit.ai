@@ -79,7 +79,7 @@ export default function BlogPost() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Seo
-        title={`${fm.title} | RxFit.ai`}
+        title={fm.seoTitle || `${fm.title} | RxFit.ai`}
         description={fm.description}
         canonicalPath={`/blog/${fm.slug}`}
         type="article"

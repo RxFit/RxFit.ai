@@ -19,6 +19,7 @@ import {
 import heroDashboardImg from "../assets/hero-dashboard.webp";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import SiteFooter from "@/components/SiteFooter";
+import { Seo } from "@/lib/seo";
 
 const bottomLeftNotifications = [
   {
@@ -137,6 +138,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
+      <Seo
+        title="RxFit.ai — AI Health Dashboard + Human Accountability Coach"
+        description="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach."
+        canonicalPath="/"
+        image="/opengraph.jpg"
+      />
 
       {/* Sticky Navbar */}
       <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-white/5">

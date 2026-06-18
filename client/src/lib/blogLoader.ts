@@ -8,6 +8,8 @@ export interface TocEntry {
 
 export interface PostFrontmatter {
   title: string;
+  /** Optional shorter title used for the <title>/og/twitter tags (~50-60 chars). Falls back to `title | RxFit.ai`. */
+  seoTitle?: string;
   slug: string;
   date: string;
   author: string;
