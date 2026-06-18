@@ -76,9 +76,16 @@ export function getPostBySlug(slug: string): Post | undefined {
 }
 
 export function getRelatedPosts(slug: string, pillar?: string, limit = 3): Post[] {
-  return posts
-    .filter((p) => p.frontmatter.slug !== slug && (!pillar || p.frontmatter.pillar === pillar))
-    .slice(0, limit);
+  const others = posts.filter((p) => p.frontmatter.slug !== slug);
+  const samePillar = pillar
+    ? others.filter((p) => p.frontmatter.pillar === pillar)
+    : [];
+  if (samePillar.length >= limit) {
+    return samePillar.slice(0, limit);
+  }
+  const samePillarSlugs = new Set(samePillar.map((p) => p.frontmatter.slug));
+  const fallback = others.filter((p) => !samePillarSlugs.has(p.frontmatter.slug));
+  return [...samePillar, ...fallback].slice(0, limit);
 }
 
 export const PILLARS = ["AI Coaching", "Wearables", "Accountability"] as const;
