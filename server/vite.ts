@@ -5,8 +5,33 @@ import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
+import matter from "gray-matter";
+import { STATIC_ROUTES } from "@shared/site";
 
 const viteLogger = createLogger();
+
+const CONTENT_DIR = path.resolve(import.meta.dirname, "..", "content", "blog");
+
+/** Whether a request path corresponds to a real route (so dev can return 404
+ *  for unknown URLs / blog slugs, matching production behavior). */
+function isKnownRoute(reqPath: string): boolean {
+  const clean = reqPath.replace(/\/+$/, "") || "/";
+  if ((STATIC_ROUTES as readonly string[]).includes(clean)) return true;
+
+  const blogMatch = clean.match(/^\/blog\/(.+)$/);
+  if (blogMatch) {
+    const slug = blogMatch[1];
+    if (!fs.existsSync(CONTENT_DIR)) return false;
+    return fs.readdirSync(CONTENT_DIR).some((f) => {
+      if (!f.endsWith(".mdx")) return false;
+      const raw = fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
+      const { data } = matter(raw);
+      const fileSlug = (data.slug as string) || f.replace(/\.mdx$/, "");
+      return fileSlug === slug;
+    });
+  }
+  return false;
+}
 
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
@@ -49,7 +74,12 @@ export async function setupVite(server: Server, app: Express) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      // Unknown URLs / blog slugs return 404 (the SPA renders NotFound, which
+      // is also noindex); real routes return 200. Derive the path from
+      // originalUrl — under an app.use mount, req.path is stripped to "/".
+      const reqPath = url.split("?")[0];
+      const status = isKnownRoute(reqPath) ? 200 : 404;
+      res.status(status).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);

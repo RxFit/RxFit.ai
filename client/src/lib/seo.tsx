@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useContext, createContext } from "react";
+import { SITE_URL, APP_URL } from "@shared/site";
 
-export const SITE_URL = "https://rxfit.ai";
-export const APP_URL = "https://app.rxfit.ai";
+export { SITE_URL, APP_URL };
 
 /**
  * Shared Organization JSON-LD. The `sameAs` array (including app.rxfit.ai) is the
@@ -39,9 +39,167 @@ export interface SeoProps {
   };
   breadcrumbs?: { name: string; path: string }[];
   jsonLd?: JsonLd[];
-  /** When true, emits <meta name="robots" content="noindex,nofollow"> (used for draft previews). */
+  /** When true, emits <meta name="robots" content="noindex,nofollow"> (used for draft previews / non-indexable pages). */
   noindex?: boolean;
 }
+
+interface MetaTag {
+  attr: "name" | "property";
+  key: string;
+  content: string;
+}
+
+interface ComputedSeo {
+  title: string;
+  canonical: string;
+  metas: MetaTag[];
+  articleTags: string[];
+  jsonLd: JsonLd[];
+  noindex: boolean;
+}
+
+/**
+ * Pure computation of every SEO tag for a route. Shared by the client-side
+ * effect (which mutates document.head) and the server-side prerender (which
+ * serializes the result into the initial HTML head).
+ */
+function computeSeo(props: SeoProps): ComputedSeo {
+  const {
+    title,
+    description,
+    canonicalPath,
+    type = "website",
+    image,
+    article,
+    breadcrumbs,
+    jsonLd,
+    noindex = false,
+  } = props;
+
+  const canonical = `${SITE_URL}${canonicalPath}`;
+  const absImage = image
+    ? image.startsWith("http")
+      ? image
+      : `${SITE_URL}${image}`
+    : `${SITE_URL}/opengraph.jpg`;
+
+  const metas: MetaTag[] = [
+    { attr: "name", key: "description", content: description },
+    { attr: "property", key: "og:title", content: title },
+    { attr: "property", key: "og:description", content: description },
+    { attr: "property", key: "og:url", content: canonical },
+    { attr: "property", key: "og:type", content: type },
+    { attr: "property", key: "og:image", content: absImage },
+    { attr: "name", key: "twitter:title", content: title },
+    { attr: "name", key: "twitter:description", content: description },
+    { attr: "name", key: "twitter:image", content: absImage },
+  ];
+
+  if (article?.publishedTime) {
+    metas.push({ attr: "property", key: "article:published_time", content: article.publishedTime });
+  }
+  if (article?.author) {
+    metas.push({ attr: "property", key: "article:author", content: article.author });
+  }
+
+  const all: JsonLd[] = [ORGANIZATION_JSONLD];
+
+  if (breadcrumbs && breadcrumbs.length > 0) {
+    all.push({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: breadcrumbs.map((b, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        name: b.name,
+        item: `${SITE_URL}${b.path}`,
+      })),
+    });
+  }
+
+  if (type === "article") {
+    all.push({
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: title,
+      description,
+      image: absImage,
+      url: canonical,
+      mainEntityOfPage: canonical,
+      datePublished: article?.publishedTime,
+      author: article?.author
+        ? { "@type": "Person", name: article.author }
+        : { "@type": "Organization", name: "RxFit.ai" },
+      publisher: {
+        "@type": "Organization",
+        name: "RxFit.ai",
+        logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+      },
+    });
+  }
+
+  (jsonLd || []).forEach((j) => all.push(j));
+
+  return { title, canonical, metas, articleTags: article?.tags || [], jsonLd: all, noindex };
+}
+
+/* ------------------------------------------------------------------ */
+/* Server-side head collection (used by the prerender build)           */
+/* ------------------------------------------------------------------ */
+
+export interface HeadCollector {
+  title?: string;
+  canonical?: string;
+  metas: MetaTag[];
+  articleTags: string[];
+  jsonLd: JsonLd[];
+  noindex: boolean;
+}
+
+export function createHeadCollector(): HeadCollector {
+  return { metas: [], articleTags: [], jsonLd: [], noindex: false };
+}
+
+/** Present only during SSR/prerender. On the client it stays null and the
+ *  effect-based path runs instead. */
+export const HeadContext = createContext<HeadCollector | null>(null);
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Escape a closing-script sequence so JSON-LD can't break out of <script>. */
+function jsonLdSafe(obj: JsonLd): string {
+  return JSON.stringify(obj).replace(/</g, "\\u003c");
+}
+
+/** Serialize a collected head into an HTML string injected into the prerendered shell. */
+export function renderHeadToString(c: HeadCollector): string {
+  const out: string[] = [];
+  if (c.title) out.push(`<title>${escapeHtml(c.title)}</title>`);
+  if (c.canonical) out.push(`<link rel="canonical" href="${escapeHtml(c.canonical)}" data-seo="true" />`);
+  for (const m of c.metas) {
+    out.push(`<meta ${m.attr}="${m.key}" content="${escapeHtml(m.content)}" data-seo="true" />`);
+  }
+  for (const t of c.articleTags) {
+    out.push(`<meta property="article:tag" content="${escapeHtml(t)}" data-seo-tag="true" />`);
+  }
+  if (c.noindex) {
+    out.push(`<meta name="robots" content="noindex,nofollow" data-seo="true" />`);
+  }
+  for (const j of c.jsonLd) {
+    out.push(`<script type="application/ld+json" data-seo-jsonld="true">${jsonLdSafe(j)}</script>`);
+  }
+  return out.join("\n    ");
+}
+
+/* ------------------------------------------------------------------ */
+/* Client-side head application                                         */
+/* ------------------------------------------------------------------ */
 
 function setMeta(attr: "name" | "property", key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -52,7 +210,6 @@ function setMeta(attr: "name" | "property", key: string, content: string) {
   }
   el.setAttribute("content", content);
   el.setAttribute("data-seo", "true");
-  return el;
 }
 
 function setCanonical(href: string) {
@@ -66,48 +223,37 @@ function setCanonical(href: string) {
   el.setAttribute("data-seo", "true");
 }
 
-export function Seo({
-  title,
-  description,
-  canonicalPath,
-  type = "website",
-  image,
-  article,
-  breadcrumbs,
-  jsonLd,
-  noindex = false,
-}: SeoProps) {
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = title;
-    const canonical = `${SITE_URL}${canonicalPath}`;
+export function Seo(props: SeoProps) {
+  // During prerender, push the computed tags into the head collector so they
+  // ship in the first HTML response. `useContext` is always called (hook rules);
+  // it only resolves to a collector on the server.
+  const collector = useContext(HeadContext);
+  if (collector) {
+    const c = computeSeo(props);
+    collector.title = c.title;
+    collector.canonical = c.canonical;
+    c.metas.forEach((m) => collector.metas.push(m));
+    c.articleTags.forEach((t) => collector.articleTags.push(t));
+    c.jsonLd.forEach((j) => collector.jsonLd.push(j));
+    if (c.noindex) collector.noindex = true;
+  }
 
-    // Standard + OG + Twitter meta. We deliberately do NOT touch og:image /
-    // twitter:image unless an explicit `image` is provided, so the defaults in
-    // client/index.html are preserved.
-    setMeta("name", "description", description);
-    setCanonical(canonical);
-    setMeta("property", "og:title", title);
-    setMeta("property", "og:description", description);
-    setMeta("property", "og:url", canonical);
-    setMeta("property", "og:type", type);
-    setMeta("name", "twitter:title", title);
-    setMeta("name", "twitter:description", description);
-    if (noindex) {
+  useEffect(() => {
+    const c = computeSeo(props);
+    const prevTitle = document.title;
+    document.title = c.title;
+    setCanonical(c.canonical);
+    c.metas.forEach((m) => setMeta(m.attr, m.key, m.content));
+    if (c.noindex) {
       setMeta("name", "robots", "noindex,nofollow");
     }
-    if (image) {
-      const absImage = image.startsWith("http") ? image : `${SITE_URL}${image}`;
-      setMeta("property", "og:image", absImage);
-      setMeta("name", "twitter:image", absImage);
-    }
-    if (article?.publishedTime) {
-      setMeta("property", "article:published_time", article.publishedTime);
-    }
-    if (article?.author) {
-      setMeta("property", "article:author", article.author);
-    }
-    (article?.tags || []).forEach((tag) => {
+
+    // Clear any pre-existing per-route tags (e.g. prerendered ones) before
+    // re-adding, so hydration / client navigation never duplicates them.
+    document.head.querySelectorAll('[data-seo-tag="true"]').forEach((el) => el.remove());
+    document.head.querySelectorAll('[data-seo-jsonld="true"]').forEach((el) => el.remove());
+
+    c.articleTags.forEach((tag) => {
       const el = document.createElement("meta");
       el.setAttribute("property", "article:tag");
       el.setAttribute("content", tag);
@@ -115,66 +261,26 @@ export function Seo({
       document.head.appendChild(el);
     });
 
-    // JSON-LD blocks
     const scripts: HTMLScriptElement[] = [];
-    const addJsonLd = (data: JsonLd) => {
+    c.jsonLd.forEach((data) => {
       const s = document.createElement("script");
       s.type = "application/ld+json";
       s.setAttribute("data-seo-jsonld", "true");
       s.textContent = JSON.stringify(data);
       document.head.appendChild(s);
       scripts.push(s);
-    };
-
-    addJsonLd(ORGANIZATION_JSONLD);
-
-    if (breadcrumbs && breadcrumbs.length > 0) {
-      addJsonLd({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: breadcrumbs.map((b, i) => ({
-          "@type": "ListItem",
-          position: i + 1,
-          name: b.name,
-          item: `${SITE_URL}${b.path}`,
-        })),
-      });
-    }
-
-    if (type === "article") {
-      addJsonLd({
-        "@context": "https://schema.org",
-        "@type": "Article",
-        headline: title,
-        description,
-        image: image ? (image.startsWith("http") ? image : `${SITE_URL}${image}`) : `${SITE_URL}/opengraph.jpg`,
-        url: canonical,
-        mainEntityOfPage: canonical,
-        datePublished: article?.publishedTime,
-        author: article?.author
-          ? { "@type": "Person", name: article.author }
-          : { "@type": "Organization", name: "RxFit.ai" },
-        publisher: {
-          "@type": "Organization",
-          name: "RxFit.ai",
-          logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
-        },
-      });
-    }
-
-    (jsonLd || []).forEach(addJsonLd);
+    });
 
     return () => {
       document.title = prevTitle;
       scripts.forEach((s) => s.remove());
       document.head.querySelectorAll('[data-seo-tag="true"]').forEach((el) => el.remove());
-      // robots is only set on draft previews — remove it so it doesn't leak to
-      // the next (publishable) page.
-      if (noindex) {
+      if (c.noindex) {
         document.head.querySelector('meta[name="robots"]')?.remove();
       }
     };
-  }, [title, description, canonicalPath, type, image, noindex, JSON.stringify(article), JSON.stringify(breadcrumbs), JSON.stringify(jsonLd)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(props)]);
 
   return null;
 }

@@ -11,6 +11,7 @@ import { appendLeadToSheet } from "./sheetsService";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import { SITE_URL } from "@shared/site";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -308,14 +309,12 @@ export async function registerRoutes(
     return data;
   };
 
-  const getBaseUrl = (req: any) => {
-    const host = req.get("host") || "rxfit.ai";
-    const proto = host.includes("localhost") ? "http" : "https";
-    return `${proto}://${host}`;
-  };
+  // Always emit the canonical origin so the sitemap and robots file agree with
+  // every page-level canonical (which also uses SITE_URL), regardless of which
+  // hostname requested them.
+  const baseUrl = SITE_URL;
 
-  app.get("/sitemap.xml", (req, res) => {
-    const baseUrl = getBaseUrl(req);
+  app.get("/sitemap.xml", (_req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const staticUrls = [
       { loc: "/", lastmod: today, priority: "1.0" },
@@ -340,8 +339,7 @@ export async function registerRoutes(
     res.send(xml);
   });
 
-  app.get("/robots.txt", (req, res) => {
-    const baseUrl = getBaseUrl(req);
+  app.get("/robots.txt", (_req, res) => {
     const body = `User-agent: *
 Allow: /
 Disallow: /api/

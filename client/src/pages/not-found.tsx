@@ -1,21 +1,30 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { AlertCircle, ArrowLeft } from "lucide-react";
+import { Seo } from "@/lib/seo";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background text-foreground px-6 text-center">
+      <Seo
+        title="Page not found | RxFit.ai"
+        description="The page you were looking for doesn't exist."
+        canonicalPath="/404"
+        noindex
+      />
+      <div className="flex items-center gap-3 mb-4">
+        <AlertCircle className="h-8 w-8 text-orange-400" />
+        <h1 className="text-3xl font-bold text-white">404 — Page not found</h1>
+      </div>
+      <p className="text-slate-400 max-w-md mb-8">
+        The page you were looking for doesn't exist or may have moved.
+      </p>
+      <Link
+        href="/"
+        className="btn-primary px-6 py-3 rounded-xl inline-flex items-center gap-2"
+        data-testid="link-home"
+      >
+        <ArrowLeft className="w-5 h-5" /> Back to homepage
+      </Link>
     </div>
   );
 }

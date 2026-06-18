@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Loader2, ExternalLink } from "lucide-react";
+import { Seo } from "@/lib/seo";
 
 export default function SuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -30,6 +31,12 @@ export default function SuccessPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
+      <Seo
+        title="Welcome to RxFit.ai"
+        description="Your RxFit.ai subscription is confirmed."
+        canonicalPath="/success"
+        noindex
+      />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-teal-500/10 blur-[120px] rounded-full -z-10" />
 
       <motion.div

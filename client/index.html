@@ -4,22 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 
+    <!-- Constant meta (never route-specific; the client Seo component never touches these). -->
+    <meta property="og:site_name" content="RxFit.ai" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@rxfitai" />
+
+    <!-- seo:start (replaced per-route by the prerender step; kept in sync at runtime by client/src/lib/seo.tsx). -->
     <title>RxFit.ai — AI Health Dashboard + Human Accountability Coach</title>
     <meta name="description" content="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach." />
     <link rel="canonical" href="https://rxfit.ai/" />
-
-    <meta property="og:site_name" content="RxFit.ai" />
-    <meta property="og:locale" content="en_US" />
-    <meta property="og:title" content="RxFit.ai - AI Health Dashboard & Human Accountability" />
-    <meta property="og:description" content="Your AI Health Dashboard. Your Human Accountability Coach. One Platform." />
+    <meta property="og:title" content="RxFit.ai — AI Health Dashboard + Human Accountability Coach" />
+    <meta property="og:description" content="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach." />
+    <meta property="og:url" content="https://rxfit.ai/" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://rxfit.ai/opengraph.jpg" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@rxfitai" />
-    <meta name="twitter:title" content="RxFit.ai" />
-    <meta name="twitter:description" content="Stop guessing. Turn your health data into consistent action with AI and human coaching." />
+    <meta name="twitter:title" content="RxFit.ai — AI Health Dashboard + Human Accountability Coach" />
+    <meta name="twitter:description" content="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach." />
     <meta name="twitter:image" content="https://rxfit.ai/opengraph.jpg" />
-
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -36,6 +38,7 @@
         ]
       }
     </script>
+    <!-- seo:end -->
 
     <!-- Plausible privacy-friendly analytics. Custom events sent via window.plausible (see src/lib/analytics.ts) -->
     <script defer data-domain="rxfit.ai" src="https://plausible.io/js/script.tagged-events.js"></script>
@@ -48,7 +51,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--app-html--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

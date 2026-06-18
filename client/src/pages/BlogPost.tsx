@@ -60,6 +60,12 @@ export default function BlogPost() {
   if (!post) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <Seo
+          title="Post not found | RxFit.ai"
+          description="We couldn't find the article you were looking for."
+          canonicalPath={`/blog/${slug}`}
+          noindex
+        />
         <SiteHeader />
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <h1 className="text-4xl font-bold text-white mb-4">Post not found</h1>
