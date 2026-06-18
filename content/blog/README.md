@@ -49,6 +49,72 @@ Drop these directly into post bodies (no import needed — provided by `<MDXProv
 - `<Callout type="tip">…</Callout>` — `tip | warning | info` colored callout.
 - `<Comparison columns={["", "AI", "Trainer"]} rows={[["Cost","$49","$300"]]} />` — responsive comparison table.
 
+## Draft → preview → publish flow
+
+Authoring is safe by default: you can write a post, see exactly how it renders, fix
+any warnings, and only then make it public. Nothing is published until you rename the
+file.
+
+1. **Create a draft.** Copy the skeleton below into a new file whose name starts with an
+   underscore: `content/blog/_my-post.mdx`. Set `slug: "_my-post"` (the slug **must** match
+   the filename, including the leading `_`). Drafts are automatically hidden from the blog
+   index (`/blog`) and the `sitemap.xml`.
+2. **Preview it.** Start the dev server and open `http://localhost:5000/blog/_my-post`. An
+   orange **"Draft preview"** banner appears at the top, and the page carries a
+   `noindex,nofollow` robots tag so search engines won't pick it up even if someone shares
+   the URL. The page renders identically to a published post otherwise.
+3. **Check the warnings.** Every time the post compiles (dev server reload or `npm run build`)
+   the build-time linter prints `[blog-lint]` warnings to the terminal if the post is missing
+   a `<TLDR>`, a `<FAQ>`, a hero image (frontmatter field **and** the file on disk), or has
+   fewer than 3 internal links. These are warnings, not errors — they never fail the build,
+   but clearing them means the post passes the publish checklist below.
+4. **Publish.** Once the preview looks right and the warnings are gone, rename the file to
+   drop the leading underscore (`_my-post.mdx` → `my-post.mdx`) and update `slug` to match
+   (`"_my-post"` → `"my-post"`). The post now appears in the index and the sitemap. Commit.
+
+### Draft skeleton (copy/paste)
+
+```mdx
+---
+title: "Your headline here"
+slug: "_my-post"
+date: "2026-01-01"
+author: "Dr. Mara Ellison"
+authorBio: "One-sentence credibility line for the author."
+authorPhoto: "/blog/authors/mara-ellison.png"
+description: "140–160 char summary used for the meta description and social cards."
+heroImage: "/blog/_my-post/hero.png"
+tags: ["AI Coaching"]
+pillar: "AI Coaching"
+targetKeyword: "your target keyword"
+recommendedPlan: "kickstart"
+---
+
+<TLDR>
+2–4 sentence summary that answers the headline up front (AI extraction / AEO).
+</TLDR>
+
+Opening paragraph.
+
+## A question-shaped H2?
+
+Body copy. Link to [another post](/blog/ai-coach-vs-personal-trainer), the
+[pricing section](/#pricing), and the [home page](/) so you clear the ≥3 internal-link bar.
+
+<KeyTakeaways items={["First point", "Second point", "Third point"]} />
+
+<CTACard plan="kickstart" />
+
+<FAQ
+  items={[
+    { q: "First question?", a: "Answer." },
+    { q: "Second question?", a: "Answer." },
+    { q: "Third question?", a: "Answer." },
+    { q: "Fourth question?", a: "Answer." }
+  ]}
+/>
+```
+
 ## Publish checklist
 
 - [ ] `<TLDR>` at the very top.

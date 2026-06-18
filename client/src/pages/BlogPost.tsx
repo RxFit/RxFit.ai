@@ -74,6 +74,7 @@ export default function BlogPost() {
   }
 
   const { frontmatter: fm, Component, readingMinutes } = post;
+  const isDraft = fm.slug.startsWith("_");
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -83,6 +84,7 @@ export default function BlogPost() {
         canonicalPath={`/blog/${fm.slug}`}
         type="article"
         image={fm.heroImage}
+        noindex={isDraft}
         article={{ publishedTime: fm.date, author: fm.author, tags: fm.tags }}
         breadcrumbs={[
           { name: "Home", path: "/" },
@@ -91,6 +93,15 @@ export default function BlogPost() {
         ]}
       />
       <SiteHeader />
+
+      {isDraft && (
+        <div
+          className="fixed top-0 inset-x-0 z-50 bg-orange-500 text-slate-950 text-center text-sm font-semibold py-2 px-4"
+          data-testid="banner-draft-preview"
+        >
+          Draft preview — this post is hidden from the blog index &amp; sitemap and won't be indexed. Rename the file to remove the leading "_" to publish.
+        </div>
+      )}
 
       <article className="pt-28 pb-20 px-6">
         <div className="container mx-auto max-w-6xl">

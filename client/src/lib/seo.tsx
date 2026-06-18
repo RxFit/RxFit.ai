@@ -39,6 +39,8 @@ export interface SeoProps {
   };
   breadcrumbs?: { name: string; path: string }[];
   jsonLd?: JsonLd[];
+  /** When true, emits <meta name="robots" content="noindex,nofollow"> (used for draft previews). */
+  noindex?: boolean;
 }
 
 function setMeta(attr: "name" | "property", key: string, content: string) {
@@ -73,6 +75,7 @@ export function Seo({
   article,
   breadcrumbs,
   jsonLd,
+  noindex = false,
 }: SeoProps) {
   useEffect(() => {
     const prevTitle = document.title;
@@ -90,6 +93,9 @@ export function Seo({
     setMeta("property", "og:type", type);
     setMeta("name", "twitter:title", title);
     setMeta("name", "twitter:description", description);
+    if (noindex) {
+      setMeta("name", "robots", "noindex,nofollow");
+    }
     if (image) {
       const absImage = image.startsWith("http") ? image : `${SITE_URL}${image}`;
       setMeta("property", "og:image", absImage);
@@ -162,8 +168,13 @@ export function Seo({
       document.title = prevTitle;
       scripts.forEach((s) => s.remove());
       document.head.querySelectorAll('[data-seo-tag="true"]').forEach((el) => el.remove());
+      // robots is only set on draft previews — remove it so it doesn't leak to
+      // the next (publishable) page.
+      if (noindex) {
+        document.head.querySelector('meta[name="robots"]')?.remove();
+      }
     };
-  }, [title, description, canonicalPath, type, image, JSON.stringify(article), JSON.stringify(breadcrumbs), JSON.stringify(jsonLd)]);
+  }, [title, description, canonicalPath, type, image, noindex, JSON.stringify(article), JSON.stringify(breadcrumbs), JSON.stringify(jsonLd)]);
 
   return null;
 }
