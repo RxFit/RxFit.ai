@@ -111,7 +111,7 @@ export default function BlogPost() {
             <span>/</span>
             <Link href="/blog" className="hover:text-teal-400">Blog</Link>
             <span>/</span>
-            <span className="text-slate-300">{fm.pillar}</span>
+            <span className="text-slate-300" aria-current="page">{fm.title}</span>
           </nav>
 
           <div className="max-w-3xl">
