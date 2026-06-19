@@ -24,6 +24,25 @@ export const ORGANIZATION_JSONLD = {
   ],
 };
 
+export const WEBSITE_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "RxFit.ai",
+  url: SITE_URL,
+  description:
+    "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+  publisher: {
+    "@type": "Organization",
+    name: "RxFit.ai",
+    url: SITE_URL,
+  },
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${SITE_URL}/blog?q={search_term_string}`,
+    "query-input": "required name=search_term_string",
+  },
+};
+
 type JsonLd = Record<string, unknown>;
 
 export interface SeoProps {
@@ -32,8 +51,15 @@ export interface SeoProps {
   canonicalPath: string;
   type?: "website" | "article";
   image?: string;
+  /**
+   * When set, this value is used as the Article JSON-LD `headline` instead of `title`.
+   * Use this to pass the full editorial article title (`fm.title`) while keeping a shorter
+   * `seoTitle` in the `<title>`/OG/Twitter tags.
+   */
+  schemaHeadline?: string;
   article?: {
     publishedTime?: string;
+    modifiedTime?: string;
     author?: string;
     tags?: string[];
   };
@@ -70,6 +96,7 @@ function computeSeo(props: SeoProps): ComputedSeo {
     canonicalPath,
     type = "website",
     image,
+    schemaHeadline,
     article,
     breadcrumbs,
     jsonLd,
@@ -98,11 +125,14 @@ function computeSeo(props: SeoProps): ComputedSeo {
   if (article?.publishedTime) {
     metas.push({ attr: "property", key: "article:published_time", content: article.publishedTime });
   }
+  if (article?.modifiedTime) {
+    metas.push({ attr: "property", key: "article:modified_time", content: article.modifiedTime });
+  }
   if (article?.author) {
     metas.push({ attr: "property", key: "article:author", content: article.author });
   }
 
-  const all: JsonLd[] = [ORGANIZATION_JSONLD];
+  const all: JsonLd[] = [ORGANIZATION_JSONLD, WEBSITE_JSONLD];
 
   if (breadcrumbs && breadcrumbs.length > 0) {
     all.push({
@@ -118,15 +148,19 @@ function computeSeo(props: SeoProps): ComputedSeo {
   }
 
   if (type === "article") {
+    const articleHeadline = schemaHeadline ?? title;
+    const datePublished = article?.publishedTime;
+    const dateModified = article?.modifiedTime ?? datePublished;
     all.push({
       "@context": "https://schema.org",
       "@type": "Article",
-      headline: title,
+      headline: articleHeadline,
       description,
       image: absImage,
       url: canonical,
       mainEntityOfPage: canonical,
-      datePublished: article?.publishedTime,
+      datePublished,
+      dateModified,
       author: article?.author
         ? { "@type": "Person", name: article.author }
         : { "@type": "Organization", name: "RxFit.ai" },

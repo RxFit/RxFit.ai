@@ -86,12 +86,13 @@ export default function BlogPost() {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Seo
         title={fm.seoTitle || `${fm.title} | RxFit.ai`}
+        schemaHeadline={fm.title}
         description={fm.description}
         canonicalPath={`/blog/${fm.slug}`}
         type="article"
         image={fm.heroImage}
         noindex={isDraft}
-        article={{ publishedTime: fm.date, author: fm.author, tags: fm.tags }}
+        article={{ publishedTime: fm.date, modifiedTime: fm.updatedDate || fm.date, author: fm.author, tags: fm.tags }}
         breadcrumbs={[
           { name: "Home", path: "/" },
           { name: "Blog", path: "/blog" },

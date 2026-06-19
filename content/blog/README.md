@@ -14,6 +14,7 @@ Every post must start with a YAML frontmatter block:
 title: "AI Fitness Coach vs Personal Trainer: Which Wins in 2026?"
 slug: "ai-coach-vs-personal-trainer"        # must match the filename (without .mdx)
 date: "2026-01-15"                            # ISO date, drives sort order + <lastmod>
+updatedDate: "2026-03-10"                     # optional; ISO date of last significant edit — populates dateModified in Article JSON-LD and article:modified_time meta
 author: "Dr. Sarah Chen"
 authorBio: "Sarah is RxFit.ai's head of coaching science with 12 years in sports physiology."
 authorPhoto: "/blog/ai-coach-vs-personal-trainer/author.jpg"  # optional

@@ -12,6 +12,8 @@ export interface PostFrontmatter {
   seoTitle?: string;
   slug: string;
   date: string;
+  /** Optional ISO date of the last significant edit. Populates `dateModified` in the Article JSON-LD and `article:modified_time` meta. Falls back to `date` when omitted. */
+  updatedDate?: string;
   author: string;
   authorBio?: string;
   authorPhoto?: string;
