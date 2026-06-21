@@ -4,6 +4,7 @@
 - Public marketing homepage (`/`)
 - Blog index (`/blog`)
 - Blog posts (`/blog/:slug`)
+- Public trust and legal pages (`/privacy`, `/terms`, `/contact`)
 - Shared public metadata, crawlability, and social/AI crawler surfaces (`client/index.html`, `robots.txt`, `sitemap.xml`, `llms.txt`)
 
 ## Out of scope
