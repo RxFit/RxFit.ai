@@ -7,12 +7,14 @@ const UPDATED = "June 18, 2026";
 
 function LegalLayout({
   title,
+  seoTitle,
   description,
   canonicalPath,
   testId,
   children,
 }: {
   title: string;
+  seoTitle?: string;
   description: string;
   canonicalPath: string;
   testId: string;
@@ -20,7 +22,7 @@ function LegalLayout({
 }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-300">
-      <Seo title={title} description={description} canonicalPath={canonicalPath} />
+      <Seo title={seoTitle ?? title} description={description} canonicalPath={canonicalPath} />
       <SiteHeader />
       <main className="pt-28 pb-20 px-6" data-testid={testId}>
         <div className="container mx-auto max-w-3xl">
@@ -42,7 +44,8 @@ export function PrivacyPage() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      description="How RxFit.ai collects, uses, and protects your personal and health-related data."
+      seoTitle="Privacy Policy | RxFit.ai"
+      description="Learn how RxFit.ai collects, uses, and protects your personal and health data — including wearable and fitness app data connected to your account."
       canonicalPath="/privacy"
       testId="page-privacy"
     >
@@ -102,7 +105,8 @@ export function TermsPage() {
   return (
     <LegalLayout
       title="Terms of Service"
-      description="The terms that govern your use of the RxFit.ai website and coaching services."
+      seoTitle="Terms of Service | RxFit.ai"
+      description="Read the terms that govern your use of RxFit.ai, including subscription billing, cancellation, health disclaimers, and intellectual property rights."
       canonicalPath="/terms"
       testId="page-terms"
     >
@@ -159,7 +163,8 @@ export function ContactPage() {
   return (
     <LegalLayout
       title="Contact Us"
-      description="Get in touch with the RxFit.ai team about support, billing, partnerships, or press."
+      seoTitle="Contact RxFit.ai Support | RxFit.ai"
+      description="Get in touch with the RxFit.ai team for account support, billing help, data privacy requests, partnership inquiries, or press."
       canonicalPath="/contact"
       testId="page-contact"
     >
