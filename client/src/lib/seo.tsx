@@ -36,11 +36,6 @@ export const WEBSITE_JSONLD = {
     name: "RxFit.ai",
     url: SITE_URL,
   },
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${SITE_URL}/blog?q={search_term_string}`,
-    "query-input": "required name=search_term_string",
-  },
 };
 
 type JsonLd = Record<string, unknown>;

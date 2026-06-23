@@ -314,14 +314,24 @@ export async function registerRoutes(
   // hostname requested them.
   const baseUrl = SITE_URL;
 
+  // Stable last-modified dates for static pages. Update a page's date here
+  // whenever its content is intentionally changed so crawlers receive accurate
+  // freshness signals rather than "today" on every request.
+  const STATIC_PAGE_DATES: Record<string, string> = {
+    "/": "2026-06-18",
+    "/blog": "2026-06-18",
+    "/privacy": "2026-06-18",
+    "/terms": "2026-06-18",
+    "/contact": "2026-06-18",
+  };
+
   app.get("/sitemap.xml", (_req, res) => {
-    const today = new Date().toISOString().slice(0, 10);
     const staticUrls = [
-      { loc: "/", lastmod: today, priority: "1.0" },
-      { loc: "/blog", lastmod: today, priority: "0.8" },
-      { loc: "/privacy", lastmod: today, priority: "0.3" },
-      { loc: "/terms", lastmod: today, priority: "0.3" },
-      { loc: "/contact", lastmod: today, priority: "0.4" },
+      { loc: "/", lastmod: STATIC_PAGE_DATES["/"], priority: "1.0" },
+      { loc: "/blog", lastmod: STATIC_PAGE_DATES["/blog"], priority: "0.8" },
+      { loc: "/privacy", lastmod: STATIC_PAGE_DATES["/privacy"], priority: "0.3" },
+      { loc: "/terms", lastmod: STATIC_PAGE_DATES["/terms"], priority: "0.3" },
+      { loc: "/contact", lastmod: STATIC_PAGE_DATES["/contact"], priority: "0.4" },
     ];
     const postUrls = readBlogPosts().map((p) => ({
       loc: `/blog/${p.slug}`,
