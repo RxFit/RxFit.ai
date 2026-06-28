@@ -10,8 +10,14 @@ import { sendLeadEmail, sendWelcomeEmail } from "./emailService";
 import { appendLeadToSheet } from "./sheetsService";
 import fs from "fs";
 import path from "path";
-import matter from "gray-matter";
+import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
+
+function parseFrontmatter(raw: string): Record<string, any> {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return {};
+  return parseYaml(m[1]) ?? {};
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -297,7 +303,7 @@ export async function registerRoutes(
       data = files
         .map((file) => {
           const raw = fs.readFileSync(path.join(dir, file), "utf-8");
-          const fm = matter(raw).data as Record<string, any>;
+          const fm = parseFrontmatter(raw);
           const slug = fm.slug || file.replace(/\.mdx$/, "");
           return { slug, date: fm.date || new Date().toISOString().slice(0, 10) };
         })

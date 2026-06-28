@@ -5,8 +5,14 @@ import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
-import matter from "gray-matter";
+import { parse as parseYaml } from "yaml";
 import { STATIC_ROUTES } from "@shared/site";
+
+function parseFrontmatter(raw: string): Record<string, any> {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return {};
+  return parseYaml(m[1]) ?? {};
+}
 
 const viteLogger = createLogger();
 
@@ -25,7 +31,7 @@ function isKnownRoute(reqPath: string): boolean {
     return fs.readdirSync(CONTENT_DIR).some((f) => {
       if (!f.endsWith(".mdx")) return false;
       const raw = fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
-      const { data } = matter(raw);
+      const data = parseFrontmatter(raw);
       const fileSlug = (data.slug as string) || f.replace(/\.mdx$/, "");
       return fileSlug === slug;
     });

@@ -1,8 +1,14 @@
 import { build as viteBuild } from "vite";
 import fs from "fs";
 import path from "path";
-import matter from "gray-matter";
+import { parse as parseYaml } from "yaml";
 import { STATIC_ROUTES } from "../shared/site";
+
+function parseFrontmatter(raw: string): Record<string, any> {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return {};
+  return parseYaml(m[1]) ?? {};
+}
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.resolve(ROOT, "dist/public");
@@ -16,7 +22,7 @@ function blogSlugs(): string[] {
     .filter((f) => f.endsWith(".mdx"))
     .map((f) => {
       const raw = fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
-      const { data } = matter(raw);
+      const data = parseFrontmatter(raw);
       return (data.slug as string) || f.replace(/\.mdx$/, "");
     });
 }
