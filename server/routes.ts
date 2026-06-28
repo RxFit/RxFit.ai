@@ -362,20 +362,31 @@ Disallow: /api/
 Disallow: /success
 
 # Explicitly welcome AI crawlers so our content can be cited (AEO/GEO)
+# Each group repeats the shared disallows so dedicated groups don't override them
 User-agent: GPTBot
 Allow: /
+Disallow: /api/
+Disallow: /success
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /api/
+Disallow: /success
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /api/
+Disallow: /success
 
 User-agent: Google-Extended
 Allow: /
+Disallow: /api/
+Disallow: /success
 
 User-agent: CCBot
 Allow: /
+Disallow: /api/
+Disallow: /success
 
 Sitemap: ${baseUrl}/sitemap.xml
 `;
