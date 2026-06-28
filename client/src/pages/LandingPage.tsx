@@ -468,12 +468,14 @@ export default function LandingPage() {
                      <div className="space-y-6 mb-8 flex-1">
                         <div className="space-y-3">
                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Core Features</div>
-                           <li className="flex items-start gap-3 text-slate-300 text-sm">
-                              <Check className="w-5 h-5 text-orange-400 shrink-0" /> Everything in Kickstart
-                           </li>
-                           <li className="flex items-start gap-3 text-slate-300 text-sm">
-                              <Check className="w-5 h-5 text-orange-400 shrink-0" /> Priority Coach Access
-                           </li>
+                           <ul className="space-y-3">
+                              <li className="flex items-start gap-3 text-slate-300 text-sm">
+                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Everything in Kickstart
+                              </li>
+                              <li className="flex items-start gap-3 text-slate-300 text-sm">
+                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Priority Coach Access
+                              </li>
+                           </ul>
                         </div>
 
                         <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
