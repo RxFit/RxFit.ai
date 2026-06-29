@@ -44,11 +44,28 @@
     <script defer data-domain="rxfit.ai" src="https://plausible.io/js/script.tagged-events.js"></script>
     <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 
+    <!-- No-flash theme: apply persisted (default dark) theme before paint. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          if (t !== 'light' && t !== 'dark') t = 'dark';
+          document.documentElement.classList.toggle('dark', t === 'dark');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Self-hosted Inter: preload above-the-fold weights to keep fonts off the third-party critical path. -->
     <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- HUD display + mono fonts (Space Grotesk for headings, JetBrains Mono for command labels). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
   </head>
   <body>
     <div id="root"><!--app-html--></div>

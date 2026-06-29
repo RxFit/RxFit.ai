@@ -35,15 +35,15 @@ export default function BlogIndex() {
       <SiteHeader />
 
       <header className="relative pt-32 pb-16 px-6 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-teal-500/10 blur-[120px] rounded-full -z-10" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-primary/10 blur-[120px] rounded-full -z-10" />
         <div className="container mx-auto max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-teal-400 text-xs font-semibold tracking-wider uppercase mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase mb-6">
             The RxFit Journal
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6">
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">
             Turn your data into <span className="text-gradient-teal">consistent action.</span>
           </h1>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Evidence-based guides on AI coaching, wearables, and the accountability that actually makes change stick.
           </p>
 
@@ -51,7 +51,7 @@ export default function BlogIndex() {
             <button
               onClick={() => setPillar(null)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
-                pillar === null ? "bg-teal-500/20 border-teal-500/40 text-teal-300" : "border-white/10 text-slate-400 hover:text-white"
+                pillar === null ? "bg-primary/20 border-primary/40 text-primary" : "border-border text-muted-foreground hover:text-foreground"
               }`}
               data-testid="chip-pillar-all"
             >
@@ -62,7 +62,7 @@ export default function BlogIndex() {
                 key={p}
                 onClick={() => setPillar(p)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
-                  pillar === p ? "bg-teal-500/20 border-teal-500/40 text-teal-300" : "border-white/10 text-slate-400 hover:text-white"
+                  pillar === p ? "bg-primary/20 border-primary/40 text-primary" : "border-border text-muted-foreground hover:text-foreground"
                 }`}
                 data-testid={`chip-pillar-${p.replace(/\s+/g, "-").toLowerCase()}`}
               >
@@ -76,8 +76,8 @@ export default function BlogIndex() {
       <main className="container mx-auto px-6 pb-24 max-w-6xl">
         {filtered.length === 0 ? (
           <div className="glass-card rounded-2xl p-12 text-center max-w-2xl mx-auto" data-testid="blog-empty-state">
-            <h2 className="text-2xl font-bold text-white mb-3">Fresh insights are on the way.</h2>
-            <p className="text-slate-400 mb-6">
+            <h2 className="text-2xl font-bold text-foreground mb-3">Fresh insights are on the way.</h2>
+            <p className="text-muted-foreground mb-6">
               We're putting the finishing touches on our first articles. In the meantime, start your
               free trial and put the science to work.
             </p>
@@ -97,7 +97,7 @@ export default function BlogIndex() {
                 data-testid={`card-post-${post.frontmatter.slug}`}
               >
                 <Link href={`/blog/${post.frontmatter.slug}`} className="block">
-                  <div className="aspect-[1200/630] bg-slate-800 overflow-hidden">
+                  <div className="aspect-[1200/630] bg-muted overflow-hidden">
                     {post.frontmatter.heroImage && (
                       <img
                         src={post.frontmatter.heroImage}
@@ -111,18 +111,18 @@ export default function BlogIndex() {
                 <div className="p-6 flex flex-col flex-1">
                   <div className="flex flex-wrap gap-2 mb-3">
                     {(post.frontmatter.tags || []).slice(0, 2).map((t) => (
-                      <span key={t} className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-300 text-xs font-medium border border-teal-500/20">
+                      <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
                         {t}
                       </span>
                     ))}
                   </div>
                   <Link href={`/blog/${post.frontmatter.slug}`}>
-                    <h2 className="text-xl font-bold text-white mb-2 hover:text-teal-300 transition-colors">
+                    <h2 className="text-xl font-bold text-foreground mb-2 hover:text-primary transition-colors">
                       {post.frontmatter.title}
                     </h2>
                   </Link>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-4 flex-1">{post.frontmatter.description}</p>
-                  <div className="flex items-center justify-between text-xs text-slate-500 pt-4 border-t border-white/5">
+                  <p className="text-muted-foreground text-sm leading-relaxed mb-4 flex-1">{post.frontmatter.description}</p>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground/70 pt-4 border-t border-border">
                     <span>{formatDate(post.frontmatter.date)}</span>
                     <span className="inline-flex items-center gap-1">
                       <Clock className="w-3 h-3" /> {post.readingMinutes} min read

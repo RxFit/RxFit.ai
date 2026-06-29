@@ -1,4 +1,1 @@
-- [MDX ?raw glob is unusable](mdx-raw-glob.md) — @mdx-js/rollup strips the query & compiles; derive reading-time/TOC via a remark plugin instead.
-- [Cross-repo: app.rxfit.ai](cross-repo-app-rxfit.md) — app.rxfit.ai is a separate private repo (RxFit/AppRxFitai); cross-domain SEO edits go there via the GitHub connection.
-- [metaImagesPlugin og:image rewrite](meta-images-plugin.md) — build-time plugin overrides index.html og/twitter image to deployment-domain opengraph.<ext>; doesn't touch runtime Seo/JSON-LD fallbacks.
-- [Blog author lint](blog-lint.md) — remarkBlogMeta prints non-fatal [blog-lint] warnings; internal-link count = markdown `/` links only (not CTACard); seed posts legitimately warn.
+- [Theming + SSR prerender](theming-ssr.md) — Tailwind v4 CSS-first tokens; theme must default dark on server + no-flash inline script to survive prerender/hydration.

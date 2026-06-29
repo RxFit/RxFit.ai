@@ -12,10 +12,10 @@ export default function NotFound() {
         noindex
       />
       <div className="flex items-center gap-3 mb-4">
-        <AlertCircle className="h-8 w-8 text-orange-400" />
-        <h1 className="text-3xl font-bold text-white">404 — Page not found</h1>
+        <AlertCircle className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-bold text-foreground">404 — Page not found</h1>
       </div>
-      <p className="text-slate-400 max-w-md mb-8">
+      <p className="text-muted-foreground max-w-md mb-8">
         The page you were looking for doesn't exist or may have moved.
       </p>
       <Link

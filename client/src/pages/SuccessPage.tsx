@@ -36,7 +36,7 @@ export default function SuccessPage() {
         canonicalPath="/success"
         noindex
       />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-teal-500/10 blur-[120px] rounded-full -z-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/10 blur-[120px] rounded-full -z-10" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -46,36 +46,36 @@ export default function SuccessPage() {
       >
         {status === "loading" ? (
           <div className="py-12">
-            <Loader2 className="w-12 h-12 animate-spin text-teal-400 mx-auto mb-4" />
-            <p className="text-slate-400">Confirming your payment...</p>
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Confirming your payment...</p>
           </div>
         ) : (
           <>
-            <div className="w-20 h-20 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 mx-auto mb-6">
+            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary mx-auto mb-6">
               <Check className="w-10 h-10" />
             </div>
 
-            <h1 className="text-3xl font-bold text-white mb-3" data-testid="text-success-title">
+            <h1 className="text-3xl font-bold text-foreground mb-3" data-testid="text-success-title">
               Welcome to RxFit.ai!
             </h1>
 
-            <p className="text-slate-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               Your payment was successful. Check your inbox for a confirmation email.
             </p>
 
-            <div className="bg-white/5 rounded-xl p-6 mb-8 border border-white/10">
-              <h3 className="text-lg font-semibold text-white mb-3">What happens next?</h3>
-              <ul className="space-y-3 text-left text-sm text-slate-300">
+            <div className="bg-foreground/5 rounded-xl p-6 mb-8 border border-border">
+              <h3 className="text-lg font-semibold text-foreground mb-3">What happens next?</h3>
+              <ul className="space-y-3 text-left text-sm text-foreground/80">
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">1</span>
                   Check your email for login credentials
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                  <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">2</span>
                   Connect your wearable devices in the dashboard
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                  <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">3</span>
                   Your coach will reach out within 24 hours
                 </li>
               </ul>
@@ -92,7 +92,7 @@ export default function SuccessPage() {
               </a>
               <a
                 href="/"
-                className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                className="text-sm text-muted-foreground/70 hover:text-foreground/80 transition-colors"
                 data-testid="link-back-home"
               >
                 Back to homepage

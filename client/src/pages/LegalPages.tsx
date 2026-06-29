@@ -21,16 +21,16 @@ function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-300">
+    <div className="min-h-screen bg-card text-foreground/80">
       <Seo title={seoTitle ?? title} description={description} canonicalPath={canonicalPath} />
       <SiteHeader />
       <main className="pt-28 pb-20 px-6" data-testid={testId}>
         <div className="container mx-auto max-w-3xl">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-4">
             {title}
           </h1>
-          <p className="text-sm text-slate-500 mb-10">Last updated: {UPDATED}</p>
-          <div className="space-y-6 leading-relaxed text-slate-300 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-10 [&_h2]:mb-3 [&_a]:text-teal-400 [&_a:hover]:underline">
+          <p className="text-sm text-muted-foreground/70 mb-10">Last updated: {UPDATED}</p>
+          <div className="space-y-6 leading-relaxed text-foreground/80 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-10 [&_h2]:mb-3 [&_a]:text-primary [&_a:hover]:underline">
             {children}
           </div>
         </div>

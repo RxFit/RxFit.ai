@@ -19,48 +19,49 @@ import {
 import heroDashboardImg from "../assets/hero-dashboard.webp";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import SiteFooter from "@/components/SiteFooter";
+import ThemeToggle from "@/components/theme-toggle";
 import { Seo } from "@/lib/seo";
 
 const bottomLeftNotifications = [
   {
     id: "recovery",
     icon: Activity,
-    iconBg: "bg-orange-500/20",
-    iconColor: "text-orange-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Recovery Score",
     value: "92%",
     badge: "↑ 4%",
-    badgeColor: "text-emerald-400",
+    badgeColor: "text-emerald-500",
   },
   {
     id: "sleep",
     icon: Moon,
-    iconBg: "bg-indigo-500/20",
-    iconColor: "text-indigo-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Sleep Analysis",
     value: "7.8 hrs",
     badge: "94% quality",
-    badgeColor: "text-indigo-300",
+    badgeColor: "text-muted-foreground",
   },
   {
     id: "workout",
     icon: Dumbbell,
-    iconBg: "bg-teal-500/20",
-    iconColor: "text-teal-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Today's Workout",
     value: "Upper Body Push",
     badge: "Adjusted",
-    badgeColor: "text-teal-300",
+    badgeColor: "text-primary",
   },
   {
     id: "resting-hr",
     icon: Heart,
-    iconBg: "bg-rose-500/20",
-    iconColor: "text-rose-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Resting HR",
     value: "58 bpm",
     badge: "↓ 3 bpm",
-    badgeColor: "text-emerald-400",
+    badgeColor: "text-emerald-500",
   },
 ];
 
@@ -68,8 +69,8 @@ const topRightNotifications = [
   {
     id: "coach-sleep",
     icon: MessageSquare,
-    iconBg: "bg-teal-500/20",
-    iconColor: "text-teal-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Coach Sarah",
     value: '"Great sleep data! Let\'s push..."',
     isText: true,
@@ -77,18 +78,18 @@ const topRightNotifications = [
   {
     id: "calories",
     icon: Flame,
-    iconBg: "bg-red-500/20",
-    iconColor: "text-red-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Daily Calories",
     value: "2,140 kcal",
     badge: "On target",
-    badgeColor: "text-emerald-400",
+    badgeColor: "text-emerald-500",
   },
   {
     id: "coach-hrv",
     icon: MessageSquare,
-    iconBg: "bg-orange-500/20",
-    iconColor: "text-orange-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Coach Sarah",
     value: '"HRV is up — time to go heavy!"',
     isText: true,
@@ -96,12 +97,12 @@ const topRightNotifications = [
   {
     id: "trend",
     icon: TrendingUp,
-    iconBg: "bg-emerald-500/20",
-    iconColor: "text-emerald-400",
+    iconBg: "bg-primary/20",
+    iconColor: "text-primary",
     label: "Weekly Trend",
     value: "Consistency: 96%",
     badge: "Personal best",
-    badgeColor: "text-amber-400",
+    badgeColor: "text-emerald-500",
   },
 ];
 
@@ -137,7 +138,7 @@ export default function LandingPage() {
   const currentTopRight = topRightNotifications[trIndex];
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30 selection:text-primary-foreground">
       <Seo
         title="RxFit.ai — AI Health Dashboard + Human Accountability Coach"
         description="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach."
@@ -146,30 +147,31 @@ export default function LandingPage() {
       />
 
       {/* Sticky Navbar */}
-      <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-white/5">
+      <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-border">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <img src="/logo.png" alt="RxFit.ai" className="w-8 h-8 rounded-lg object-cover" />
-            <span className="text-xl font-bold tracking-tight">RxFit<span className="text-teal-400">.ai</span></span>
+            <span className="text-xl font-bold tracking-tight">RxFit<span className="text-primary">.ai</span></span>
           </a>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-            <a href="/blog" className="hover:text-white transition-colors" data-testid="link-nav-blog">Blog</a>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-foreground/80">
+            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a>
+            <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
+            <a href="/blog" className="hover:text-foreground transition-colors" data-testid="link-nav-blog">Blog</a>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <a
               href="https://app.rxfit.ai"
               rel="noopener"
-              className="hidden sm:inline-block text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              className="hidden sm:inline-block text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
               data-testid="link-nav-login"
             >
               Log In
             </a>
             <button
               onClick={() => openSignup("kickstart")}
-              className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20"
+              className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-primary/20"
               data-testid="button-nav-trial"
             >
               Start Free Trial
@@ -180,8 +182,8 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-teal-500/10 blur-[120px] rounded-full -z-10" />
-        <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-orange-500/5 blur-[100px] rounded-full -z-10" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 blur-[120px] rounded-full -z-10" />
+        <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-primary/5 blur-[100px] rounded-full -z-10" />
 
         <div className="container mx-auto text-center max-w-5xl relative z-10">
           <motion.div 
@@ -190,24 +192,24 @@ export default function LandingPage() {
             variants={staggerContainer}
             className="space-y-6"
           >
-            <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-teal-400 text-xs font-semibold tracking-wider uppercase mb-4">
-              <Zap className="w-3 h-3 fill-teal-400" />
+            <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase mb-4">
+              <Zap className="w-3 h-3 fill-primary" />
               The Future of Personal Health
             </motion.div>
             
-            <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight text-white">
+            <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight text-foreground">
               Your AI Health Dashboard.<br />
               <span className="text-gradient-teal">Your Human Coach.</span>
             </motion.h1>
             
-            <motion.p variants={fadeIn} className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              Stop guessing. <span className="text-white font-medium">RxFit.ai</span> syncs with your devices and connects you to a real human coach to turn your data into daily, consistent action.
+            <motion.p variants={fadeIn} className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Stop guessing. <span className="text-foreground font-medium">RxFit.ai</span> syncs with your devices and connects you to a real human coach to turn your data into daily, consistent action.
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <button
                 onClick={() => openSignup("kickstart")}
-                className="btn-primary w-full sm:w-auto px-8 py-4 rounded-full text-lg shadow-xl shadow-teal-500/20 flex items-center justify-center gap-2 group"
+                className="btn-primary w-full sm:w-auto px-8 py-4 rounded-full text-lg shadow-xl shadow-primary/20 flex items-center justify-center gap-2 group"
                 data-testid="button-hero-trial"
               >
                 Start Your Free Trial
@@ -215,7 +217,7 @@ export default function LandingPage() {
               </button>
               <a
                 href="#features"
-                className="w-full sm:w-auto px-8 py-4 rounded-full text-lg font-medium text-slate-300 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-8 py-4 rounded-full text-lg font-medium text-foreground/80 hover:text-foreground border border-border hover:border-foreground/20 hover:bg-foreground/5 transition-all flex items-center justify-center gap-2"
                 data-testid="link-how-it-works"
               >
                 See How It Works
@@ -223,8 +225,8 @@ export default function LandingPage() {
             </motion.div>
             
             <motion.div variants={fadeIn} className="pt-16 relative">
-               <div className="relative mx-auto max-w-4xl rounded-xl border border-white/10 shadow-2xl shadow-teal-900/50 bg-slate-900/50 backdrop-blur-sm overflow-hidden group">
-                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10" />
+               <div className="relative mx-auto max-w-4xl rounded-xl border border-border shadow-2xl shadow-primary/20 bg-card/50 backdrop-blur-sm overflow-hidden group">
+                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
                  <img 
                    src={heroDashboardImg} 
                    alt="RxFit AI Dashboard" 
@@ -249,8 +251,8 @@ export default function LandingPage() {
                           <currentBottomLeft.icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="text-xs text-slate-400">{currentBottomLeft.label}</div>
-                          <div className="text-lg font-bold text-white" data-testid="text-hero-notif-bl">
+                          <div className="text-xs text-muted-foreground">{currentBottomLeft.label}</div>
+                          <div className="text-lg font-bold text-foreground" data-testid="text-hero-notif-bl">
                             {currentBottomLeft.value}
                             {currentBottomLeft.badge && <span className={`text-xs font-normal ${currentBottomLeft.badgeColor} ml-1`}>{currentBottomLeft.badge}</span>}
                           </div>
@@ -273,11 +275,11 @@ export default function LandingPage() {
                           <currentTopRight.icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="text-xs text-slate-400">{currentTopRight.label}</div>
+                          <div className="text-xs text-muted-foreground">{currentTopRight.label}</div>
                           {currentTopRight.isText ? (
-                            <div className="text-sm font-bold text-white max-w-[200px]">{currentTopRight.value}</div>
+                            <div className="text-sm font-bold text-foreground max-w-[200px]">{currentTopRight.value}</div>
                           ) : (
-                            <div className="text-lg font-bold text-white" data-testid="text-hero-notif-tr">
+                            <div className="text-lg font-bold text-foreground" data-testid="text-hero-notif-tr">
                               {currentTopRight.value}
                               {currentTopRight.badge && <span className={`text-xs font-normal ${currentTopRight.badgeColor} ml-1`}>{currentTopRight.badge}</span>}
                             </div>
@@ -293,15 +295,15 @@ export default function LandingPage() {
       </header>
 
       {/* Social Proof */}
-      <section className="py-10 border-y border-white/5 bg-slate-900/30">
+      <section className="py-10 border-y border-border bg-muted/30">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest mb-8">Works seamlessly with your favorite gear</p>
+          <p className="text-sm font-medium text-muted-foreground/70 uppercase tracking-widest mb-8">Works seamlessly with your favorite gear</p>
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-             <span className="text-xl font-bold text-white">OURA</span>
-             <span className="text-xl font-bold text-white">GARMIN</span>
-             <span className="text-xl font-bold text-white">SnapCalorie</span>
-             <span className="text-xl font-bold text-white">Apple Health</span>
-             <span className="text-xl font-bold text-white">STRAVA</span>
+             <span className="text-xl font-bold text-foreground">OURA</span>
+             <span className="text-xl font-bold text-foreground">GARMIN</span>
+             <span className="text-xl font-bold text-foreground">SnapCalorie</span>
+             <span className="text-xl font-bold text-foreground">Apple Health</span>
+             <span className="text-xl font-bold text-foreground">STRAVA</span>
           </div>
         </div>
       </section>
@@ -309,70 +311,70 @@ export default function LandingPage() {
       {/* The Problem (Agitation) */}
       <section className="py-24 relative">
         <div className="container mx-auto px-6 max-w-4xl text-center">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Why do most high-performers fail?</h2>
-          <p className="text-lg text-slate-400 mb-16 max-w-2xl mx-auto">
-            It's not lack of effort. It's the cycle of <span className="text-orange-400">information overload</span> and <span className="text-orange-400">isolation</span>.
+          <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-6">Why do most high-performers fail?</h2>
+          <p className="text-lg text-muted-foreground mb-16 max-w-2xl mx-auto">
+            It's not lack of effort. It's the cycle of <span className="text-primary">information overload</span> and <span className="text-primary">isolation</span>.
           </p>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors text-left">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 mb-4">
+            <div className="p-8 rounded-2xl bg-foreground/5 border border-border hover:border-border transition-colors text-left">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
                 <Activity className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Data without Direction</h3>
-              <p className="text-slate-400">You have 10,000 data points from your watch, but no idea what to actually <em>do</em> today.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Data without Direction</h3>
+              <p className="text-muted-foreground">You have 10,000 data points from your watch, but no idea what to actually <em>do</em> today.</p>
             </div>
-            <div className="p-8 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors text-left">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 mb-4">
+            <div className="p-8 rounded-2xl bg-foreground/5 border border-border hover:border-border transition-colors text-left">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
                 <Brain className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Decision Fatigue</h3>
-              <p className="text-slate-400">Trying to be the nutritionist, trainer, and data analyst while running your business.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Decision Fatigue</h3>
+              <p className="text-muted-foreground">Trying to be the nutritionist, trainer, and data analyst while running your business.</p>
             </div>
-            <div className="p-8 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors text-left">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 mb-4">
+            <div className="p-8 rounded-2xl bg-foreground/5 border border-border hover:border-border transition-colors text-left">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
                 <Users className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Isolation</h3>
-              <p className="text-slate-400">Apps can't keep you accountable. When things get tough, it's easy to ignore a notification.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Isolation</h3>
+              <p className="text-muted-foreground">Apps can't keep you accountable. When things get tough, it's easy to ignore a notification.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* The Solution (The RxFit Way) */}
-      <section id="features" className="py-24 relative overflow-hidden bg-slate-900/50">
-         <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-teal-500/5 blur-[120px] rounded-full -z-10" />
+      <section id="features" className="py-24 relative overflow-hidden bg-card/50">
+         <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full -z-10" />
          
          <div className="container mx-auto px-6">
             <div className="text-center mb-16">
-               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">The <span className="text-teal-400">RxFit</span> Way</h2>
-               <p className="text-slate-400">From overwhelmed to optimized in three steps.</p>
+               <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">The <span className="text-primary">RxFit</span> Way</h2>
+               <p className="text-muted-foreground">From overwhelmed to optimized in three steps.</p>
             </div>
 
             <div className="space-y-24">
                {/* Feature 1 */}
                <div className="flex flex-col md:flex-row items-center gap-12">
                   <div className="flex-1 space-y-6">
-                     <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400 border border-teal-500/20">
+                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                         <LayoutDashboard className="w-6 h-6" />
                      </div>
-                     <h3 className="text-3xl font-bold text-white">Centralized AI Hub</h3>
-                     <p className="text-lg text-slate-400 leading-relaxed">
+                     <h3 className="text-3xl font-bold text-foreground">Centralized AI Hub</h3>
+                     <p className="text-lg text-muted-foreground leading-relaxed">
                         We integrate with Apple Health, Oura, Garmin, and more to create a single source of truth. Our AI analyzes your biometrics to find patterns you'd miss.
                      </p>
                      <ul className="space-y-3">
-                        <li className="flex items-center gap-3 text-slate-300">
-                           <Check className="w-5 h-5 text-teal-400" /> Auto-syncs with all major wearables
+                        <li className="flex items-center gap-3 text-foreground/80">
+                           <Check className="w-5 h-5 text-primary" /> Auto-syncs with all major wearables
                         </li>
-                        <li className="flex items-center gap-3 text-slate-300">
-                           <Check className="w-5 h-5 text-teal-400" /> Daily Readiness Score
+                        <li className="flex items-center gap-3 text-foreground/80">
+                           <Check className="w-5 h-5 text-primary" /> Daily Readiness Score
                         </li>
                      </ul>
                   </div>
                   <div className="flex-1 relative">
                      <div className="glass-card p-1 rounded-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <img src="/ai-visualization.webp" loading="lazy" decoding="async" width={800} height={534} alt="AI Health Data Visualization" className="rounded-xl w-full h-auto object-cover border border-white/5" />
+                        <img src="/ai-visualization.webp" loading="lazy" decoding="async" width={800} height={534} alt="AI Health Data Visualization" className="rounded-xl w-full h-auto object-cover border border-border" />
                      </div>
                   </div>
                </div>
@@ -380,25 +382,25 @@ export default function LandingPage() {
                {/* Feature 2 */}
                <div className="flex flex-col md:flex-row-reverse items-center gap-12">
                   <div className="flex-1 space-y-6">
-                     <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 border border-orange-500/20">
+                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                         <Users className="w-6 h-6" />
                      </div>
-                     <h3 className="text-3xl font-bold text-white">Real Human Touch</h3>
-                     <p className="text-lg text-slate-400 leading-relaxed">
+                     <h3 className="text-3xl font-bold text-foreground">Real Human Touch</h3>
+                     <p className="text-lg text-muted-foreground leading-relaxed">
                         Not a chatbot. A dedicated coach who sees your data and adjusts your plan daily. They know when to push you and when to tell you to rest.
                      </p>
                      <ul className="space-y-3">
-                        <li className="flex items-center gap-3 text-slate-300">
-                           <Check className="w-5 h-5 text-orange-400" /> Daily human check-ins
+                        <li className="flex items-center gap-3 text-foreground/80">
+                           <Check className="w-5 h-5 text-primary" /> Daily human check-ins
                         </li>
-                        <li className="flex items-center gap-3 text-slate-300">
-                           <Check className="w-5 h-5 text-orange-400" /> Custom workout & nutrition adjustments
+                        <li className="flex items-center gap-3 text-foreground/80">
+                           <Check className="w-5 h-5 text-primary" /> Custom workout & nutrition adjustments
                         </li>
                      </ul>
                   </div>
                   <div className="flex-1 relative">
                      <div className="glass-card p-1 rounded-2xl -rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <img src="/coach-interface.webp" loading="lazy" decoding="async" width={800} height={534} alt="Coach reviewing health data with client" className="rounded-xl w-full h-auto object-cover border border-white/5" />
+                        <img src="/coach-interface.webp" loading="lazy" decoding="async" width={800} height={534} alt="Coach reviewing health data with client" className="rounded-xl w-full h-auto object-cover border border-border" />
                      </div>
                   </div>
                </div>
@@ -408,12 +410,12 @@ export default function LandingPage() {
 
       {/* Pricing Section (The Value Stack) */}
       <section id="pricing" className="py-24 relative">
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[400px] bg-indigo-500/5 blur-[100px] rounded-full -z-10" />
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[400px] bg-primary/5 blur-[100px] rounded-full -z-10" />
 
          <div className="container mx-auto px-6">
             <div className="text-center mb-16">
-               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Simple, Transparent Investment</h2>
-               <p className="text-slate-400">Choose the level of accountability you need.</p>
+               <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">Simple, Transparent Investment</h2>
+               <p className="text-muted-foreground">Choose the level of accountability you need.</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -421,29 +423,29 @@ export default function LandingPage() {
                {/* Tier 1: Kickstart */}
                <div className="glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
                   <div className="mb-6">
-                     <h3 className="text-xl font-medium text-slate-300 mb-2">The Kickstart</h3>
+                     <h3 className="text-xl font-medium text-foreground/80 mb-2">The Kickstart</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-white" data-testid="text-price-kickstart">$49</span>
-                        <span className="text-slate-500">/mo</span>
+                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-kickstart">$49</span>
+                        <span className="text-muted-foreground/70">/mo</span>
                      </div>
-                     <div className="mt-4 inline-block px-3 py-1 rounded-full bg-teal-500/10 text-teal-400 text-xs font-bold border border-teal-500/20">
+                     <div className="mt-4 inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
                         7-Day Free Trial
                      </div>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1">
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-teal-500 shrink-0" /> AI Dashboard Access
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-primary shrink-0" /> AI Dashboard Access
                      </li>
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-teal-500 shrink-0" /> Device Sync (All brands)
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-primary shrink-0" /> Device Sync (All brands)
                      </li>
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-teal-500 shrink-0" /> Weekly Coach Check-in
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-primary shrink-0" /> Weekly Coach Check-in
                      </li>
                   </ul>
                   <button
                     onClick={() => openSignup("kickstart")}
-                    className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors"
+                    className="w-full py-3 rounded-xl border border-border hover:bg-foreground/5 text-foreground font-medium transition-colors"
                     data-testid="button-signup-kickstart"
                   >
                      Start Free Trial
@@ -452,40 +454,40 @@ export default function LandingPage() {
 
                {/* Tier 2: The Committed (Best Value) */}
                <div className="glass-card rounded-3xl p-1 flex flex-col relative transform md:-translate-y-4 z-10">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-400 to-rose-400 text-slate-900 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-lg">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-primary to-[hsl(43_55%_62%)] text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider hud-label shadow-lg">
                      Best Value
                   </div>
-                  <div className="bg-slate-900/90 rounded-[22px] p-8 h-full flex flex-col">
+                  <div className="bg-card rounded-[22px] p-8 h-full flex flex-col">
                      <div className="mb-6">
-                        <h3 className="text-xl font-bold text-white mb-2">The Committed</h3>
+                        <h3 className="text-xl font-bold text-foreground mb-2">The Committed</h3>
                         <div className="flex items-baseline gap-1">
-                           <span className="text-5xl font-bold text-white" data-testid="text-price-committed">$490</span>
-                           <span className="text-slate-500">/yr</span>
+                           <span className="text-5xl font-bold text-foreground" data-testid="text-price-committed">$490</span>
+                           <span className="text-muted-foreground/70">/yr</span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">Paid upfront. Save $98/year.</p>
+                        <p className="text-xs text-muted-foreground mt-2">Paid upfront. Save $98/year.</p>
                      </div>
                      
                      <div className="space-y-6 mb-8 flex-1">
                         <div className="space-y-3">
-                           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Core Features</div>
+                           <div className="text-xs font-bold text-muted-foreground/70 uppercase tracking-wider">Core Features</div>
                            <ul className="space-y-3">
-                              <li className="flex items-start gap-3 text-slate-300 text-sm">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Everything in Kickstart
+                              <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                                 <Check className="w-5 h-5 text-primary shrink-0" /> Everything in Kickstart
                               </li>
-                              <li className="flex items-start gap-3 text-slate-300 text-sm">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Priority Coach Access
+                              <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                                 <Check className="w-5 h-5 text-primary shrink-0" /> Priority Coach Access
                               </li>
                            </ul>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                           <div className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-3">Included Bonuses</div>
+                        <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                           <div className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Included Bonuses</div>
                            <ul className="space-y-3">
-                              <li className="flex items-start gap-3 text-white text-sm font-medium">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> $150 Value for Garmin HRM
+                              <li className="flex items-start gap-3 text-foreground text-sm font-medium">
+                                 <Check className="w-5 h-5 text-primary shrink-0" /> $150 Value for Garmin HRM
                               </li>
-                              <li className="flex items-start gap-3 text-white text-sm font-medium">
-                                 <Check className="w-5 h-5 text-orange-400 shrink-0" /> Live Audit w/ Licensed Nutritionist
+                              <li className="flex items-start gap-3 text-foreground text-sm font-medium">
+                                 <Check className="w-5 h-5 text-primary shrink-0" /> Live Audit w/ Licensed Nutritionist
                               </li>
                            </ul>
                         </div>
@@ -493,7 +495,7 @@ export default function LandingPage() {
 
                      <button
                        onClick={() => openSignup("committed")}
-                       className="btn-secondary w-full py-4 rounded-xl shadow-lg shadow-orange-500/20"
+                       className="btn-secondary w-full py-4 rounded-xl shadow-lg shadow-primary/20"
                        data-testid="button-signup-committed"
                      >
                         Claim Annual Offer
@@ -504,32 +506,32 @@ export default function LandingPage() {
                {/* Tier 3: Transformation */}
                <div className="glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
                   <div className="mb-6">
-                     <h3 className="text-xl font-medium text-slate-300 mb-2">The Transformation</h3>
+                     <h3 className="text-xl font-medium text-foreground/80 mb-2">The Transformation</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-white" data-testid="text-price-transformation">$997</span>
-                        <span className="text-slate-500">/one-time</span>
+                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-transformation">$997</span>
+                        <span className="text-muted-foreground/70">/one-time</span>
                      </div>
-                     <div className="mt-4 inline-block px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700">
+                     <div className="mt-4 inline-block px-3 py-1 rounded-full bg-muted text-foreground/80 text-xs font-bold border border-border">
                         VIP Access
                      </div>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1">
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-white shrink-0" /> 1-on-1 Deep Dive Strategy
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-foreground shrink-0" /> 1-on-1 Deep Dive Strategy
                      </li>
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-white shrink-0" /> Executive Wellness Audit
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-foreground shrink-0" /> Executive Wellness Audit
                      </li>
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-white shrink-0" /> Daily Live Coaching Interaction
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-foreground shrink-0" /> Daily Live Coaching Interaction
                      </li>
-                     <li className="flex items-start gap-3 text-slate-300 text-sm">
-                        <Check className="w-5 h-5 text-white shrink-0" /> Lifetime Community Access
+                     <li className="flex items-start gap-3 text-foreground/80 text-sm">
+                        <Check className="w-5 h-5 text-foreground shrink-0" /> Lifetime Community Access
                      </li>
                   </ul>
                   <button
                     onClick={() => openSignup("transformation")}
-                    className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium transition-colors"
+                    className="w-full py-3 rounded-xl border border-border hover:bg-foreground/5 text-foreground font-medium transition-colors"
                     data-testid="button-signup-transformation"
                   >
                      Book a Strategy Call
@@ -541,18 +543,18 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonial Section */}
-      <section className="py-24 bg-slate-900/50">
+      <section className="py-24 bg-card/50">
         <div className="container mx-auto px-6 max-w-4xl">
            <div className="glass-card p-10 rounded-2xl relative">
-              <div className="absolute -top-6 -left-6 text-6xl text-teal-500/20 font-serif">"</div>
-              <p className="text-2xl text-slate-200 leading-relaxed text-center italic mb-8">
-                 "I've tried every app out there. RxFit is different because <span className="text-teal-400 font-bold">my coach actually sees the data</span>. When I had a bad sleep week, she adjusted my workouts automatically. That consistency changed everything."
+              <div className="absolute -top-6 -left-6 text-6xl text-primary/20 font-serif">"</div>
+              <p className="text-2xl text-foreground leading-relaxed text-center italic mb-8">
+                 "I've tried every app out there. RxFit is different because <span className="text-primary font-bold">my coach actually sees the data</span>. When I had a bad sleep week, she adjusted my workouts automatically. That consistency changed everything."
               </p>
               <div className="flex items-center justify-center gap-4">
-                 <div className="w-12 h-12 rounded-full bg-slate-700" />
+                 <div className="w-12 h-12 rounded-full bg-muted" />
                  <div className="text-left">
-                    <div className="font-bold text-white">Michael R.</div>
-                    <div className="text-sm text-slate-500">Software Executive</div>
+                    <div className="font-bold text-foreground">Michael R.</div>
+                    <div className="text-sm text-muted-foreground/70">Software Executive</div>
                  </div>
               </div>
            </div>

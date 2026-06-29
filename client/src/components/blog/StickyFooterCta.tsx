@@ -27,16 +27,16 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-[90] border-t border-white/10 bg-slate-950/90 backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-[90] border-t border-border bg-card/90 backdrop-blur-md"
       data-testid="sticky-footer-cta"
     >
       <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="hidden sm:flex w-9 h-9 rounded-full bg-teal-500/15 items-center justify-center text-teal-400 shrink-0">
+          <div className="hidden sm:flex w-9 h-9 rounded-full bg-primary/15 items-center justify-center text-primary shrink-0">
             <Sparkles className="w-4 h-4" />
           </div>
-          <p className="text-sm text-slate-200 truncate">
-            Ready to turn your data into action? <span className="hidden sm:inline text-slate-400">Coach + AI, free for 7 days.</span>
+          <p className="text-sm text-foreground truncate">
+            Ready to turn your data into action? <span className="hidden sm:inline text-muted-foreground">Coach + AI, free for 7 days.</span>
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -52,7 +52,7 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
           </button>
           <button
             onClick={dismiss}
-            className="p-2 text-slate-400 hover:text-white"
+            className="p-2 text-muted-foreground hover:text-foreground"
             aria-label="Dismiss"
             data-testid="button-sticky-dismiss"
           >

@@ -87,44 +87,44 @@ export default function SignupModal({
           >
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition-colors"
               data-testid="button-close-modal"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="mb-6">
-              <h3 className="text-2xl font-bold text-white mb-2">Get Started with RxFit.ai</h3>
-              <p className="text-sm text-slate-400">{planLabels[plan] || plan}</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Get Started with RxFit.ai</h3>
+              <p className="text-sm text-muted-foreground">{planLabels[plan] || plan}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                <label className="block text-sm font-medium text-foreground/80 mb-1">Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-lg bg-foreground/5 border border-border text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   data-testid="input-name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground/80 mb-1">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="you@email.com"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-lg bg-foreground/5 border border-border text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   data-testid="input-email"
                 />
               </div>
 
               {errorMsg && (
-                <p className="text-sm text-red-400" data-testid="text-error">{errorMsg}</p>
+                <p className="text-sm text-destructive" data-testid="text-error">{errorMsg}</p>
               )}
 
               <button
@@ -146,7 +146,7 @@ export default function SignupModal({
                 )}
               </button>
 
-              <p className="text-xs text-slate-500 text-center">
+              <p className="text-xs text-muted-foreground/70 text-center">
                 Secure checkout powered by Stripe. Cancel anytime.
               </p>
             </form>

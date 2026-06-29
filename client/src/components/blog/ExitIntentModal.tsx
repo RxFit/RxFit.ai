@@ -66,7 +66,7 @@ export default function ExitIntentModal({ slug }: { slug?: string }) {
           >
             <button
               onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition-colors"
               data-testid="button-close-exit"
             >
               <X className="w-5 h-5" />
@@ -74,17 +74,17 @@ export default function ExitIntentModal({ slug }: { slug?: string }) {
 
             {status === "done" ? (
               <div className="text-center py-4">
-                <div className="w-12 h-12 rounded-full bg-teal-500/15 flex items-center justify-center text-teal-400 mx-auto mb-4">
+                <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center text-primary mx-auto mb-4">
                   <Mail className="w-6 h-6" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">You're on the list!</h3>
-                <p className="text-slate-400">Check your inbox — we'll send your next steps shortly.</p>
+                <h3 className="text-2xl font-bold text-foreground mb-2">You're on the list!</h3>
+                <p className="text-muted-foreground">Check your inbox — we'll send your next steps shortly.</p>
               </div>
             ) : (
               <>
                 <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-white mb-2">Before you go…</h3>
-                  <p className="text-sm text-slate-400">
+                  <h3 className="text-2xl font-bold text-foreground mb-2">Before you go…</h3>
+                  <p className="text-sm text-muted-foreground">
                     Get our weekly breakdown of wearable data, coaching science, and what actually
                     moves the needle. No spam.
                   </p>
@@ -96,10 +96,10 @@ export default function ExitIntentModal({ slug }: { slug?: string }) {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="you@email.com"
-                    className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-4 py-3 rounded-lg bg-foreground/5 border border-border text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-exit-email"
                   />
-                  {status === "error" && <p className="text-sm text-red-400">Something went wrong. Try again.</p>}
+                  {status === "error" && <p className="text-sm text-destructive">Something went wrong. Try again.</p>}
                   <button
                     type="submit"
                     disabled={status === "loading"}

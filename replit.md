@@ -4,10 +4,10 @@
 RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion, and payment processing. The product combines AI health data integration (wearables/apps) with real human personal trainer/accountability coaching.
 
 ## Current State
-- **Frontend:** Dark Mode SaaS landing page with glassmorphism effects, Teal (#2DD4BF) and Coral (#FB923C) accents on a deep slate (#0F172A) background.
+- **Frontend:** "RxFit Concierge" Lux-Industrial / Command-HUD aesthetic — champagne-gold accent (light `hsl(38 60% 42%)` / dark `hsl(43 53% 54%)`) with light ("Warm White Luxury") and dark ("Dark Luxury") themes. Theme toggle in nav (defaults to dark; persisted in localStorage; no-flash inline script). Glassmorphism modules, HUD detailing (mono command labels, sharp lucide icons, faint full-screen grid overlay).
 - **Backend:** Express server with PostgreSQL database for lead capture and Stripe integration for payments.
 - **Payments:** Stripe Checkout integration with 3 pricing tiers, webhooks, and success page.
-- **Typography:** Inter font family throughout.
+- **Typography:** Inter (body, self-hosted), Space Grotesk (display/headings), JetBrains Mono (HUD command labels).
 
 ## Project Architecture
 - `client/src/pages/LandingPage.tsx` — Main landing page (pricing buttons open the shared signup modal via `useSignupModal`)
@@ -80,7 +80,9 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - Mobile responsive
 
 ## User Preferences
-- Dark mode SaaS aesthetic preferred
+- "RxFit Concierge" champagne-gold Lux-Industrial / Command-HUD aesthetic (supersedes the prior teal/coral palette)
+- Support BOTH light and dark themes with a nav theme toggle; dark is the default
 - Original landing page layout (not sidebar/dashboard layout)
-- Avoid executive-heavy branding for broader audience appeal
+- Premium/concierge brand feel is welcome (supersedes the earlier "avoid executive-heavy branding" note)
+- Keep brand name "RxFit.ai" and the existing logo.png
 - Subdomain architecture: landing on rxfit.ai, product app on app.rxfit.ai

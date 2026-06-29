@@ -68,8 +68,8 @@ export default function BlogPost() {
         />
         <SiteHeader />
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">Post not found</h1>
-          <p className="text-slate-400 mb-8">We couldn't find the article you were looking for.</p>
+          <h1 className="text-4xl font-bold text-foreground mb-4">Post not found</h1>
+          <p className="text-muted-foreground mb-8">We couldn't find the article you were looking for.</p>
           <Link href="/blog" className="btn-primary px-6 py-3 rounded-xl inline-flex items-center gap-2">
             <ArrowLeft className="w-5 h-5" /> Back to the blog
           </Link>
@@ -103,7 +103,7 @@ export default function BlogPost() {
 
       {isDraft && (
         <div
-          className="fixed top-0 inset-x-0 z-50 bg-orange-500 text-slate-950 text-center text-sm font-semibold py-2 px-4"
+          className="fixed top-0 inset-x-0 z-50 bg-primary text-primary-foreground text-center text-sm font-semibold py-2 px-4"
           data-testid="banner-draft-preview"
         >
           Draft preview — this post is hidden from the blog index &amp; sitemap and won't be indexed. Rename the file to remove the leading "_" to publish.
@@ -113,33 +113,33 @@ export default function BlogPost() {
       <article className="pt-28 pb-20 px-6">
         <div className="container mx-auto max-w-6xl">
           {/* Breadcrumb */}
-          <nav className="text-sm text-slate-500 mb-8 flex items-center gap-2" aria-label="Breadcrumb">
-            <Link href="/" className="hover:text-teal-400">Home</Link>
+          <nav className="text-sm text-muted-foreground/70 mb-8 flex items-center gap-2" aria-label="Breadcrumb">
+            <Link href="/" className="hover:text-primary">Home</Link>
             <span>/</span>
-            <Link href="/blog" className="hover:text-teal-400">Blog</Link>
+            <Link href="/blog" className="hover:text-primary">Blog</Link>
             <span>/</span>
-            <span className="text-slate-300" aria-current="page">{fm.title}</span>
+            <span className="text-foreground/80" aria-current="page">{fm.title}</span>
           </nav>
 
           <div className="max-w-3xl">
             <div className="flex flex-wrap gap-2 mb-4">
               {(fm.tags || []).map((t) => (
-                <span key={t} className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-300 text-xs font-medium border border-teal-500/20">
+                <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
                   {t}
                 </span>
               ))}
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight mb-6">
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight mb-6">
               {fm.title}
             </h1>
-            <div className="flex items-center gap-4 text-sm text-slate-400 mb-8">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8">
               {fm.authorPhoto ? (
                 <img src={fm.authorPhoto} alt={fm.author} loading="lazy" className="w-10 h-10 rounded-full object-cover" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-slate-700" />
+                <div className="w-10 h-10 rounded-full bg-muted" />
               )}
               <div>
-                <div className="text-white font-medium">{fm.author}</div>
+                <div className="text-foreground font-medium">{fm.author}</div>
                 <div className="flex items-center gap-3">
                   <span>{formatDate(fm.date)}</span>
                   <span className="inline-flex items-center gap-1">
@@ -151,7 +151,7 @@ export default function BlogPost() {
           </div>
 
           {fm.heroImage && (
-            <div className="rounded-2xl overflow-hidden border border-white/10 mb-12 max-w-4xl">
+            <div className="rounded-2xl overflow-hidden border border-border mb-12 max-w-4xl">
               <img
                 src={fm.heroImage}
                 alt={fm.title}
@@ -176,15 +176,15 @@ export default function BlogPost() {
                 {fm.authorPhoto ? (
                   <img src={fm.authorPhoto} alt={fm.author} loading="lazy" className="w-14 h-14 rounded-full object-cover shrink-0" />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-slate-700 shrink-0" />
+                  <div className="w-14 h-14 rounded-full bg-muted shrink-0" />
                 )}
                 <div>
-                  <div className="text-white font-bold mb-1">{fm.author}</div>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-2">{fm.authorBio}</p>
+                  <div className="text-foreground font-bold mb-1">{fm.author}</div>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-2">{fm.authorBio}</p>
                   <a
                     href={appendUtm(APP_URL, fm.slug)}
                     rel="noopener"
-                    className="text-sm text-teal-400 hover:text-teal-300 inline-flex items-center gap-1"
+                    className="text-sm text-primary hover:text-primary inline-flex items-center gap-1"
                     data-testid="link-bio-app"
                   >
                     Open the RxFit web app <ArrowRight className="w-4 h-4" />
@@ -201,13 +201,13 @@ export default function BlogPost() {
             {toc.length > 0 && (
               <aside className="hidden lg:block">
                 <div className="sticky top-24">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">On this page</div>
-                  <ul className="space-y-2 text-sm border-l border-white/10">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">On this page</div>
+                  <ul className="space-y-2 text-sm border-l border-border">
                     {toc.map((h) => (
                       <li key={h.id}>
                         <a
                           href={`#${h.id}`}
-                          className="block pl-4 -ml-px border-l border-transparent hover:border-teal-400 text-slate-400 hover:text-teal-300 transition-colors"
+                          className="block pl-4 -ml-px border-l border-transparent hover:border-primary text-muted-foreground hover:text-primary transition-colors"
                         >
                           {h.text}
                         </a>
@@ -222,7 +222,7 @@ export default function BlogPost() {
           {/* Related posts */}
           {related.length > 0 && (
             <div className="max-w-5xl mt-20">
-              <h2 className="text-2xl font-bold text-white mb-6">Related reading</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-6">Related reading</h2>
               <div className="grid gap-6 md:grid-cols-3">
                 {related.map((r) => (
                   <Link
@@ -231,9 +231,9 @@ export default function BlogPost() {
                     className="glass-card glass-card-hover rounded-2xl p-6 block"
                     data-testid={`card-related-${r.frontmatter.slug}`}
                   >
-                    <div className="text-xs text-teal-400 mb-2">{r.frontmatter.pillar}</div>
-                    <div className="text-white font-bold mb-2">{r.frontmatter.title}</div>
-                    <div className="text-sm text-slate-400 line-clamp-2">{r.frontmatter.description}</div>
+                    <div className="text-xs text-primary mb-2">{r.frontmatter.pillar}</div>
+                    <div className="text-foreground font-bold mb-2">{r.frontmatter.title}</div>
+                    <div className="text-sm text-muted-foreground line-clamp-2">{r.frontmatter.description}</div>
                   </Link>
                 ))}
               </div>
