@@ -5,23 +5,22 @@ import { Seo } from "@/lib/seo";
 
 export default function SuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [email, setEmail] = useState("");
-  const [customerId, setCustomerId] = useState("");
+  const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
+    const sid = params.get("session_id");
 
-    if (!sessionId) {
+    if (!sid) {
       setStatus("success");
       return;
     }
 
-    fetch(`/api/stripe/session/${sessionId}`)
+    setSessionId(sid);
+
+    fetch(`/api/stripe/session/${sid}`)
       .then((res) => res.json())
-      .then((data) => {
-        if (data.customer_email) setEmail(data.customer_email);
-        if (data.customer_id) setCustomerId(data.customer_id);
+      .then(() => {
         setStatus("success");
       })
       .catch(() => {
@@ -60,12 +59,9 @@ export default function SuccessPage() {
               Welcome to RxFit.ai!
             </h1>
 
-            <p className="text-slate-400 mb-2">
-              Your payment was successful{email ? ` and a confirmation has been sent to` : ""}.
+            <p className="text-slate-400 mb-6">
+              Your payment was successful. Check your inbox for a confirmation email.
             </p>
-            {email && (
-              <p className="text-teal-400 font-medium mb-6" data-testid="text-success-email">{email}</p>
-            )}
 
             <div className="bg-white/5 rounded-xl p-6 mb-8 border border-white/10">
               <h3 className="text-lg font-semibold text-white mb-3">What happens next?</h3>
@@ -87,7 +83,7 @@ export default function SuccessPage() {
 
             <div className="flex flex-col gap-3">
               <a
-                href={customerId ? `https://app.rxfit.ai?cid=${customerId}` : "https://app.rxfit.ai"}
+                href={sessionId ? `https://app.rxfit.ai?sid=${sessionId}` : "https://app.rxfit.ai"}
                 className="btn-primary w-full py-4 rounded-xl text-lg flex items-center justify-center gap-2"
                 data-testid="link-go-to-app"
               >

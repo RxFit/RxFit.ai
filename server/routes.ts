@@ -208,6 +208,12 @@ export async function registerRoutes(
     }
   });
 
+  // Track sessions whose post-purchase side effects have already been fired.
+  // An in-memory Set is sufficient: side effects are idempotent at the business
+  // level and the webhook is the authoritative trigger; this guard prevents
+  // repeated sends when the success page URL is replayed.
+  const processedSessions = new Set<string>();
+
   app.get("/api/stripe/session/:sessionId", async (req, res) => {
     try {
       const stripe = await getUncachableStripeClient();
@@ -222,21 +228,23 @@ export async function registerRoutes(
       const product = lineItem?.price?.product as any;
       const planName = product?.name || 'RxFit.ai';
 
+      const sessionId = req.params.sessionId;
       if ((session.payment_status === 'paid' || session.status === 'complete') && email) {
-        sendWelcomeEmail(email, customerName, planName).catch(() => {});
-        appendLeadToSheet({
-          email,
-          name: customerName,
-          plan: planName,
-          source: 'stripe_checkout',
-          status: 'paid',
-        }).catch(() => {});
+        if (!processedSessions.has(sessionId)) {
+          processedSessions.add(sessionId);
+          sendWelcomeEmail(email, customerName, planName).catch(() => {});
+          appendLeadToSheet({
+            email,
+            name: customerName,
+            plan: planName,
+            source: 'stripe_checkout',
+            status: 'paid',
+          }).catch(() => {});
+        }
       }
 
       return res.json({
         status: session.status,
-        customer_email: email,
-        customer_id: customerId,
         payment_status: session.payment_status,
       });
     } catch (error) {
@@ -247,20 +255,33 @@ export async function registerRoutes(
 
   app.post("/api/stripe/customer-portal", async (req, res) => {
     try {
-      const { customerId, email } = req.body;
-      const stripe = await getUncachableStripeClient();
+      const { sessionId } = req.body;
 
-      let resolvedCustomerId = customerId;
-
-      if (!resolvedCustomerId && email) {
-        const customers = await stripe.customers.list({ email, limit: 1 });
-        if (customers.data.length > 0) {
-          resolvedCustomerId = customers.data[0].id;
-        }
+      if (!sessionId || typeof sessionId !== 'string') {
+        return res.status(400).json({ message: "A valid checkout session ID is required." });
       }
 
+      const stripe = await getUncachableStripeClient();
+
+      // Resolve the customer from the Stripe session — never trust a caller-supplied
+      // customer ID or email address as proof of identity.
+      let session: any;
+      try {
+        session = await stripe.checkout.sessions.retrieve(sessionId);
+      } catch {
+        return res.status(400).json({ message: "Invalid session ID." });
+      }
+
+      if (session.payment_status !== 'paid' && session.status !== 'complete') {
+        return res.status(403).json({ message: "Session has not been paid." });
+      }
+
+      const resolvedCustomerId = typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id;
+
       if (!resolvedCustomerId) {
-        return res.status(400).json({ message: "No customer found. Please provide a valid customer ID or email." });
+        return res.status(400).json({ message: "No customer associated with this session." });
       }
 
       const portalSession = await stripe.billingPortal.sessions.create({
