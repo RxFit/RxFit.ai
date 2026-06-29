@@ -1,0 +1,92 @@
+Here's the complete UI/UX spec for this app (RxFit Concierge), organized so you can copy it directly into an adjacent app. Everything below is pulled from the actual source.
+
+1. Brand & Design Language
+Name/identity: "RxFit Concierge" — an executive wellness platform. Wordmark is Rx + gold Fit.
+Aesthetic: "Lux‑Industrial / Command‑HUD." Warm‑white luxury in light mode, "dark luxury" in dark mode, with terminal/heads‑up‑display accents (monospace labels, glow, corner brackets, scanlines, a faint grid overlay).
+Logo asset: client/src/assets/rxfit-pulse-logo.png.
+2. Color System (the core of the look)
+Defined as HSL channel triplets (no hsl() wrapper) in client/src/index.css, consumed via Tailwind with <alpha-value>. The signature accent is champagne gold.
+
+Light mode (:root) — "Warm White Luxury"
+
+--background: 40 20% 97% · --foreground: 224 28% 14%
+--card: 0 0% 100% · --border: 40 10% 88%
+--primary: 38 60% 42% (gold) · --primary-foreground: 0 0% 100%
+--sidebar: 40 15% 95% · --sidebar-primary: 38 60% 42%
+--muted: 40 10% 94% · --muted-foreground: 224 8% 48%
+--destructive: 0 72% 51%
+Charts: 38 60% 42%, 180 50% 35%, 142 45% 38%, 25 75% 47%, 262 45% 48%
+Dark mode (.dark) — "Dark Luxury"
+
+--background: 224 28% 14% · --foreground: 0 0% 100%
+--card: 224 22% 18% · --border: 222 17% 25%
+--primary: 43 53% 54% (brighter gold) · --primary-foreground: 224 28% 14%
+--sidebar: 224 30% 12% · --sidebar-primary: 43 53% 54%
+Shadows are zeroed‑out in dark mode (flat, glow does the work instead)
+Status colors (in tailwind.config.ts): online rgb(34 197 94), away rgb(245 158 11), busy rgb(239 68 68), offline rgb(156 163 175).
+
+Portal color namespace: portal-client, portal-trainer, portal-admin all map to the same gold primary — role differentiation is by label/badge, not hue.
+
+3. Typography
+Fonts loaded (Google Fonts in client/index.html + an @import in index.css): Inter (primary), JetBrains Mono, Space Grotesk.
+--font-sans: 'Inter', --font-serif: Georgia, --font-mono: 'Inter' (note: mono var currently points to Inter).
+Body: letter-spacing: 0.02em, antialiased.
+Headings: weight 600, letter-spacing: -0.01em.
+Signature "command" treatment: font-mono + uppercase + wide tracking (tracking-[0.1em] to tracking-[0.3em]) on nav items, labels, badges, and status text. This is the single most distinctive typographic move — used everywhere.
+Responsive scale-up: at ≥1024px, html { font-size: 125% }.
+4. Spacing, Radius, Shadows, Elevation
+Radius: --radius: .75rem → Tailwind lg .75rem / md .5rem / sm .375rem.
+Shadow scale: --shadow-2xs … --shadow-2xl (subtle in light, flat/zero in dark).
+Elevation system (custom): .hover-elevate, .active-elevate, .hover-elevate-2, .toggle-elevate use ::after/::before overlays with --elevate-1: rgba(0,0,0,.03) / --elevate-2: rgba(0,0,0,.06) (inverted to white in dark). Buttons/cards get a derived border via --opaque-button-border-intensity and hsl(from … calc(l + …)). This is what makes cards feel like physical "modules."
+5. Component Library
+shadcn/ui ("new-york" style, base color neutral, CSS variables on) — config in components.json. Radix UI + Tailwind under the hood.
+Full primitive set in client/src/components/ui/: accordion, alert(+dialog), avatar, badge, breadcrumb, button, calendar, card, carousel, chart, checkbox, collapsible, command, context-menu, dialog, drawer, dropdown-menu, form, hover-card, input(+otp), label, menubar, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, separator, sheet, sidebar, skeleton, slider, switch, table, tabs, textarea, toast(+toaster), toggle(+group), tooltip.
+Aliases: @/components, @/components/ui, @/lib, @/lib/utils, @/hooks, @assets, @shared.
+Icons: lucide-react, with a global override making every icon stroke-width: 2.5px; stroke-linecap: square; stroke-linejoin: miter (sharp, industrial). Company logos via react-icons/si.
+6. Layout Architecture ("Shell-and-Portal")
+Routing is wouter in client/src/App.tsx. The app picks layout chrome by role + path:
+
+DesktopShell (layouts/DesktopShell.tsx) — primary desktop chrome: role-aware AppSidebar (left), sticky top header with backdrop-blur-lg, a sidebar toggle, a monospace date stamp (YYYY.MM.DD // RXFIT CONCIERGE), "ENCRYPTED CHANNEL" label, a Jade Console terminal button (Alt+J shortcut), and a theme toggle. Scrollable <main>.
+AppSidebar (components/app-sidebar.tsx) — collapsible shadcn sidebar (--sidebar-width: 16rem, icon mode 3rem), grouped nav (Command / Operations / Protocols / Intelligence / Sovereign Mesh), logo header with SYS.STATUS: ACTIVE, footer with a synthetic "NODE:" id and a user dropdown (avatar initials, edit profile, documents, sign out).
+Role layouts (AdminLayout, TrainerLayout, ClientLayout): on desktop they delegate to DesktopShell; on mobile they switch to a bottom tab bar (icons + short labels, active indicator pill on top). Trainer sidebar is independently collapsible (w-60↔w-14).
+PortalLayout — minimal wrapper used for certain portal/admin routes.
+Portal routing rule: isPortalRoute (in App.tsx) decides whether a route renders bare (portal pages manage their own chrome) or inside DesktopShell.
+7. Navigation by Role
+Client: Dashboard, Programming/Workouts, Wellness KPIs (Biometrics), Schedule, Communications, Vault (documents), Video Library.
+Trainer: Dashboard, Client Roster, Programming, Wellness KPIs, Longevity suite (Assessment, Metabolic Phase, Genomics, Telemetry, Session Planner), Schedule, Communications, Vault, Video Library, AI Co‑pilot.
+Admin / Orchestrator: grouped "Command" (Dashboard, Trainer Performance, User Management, API Tokens) + "Operations" + collapsible Intelligence group (Council HUD, SEO/AEO, Organic Growth, Automation, Corporate ROI, Sales Velocity, Astronaut Pulse, Biometrics, Financial Audit, Trainer Intel, Knowledge Base). Orchestrator additionally gets "Sovereign Mesh → Jade Console."
+8. Theming / Dark Mode
+ThemeProvider (components/theme-provider.tsx): light | dark, toggles .dark on <html>, persists to localStorage under theme. Defaults to dark.
+Tailwind darkMode: ["class"].
+ThemeToggle component in the header.
+9. Signature/Custom CSS Utilities (the "HUD" layer)
+All in client/src/index.css — these are what make it feel bespoke rather than stock shadcn:
+
+.hud-label — 11px uppercase 0.12em mono label.
+.hud-glow / .hud-glow-amber — gold text-shadow glow (dark-mode only).
+.hud-glow-box — gold box glow + inset.
+.hud-corner — L-shaped corner brackets on panels (::before/::after).
+.hud-scanline — faint repeating horizontal scanlines in dark mode.
+Video player skin: .video-player-shell, .video-scrub, .video-timecode (gold glow, tabular numerals).
+Grid overlay: App.tsx renders a fixed full-screen 40px linear-gradient grid (rgba(255,255,255,0.02) dark / rgba(0,0,0,0.03) light).
+Glassmorphism: headers/sidebars use bg-background/90 + backdrop-blur-lg.
+Custom scrollbars: thin, 6px, gold hover thumb.
+React Flow theming: restyled controls/minimap (for node/automation views).
+Replit dev badges hidden via a CSS block at the top of index.css.
+10. Distinctive Page Patterns
+Council HUD (/council-hud): SVG gauge rings (SymbiosisRing) and "Pillar" components for KPIs.
+Jade Console (/jade, Alt+J): immersive terminal interface (jade-terminal.tsx) — scanlines, monochrome glowing text, bypasses normal chrome.
+Longevity suite: specialized dials/gauges (MetabolicPhaseDial, KPIGauge).
+Loading states use shadcn Skeleton and a gold spinner (border-t-primary animate-spin).
+11. Files to Copy (minimum viable port)
+client/src/index.css — all tokens, dark mode, HUD utilities, scrollbars, icon override.
+tailwind.config.ts — color mapping, portal/status colors, radius, fonts, animations.
+components.json + client/src/components/ui/** — the shadcn primitives.
+client/src/components/theme-provider.tsx + theme-toggle.tsx.
+client/src/layouts/** (DesktopShell, PortalLayout, role layouts) + client/src/components/app-sidebar.tsx.
+client/index.html — font <link>s + meta.
+client/src/lib/utils.ts (the cn helper) and the path aliases in vite.config.ts / tsconfig.json.
+Logo asset client/src/assets/rxfit-pulse-logo.png (swap for your brand).
+A few gotchas when porting: the gold accent differs between light (38 60% 42%) and dark (43 53% 54%); shadows are intentionally flattened in dark mode (glow replaces them); the --font-mono variable currently points to Inter (set it to JetBrains Mono if you want true mono); and the whole "command" feel comes from the font-mono + uppercase + wide tracking convention plus the .hud-* utilities — copy those or the look won't transfer.
+
+Want me to package this into a written design-spec task (e.g., "Create a UI/UX style-guide document for the adjacent app") that a build agent can execute, or are these details enough to copy from directly?
