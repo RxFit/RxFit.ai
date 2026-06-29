@@ -180,6 +180,9 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      {/* Main content landmark — wraps hero through testimonial, outside nav and footer */}
+      <main>
+
       {/* Hero Section */}
       <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 blur-[120px] rounded-full -z-10" />
@@ -560,6 +563,8 @@ export default function LandingPage() {
            </div>
         </div>
       </section>
+
+      </main>
 
       <SiteFooter />
 
