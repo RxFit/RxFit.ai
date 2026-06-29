@@ -82,7 +82,7 @@ export default function SignupModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.3 }}
-            className="glass-card rounded-2xl p-8 w-full max-w-md relative"
+            className="hud-corner hud-glow-box glass-card rounded-2xl p-8 w-full max-w-md relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button

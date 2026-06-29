@@ -153,7 +153,7 @@ export default function LandingPage() {
             <img src="/logo.png" alt="RxFit.ai" className="w-8 h-8 rounded-lg object-cover" />
             <span className="text-xl font-bold tracking-tight">RxFit<span className="text-primary">.ai</span></span>
           </a>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-foreground/80">
+          <div className="hidden md:flex items-center gap-8 hud-label text-foreground/80">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
@@ -192,7 +192,7 @@ export default function LandingPage() {
             variants={staggerContainer}
             className="space-y-6"
           >
-            <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase mb-4">
+            <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-4">
               <Zap className="w-3 h-3 fill-primary" />
               The Future of Personal Health
             </motion.div>
@@ -225,7 +225,7 @@ export default function LandingPage() {
             </motion.div>
             
             <motion.div variants={fadeIn} className="pt-16 relative">
-               <div className="relative mx-auto max-w-4xl rounded-xl border border-border shadow-2xl shadow-primary/20 bg-card/50 backdrop-blur-sm overflow-hidden group">
+               <div className="hud-corner hud-scanline hud-glow-box relative mx-auto max-w-4xl rounded-xl border border-border shadow-2xl shadow-primary/20 bg-card/50 backdrop-blur-sm overflow-hidden group">
                  <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
                  <img 
                    src={heroDashboardImg} 
@@ -251,7 +251,7 @@ export default function LandingPage() {
                           <currentBottomLeft.icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="text-xs text-muted-foreground">{currentBottomLeft.label}</div>
+                          <div className="hud-label text-muted-foreground">{currentBottomLeft.label}</div>
                           <div className="text-lg font-bold text-foreground" data-testid="text-hero-notif-bl">
                             {currentBottomLeft.value}
                             {currentBottomLeft.badge && <span className={`text-xs font-normal ${currentBottomLeft.badgeColor} ml-1`}>{currentBottomLeft.badge}</span>}
@@ -275,7 +275,7 @@ export default function LandingPage() {
                           <currentTopRight.icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="text-xs text-muted-foreground">{currentTopRight.label}</div>
+                          <div className="hud-label text-muted-foreground">{currentTopRight.label}</div>
                           {currentTopRight.isText ? (
                             <div className="text-sm font-bold text-foreground max-w-[200px]">{currentTopRight.value}</div>
                           ) : (
@@ -297,7 +297,7 @@ export default function LandingPage() {
       {/* Social Proof */}
       <section className="py-10 border-y border-border bg-muted/30">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm font-medium text-muted-foreground/70 uppercase tracking-widest mb-8">Works seamlessly with your favorite gear</p>
+          <p className="hud-label text-muted-foreground/70 mb-8">Works seamlessly with your favorite gear</p>
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
              <span className="text-xl font-bold text-foreground">OURA</span>
              <span className="text-xl font-bold text-foreground">GARMIN</span>
@@ -421,7 +421,7 @@ export default function LandingPage() {
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                
                {/* Tier 1: Kickstart */}
-               <div className="glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
+               <div className="hud-corner glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-foreground/80 mb-2">The Kickstart</h3>
                      <div className="flex items-baseline gap-1">
@@ -453,7 +453,7 @@ export default function LandingPage() {
                </div>
 
                {/* Tier 2: The Committed (Best Value) */}
-               <div className="glass-card rounded-3xl p-1 flex flex-col relative transform md:-translate-y-4 z-10">
+               <div className="hud-corner hud-glow-box glass-card rounded-3xl p-1 flex flex-col relative transform md:-translate-y-4 z-10">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-primary to-[hsl(43_55%_62%)] text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider hud-label shadow-lg">
                      Best Value
                   </div>
@@ -469,7 +469,7 @@ export default function LandingPage() {
                      
                      <div className="space-y-6 mb-8 flex-1">
                         <div className="space-y-3">
-                           <div className="text-xs font-bold text-muted-foreground/70 uppercase tracking-wider">Core Features</div>
+                           <div className="hud-label font-bold text-muted-foreground/70">Core Features</div>
                            <ul className="space-y-3">
                               <li className="flex items-start gap-3 text-foreground/80 text-sm">
                                  <Check className="w-5 h-5 text-primary shrink-0" /> Everything in Kickstart
@@ -481,7 +481,7 @@ export default function LandingPage() {
                         </div>
 
                         <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                           <div className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Included Bonuses</div>
+                           <div className="hud-label font-bold text-primary mb-3">Included Bonuses</div>
                            <ul className="space-y-3">
                               <li className="flex items-start gap-3 text-foreground text-sm font-medium">
                                  <Check className="w-5 h-5 text-primary shrink-0" /> $150 Value for Garmin HRM
@@ -504,7 +504,7 @@ export default function LandingPage() {
                </div>
 
                {/* Tier 3: Transformation */}
-               <div className="glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
+               <div className="hud-corner glass-card rounded-3xl p-8 flex flex-col glass-card-hover relative group">
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-foreground/80 mb-2">The Transformation</h3>
                      <div className="flex items-baseline gap-1">

@@ -37,7 +37,7 @@ export default function BlogIndex() {
       <header className="relative pt-32 pb-16 px-6 overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-primary/10 blur-[120px] rounded-full -z-10" />
         <div className="container mx-auto max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">
             The RxFit Journal
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">
@@ -93,7 +93,7 @@ export default function BlogIndex() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col"
+                className="hud-corner glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col"
                 data-testid={`card-post-${post.frontmatter.slug}`}
               >
                 <Link href={`/blog/${post.frontmatter.slug}`} className="block">

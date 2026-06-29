@@ -11,7 +11,7 @@ export default function SiteHeader() {
           <img src="/logo.png" alt="RxFit.ai" className="w-8 h-8 rounded-lg object-cover" />
           <span className="text-xl font-bold tracking-tight">RxFit<span className="text-primary">.ai</span></span>
         </Link>
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-foreground/80">
+        <div className="hidden md:flex items-center gap-8 hud-label text-foreground/80">
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>
           <a href="/#pricing" className="hover:text-foreground transition-colors">Pricing</a>
