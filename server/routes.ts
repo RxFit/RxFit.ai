@@ -1,12 +1,13 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { sendLeadEmail, sendWelcomeEmail } from "./emailService";
+import { sendWelcomeEmail } from "./emailService";
 import { appendLeadToSheet } from "./sheetsService";
 import fs from "fs";
 import path from "path";
@@ -19,23 +20,30 @@ function parseFrontmatter(raw: string): Record<string, any> {
   return parseYaml(m[1]) ?? {};
 }
 
+const leadsRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again later." },
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
-  app.post("/api/leads", async (req, res) => {
+  app.post("/api/leads", leadsRateLimit, async (req, res) => {
     try {
       const parsed = insertLeadSchema.parse(req.body);
 
       const existing = await storage.getLeadByEmail(parsed.email);
       if (existing) {
-        return res.status(200).json({ message: "You're already on the list!", lead: existing });
+        return res.status(200).json({ message: "You're in! Check your email for next steps." });
       }
 
-      const lead = await storage.createLead(parsed);
+      await storage.createLead(parsed);
 
-      sendLeadEmail(parsed.email, parsed.name || '').catch(() => {});
       appendLeadToSheet({
         email: parsed.email,
         name: parsed.name || undefined,
@@ -44,7 +52,7 @@ export async function registerRoutes(
         status: 'lead',
       }).catch(() => {});
 
-      return res.status(201).json({ message: "You're in! Check your email for next steps.", lead });
+      return res.status(200).json({ message: "You're in! Check your email for next steps." });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Please enter a valid email address.", errors: error.errors });
@@ -54,7 +62,11 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/leads", async (_req, res) => {
+  app.get("/api/leads", async (req, res) => {
+    const adminKey = process.env.ADMIN_API_KEY;
+    if (!adminKey || req.headers["x-admin-key"] !== adminKey) {
+      return res.status(401).json({ message: "Unauthorized." });
+    }
     try {
       const allLeads = await storage.getLeads();
       return res.status(200).json(allLeads);

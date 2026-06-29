@@ -1,5 +1,14 @@
 import { getUncachableGmailClient } from './gmailClient';
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function createMimeMessage(to: string, subject: string, htmlBody: string): string {
   const boundary = 'boundary_' + Date.now();
   const message = [
@@ -21,7 +30,8 @@ function createMimeMessage(to: string, subject: string, htmlBody: string): strin
 }
 
 function getWelcomeEmailHtml(name: string, planName: string): string {
-  const firstName = name ? name.split(' ')[0] : 'there';
+  const firstName = escapeHtml(name ? name.split(' ')[0] : 'there');
+  const safePlanName = escapeHtml(planName);
   return `
 <!DOCTYPE html>
 <html>
@@ -43,7 +53,7 @@ function getWelcomeEmailHtml(name: string, planName: string): string {
             <td>
               <h2 style="color:#F8FAFC;font-size:24px;margin:0 0 20px;">Welcome to RxFit.ai, ${firstName}!</h2>
               <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 20px;">
-                You've just taken the first step toward transforming your health with the <strong style="color:#2DD4BF;">${planName}</strong> plan. We're excited to have you on board.
+                You've just taken the first step toward transforming your health with the <strong style="color:#2DD4BF;">${safePlanName}</strong> plan. We're excited to have you on board.
               </p>
               <h3 style="color:#F8FAFC;font-size:18px;margin:0 0 15px;">Here's what happens next:</h3>
               <table cellpadding="0" cellspacing="0" style="margin-bottom:25px;">
@@ -82,7 +92,7 @@ function getWelcomeEmailHtml(name: string, planName: string): string {
 }
 
 function getLeadWelcomeEmailHtml(name: string): string {
-  const firstName = name ? name.split(' ')[0] : 'there';
+  const firstName = escapeHtml(name ? name.split(' ')[0] : 'there');
   return `
 <!DOCTYPE html>
 <html>

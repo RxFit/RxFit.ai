@@ -22,11 +22,13 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
-export const insertLeadSchema = createInsertSchema(leads).pick({
-  email: true,
-  name: true,
-  plan: true,
-});
+export const insertLeadSchema = createInsertSchema(leads)
+  .pick({ email: true, name: true, plan: true })
+  .extend({
+    email: z.string().email().max(254).transform((v) => v.toLowerCase().trim()),
+    name: z.string().max(100).optional(),
+    plan: z.enum(["kickstart", "committed", "transformation"]).optional(),
+  });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
