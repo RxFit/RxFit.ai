@@ -10,6 +10,10 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 5001
+externalPort = 3002
+
+[[ports]]
 localPort = 5099
 externalPort = 3000
 
@@ -46,7 +50,7 @@ waitForPort = 5000
 [agent]
 stack = "MOCKUP_JS"
 mockupState = "FULLSTACK"
-integrations = ["stripe:2.0.0", "google-mail:1.0.0", "google-sheet:1.0.0", "github:1.0.0"]
+integrations = ["stripe:2.0.0", "google-mail:1.0.0", "google-sheet:1.0.0", "github:1.0.0", "javascript_openai_ai_integrations:2.0.0"]
 
 [userenv]
 

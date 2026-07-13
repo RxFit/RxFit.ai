@@ -28,7 +28,15 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `content/blog/*.mdx` — Blog posts (frontmatter + MDX body); see `content/blog/README.md` author guide
 - `client/public/llms.txt` — AI-assistant summary of the site (AEO/GEO)
 - `client/src/index.css` — Design system (dark mode SaaS theme with glassmorphism utilities)
-- `shared/schema.ts` — Database schema (users, leads tables)
+- `shared/schema.ts` — Database schema (users, leads, generated_posts, keyword_themes tables)
+- `shared/generated-blog.ts` — Types/zod schemas shared by the AI blog publisher (server + client)
+- `server/exaClient.ts` — Exa research API client (EXA_API_KEY secret)
+- `server/blogGenerator.ts` — AI post pipeline: theme → Exa research → gpt-5.4 (json_object) → validate w/ one retry (incl. disallowed-URL-scheme rejection) → publish to DB → Gmail notification; loud failure email + rethrow
+- `server/blogScheduler.ts` — Hourly + boot check; publishes when the newest post is ≥3 days old; pg advisory lock prevents double-publish; runs in production (or `BLOG_AUTOPUBLISH=true` in dev)
+- `server/blogSsr.ts` — Runtime crawler HTML for DB posts (head mirrors seo.tsx incl. JSON-LD; marked-rendered body with raw-HTML escaping + URL scheme sanitization, brand classes, TOC ids)
+- `server/generate-post.ts` — Manual CLI: `npx tsx server/generate-post.ts` publishes one post now
+- `client/src/lib/generatedPosts.ts` — react-query hooks for `/api/blog/posts*` + frontmatter adapter
+- `client/src/components/blog/GeneratedPostContent.tsx` — Renders DB posts with the same brand primitives (TLDR/KeyTakeaways/CTACard/FAQ) via ReactMarkdown
 - `server/routes.ts` — API routes (leads, Stripe checkout, products, session retrieval, email+sheets triggers)
 - `server/storage.ts` — Database storage interface using Drizzle ORM
 - `server/db.ts` — PostgreSQL connection pool (with SSL for production)
@@ -65,6 +73,14 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **Attribution:** `client/src/lib/utm.ts` captures/persists UTMs and builds a `client_reference_id` (`slug|source|medium|campaign`) passed through `/api/stripe/checkout`.
 - **Analytics:** Plausible (`data-domain=rxfit.ai` in `client/index.html`); `client/src/lib/analytics.ts` tracks `pageview`, `scroll_50`, `scroll_90`, `cta_*` events.
 - **Cross-domain authority:** Crawlable `<a href="https://app.rxfit.ai">` links in header/footer/landing/post + Organization `sameAs`. Reciprocal links FROM app.rxfit.ai are a manual step — see `CROSS-DOMAIN-SEO.md`.
+
+## Automated AI Blog Publisher
+- **Cadence:** In production, `server/blogScheduler.ts` checks hourly (and at boot) and publishes a new post whenever the newest published post is ≥3 days old. A Postgres advisory lock prevents double-publish across instances. In dev the scheduler is off unless `BLOG_AUTOPUBLISH=true`; publish manually with `npx tsx server/generate-post.ts`.
+- **Pipeline:** rotating keyword theme (`keyword_themes` table, least-recently-used first) → Exa search for fresh sources (`server/exaClient.ts`, `EXA_API_KEY` secret) → gpt-5.4 via Replit OpenAI integration (`AI_INTEGRATIONS_OPENAI_API_KEY/BASE_URL`, `response_format: json_object`) → strict validation (required fields, ≥3 H2s, ≥700 words, ≥3 internal links, meta length, unique slug, no disallowed URL schemes) with one retry → insert into `generated_posts` → Gmail publish notification. Any failure sends a failure email to the Gmail account owner and rethrows (loud failure).
+- **Serving (no redeploy):** `GET /api/blog/posts` + `/api/blog/posts/:slug` serve DB posts; runtime `GET /blog/:slug` in `server/routes.ts` returns full crawler HTML via `server/blogSsr.ts` (falls through to static files for MDX slugs; SPA shell in dev). `prerender.ts` saves the raw built shell to `dist/public/template.html` for this. `/sitemap.xml` merges DB posts with MDX posts.
+- **Client:** `BlogIndex`/`BlogPost` merge DB posts with MDX posts via `client/src/lib/generatedPosts.ts`; `GeneratedPostContent.tsx` renders markdown with the brand primitives (TLDR, KeyTakeaways, mid-article CTACard, FAQ). `main.tsx` renders fresh (no hydration) when the shell has `data-runtime-ssr`.
+- **Security:** LLM markdown is never trusted — raw HTML is escaped and link/image URL schemes are sanitized in `blogSsr.ts` (render-time) and rejected in `blogGenerator.ts` validation (publish-time); client uses ReactMarkdown (no raw HTML, safe URL transform).
+- **gpt-5.4 notes:** do not pass `temperature`/`max_tokens`; `response_format: {type: "json_object"}` works.
 
 ## Key Features
 - Blog with SEO/AEO/CRO infrastructure (MDX posts, JSON-LD, sitemap/robots/llms.txt, CTAs, analytics)

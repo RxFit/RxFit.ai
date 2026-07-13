@@ -1,14 +1,16 @@
 import { useEffect, useMemo } from "react";
 import { Link, useRoute } from "wouter";
 import { MDXProvider } from "@mdx-js/react";
-import { ArrowLeft, ArrowRight, Clock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock, Loader2 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import StickyFooterCta from "@/components/blog/StickyFooterCta";
 import ExitIntentModal from "@/components/blog/ExitIntentModal";
 import { mdxComponents, CTACard } from "@/components/blog/MdxComponents";
+import GeneratedPostContent from "@/components/blog/GeneratedPostContent";
 import { Seo, APP_URL } from "@/lib/seo";
 import { getPostBySlug, getRelatedPosts } from "@/lib/blogLoader";
+import { useGeneratedPost, toFrontmatter } from "@/lib/generatedPosts";
 import { track } from "@/lib/analytics";
 import { appendUtm } from "@/lib/utm";
 
@@ -23,15 +25,28 @@ function formatDate(date: string) {
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
   const slug = params?.slug || "";
-  const post = getPostBySlug(slug);
-  const toc = post?.toc ?? [];
+  // Build-time MDX posts take priority; otherwise try the DB-backed
+  // (AI-generated) posts published at runtime.
+  const staticPost = getPostBySlug(slug);
+  const genQuery = useGeneratedPost(slug, !staticPost);
+  const generated = staticPost ? undefined : genQuery.data || undefined;
+
+  const fm = staticPost
+    ? staticPost.frontmatter
+    : generated
+      ? toFrontmatter(generated)
+      : undefined;
+  const readingMinutes = staticPost?.readingMinutes ?? generated?.readingMinutes ?? 1;
+  const toc = staticPost?.toc ?? generated?.toc ?? [];
+  const pillar = fm?.pillar;
   const related = useMemo(
-    () => (post ? getRelatedPosts(slug, post.frontmatter.pillar) : []),
-    [slug, post],
+    () => (fm ? getRelatedPosts(slug, pillar) : []),
+    [slug, fm !== undefined, pillar],
   );
 
+  const hasPost = !!fm;
   useEffect(() => {
-    if (!post) return;
+    if (!hasPost) return;
     track("pageview", { slug });
     let fired50 = false;
     let fired90 = false;
@@ -55,9 +70,23 @@ export default function BlogPost() {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [slug, post]);
+  }, [slug, hasPost]);
 
-  if (!post) {
+  // Still checking the runtime post API — show a quiet loading state instead
+  // of flashing "Post not found".
+  if (!staticPost && (genQuery.isLoading || genQuery.isFetching) && !generated) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex items-center justify-center" data-testid="blog-post-loading">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (!fm) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <Seo
@@ -79,7 +108,6 @@ export default function BlogPost() {
     );
   }
 
-  const { frontmatter: fm, Component, readingMinutes } = post;
   const isDraft = fm.slug.startsWith("_");
 
   return (
@@ -167,9 +195,13 @@ export default function BlogPost() {
           <div className="lg:grid lg:grid-cols-[1fr_260px] lg:gap-12">
             {/* Content */}
             <div className="max-w-3xl min-w-0" data-testid="blog-post-content">
-              <MDXProvider components={mdxComponents}>
-                <Component />
-              </MDXProvider>
+              {staticPost ? (
+                <MDXProvider components={mdxComponents}>
+                  <staticPost.Component />
+                </MDXProvider>
+              ) : generated ? (
+                <GeneratedPostContent post={generated} />
+              ) : null}
 
               {/* Author bio + contextual app link */}
               <div className="glass-card rounded-2xl p-6 mt-12 flex gap-4 items-start" data-testid="blog-author-bio">

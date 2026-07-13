@@ -13,6 +13,7 @@ import fs from "fs";
 import path from "path";
 import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
+import { renderGeneratedPostPage } from "./blogSsr";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -320,6 +321,82 @@ export async function registerRoutes(
     }
   });
 
+  // ---- AI-generated blog posts (DB-backed, live without redeploy) ----
+
+  app.get("/api/blog/posts", async (_req, res) => {
+    try {
+      const posts = await storage.getPublishedGeneratedPosts();
+      return res.json(
+        posts.map((p) => ({
+          slug: p.slug,
+          title: p.title,
+          seoTitle: p.seoTitle,
+          description: p.description,
+          pillar: p.pillar,
+          tags: p.tags,
+          author: p.author,
+          authorBio: p.authorBio,
+          heroImage: p.heroImage,
+          recommendedPlan: p.recommendedPlan,
+          date: p.date,
+          readingMinutes: p.readingMinutes,
+        })),
+      );
+    } catch (error) {
+      console.error("Error listing generated posts:", error);
+      return res.status(500).json({ message: "Failed to load posts." });
+    }
+  });
+
+  app.get("/api/blog/posts/:slug", async (req, res) => {
+    try {
+      const post = await storage.getGeneratedPostBySlug(req.params.slug);
+      if (!post || post.status !== "published") {
+        return res.status(404).json({ message: "Post not found." });
+      }
+      return res.json({
+        slug: post.slug,
+        title: post.title,
+        seoTitle: post.seoTitle,
+        description: post.description,
+        pillar: post.pillar,
+        tags: post.tags,
+        author: post.author,
+        authorBio: post.authorBio,
+        heroImage: post.heroImage,
+        recommendedPlan: post.recommendedPlan,
+        date: post.date,
+        readingMinutes: post.readingMinutes,
+        tldr: post.tldr,
+        keyTakeaways: post.keyTakeaways,
+        bodyMarkdown: post.bodyMarkdown,
+        faq: post.faq,
+        toc: post.toc,
+      });
+    } catch (error) {
+      console.error("Error loading generated post:", error);
+      return res.status(500).json({ message: "Failed to load post." });
+    }
+  });
+
+  // Runtime SSR for generated posts: prerendered MDX posts are static files,
+  // but DB posts appear after the deploy, so their crawlable HTML is rendered
+  // on request. Falls through (next()) for non-DB slugs so the static
+  // prerendered file — or the 404 shell — is served instead. In dev the
+  // template doesn't exist and the Vite SPA shell takes over.
+  app.get("/blog/:slug", async (req, res, next) => {
+    try {
+      const post = await storage.getGeneratedPostBySlug(req.params.slug);
+      if (!post || post.status !== "published") return next();
+      const page = renderGeneratedPostPage(post);
+      if (!page) return next();
+      return res.status(200).type("html").send(page);
+    } catch (error) {
+      console.error("Error rendering generated post page:", error);
+      return next();
+    }
+  });
+
   // ---- SEO / AEO crawlable endpoints ----
 
   type BlogMeta = { slug: string; date: string };
@@ -364,7 +441,7 @@ export async function registerRoutes(
     "/contact": "2026-06-18",
   };
 
-  app.get("/sitemap.xml", (_req, res) => {
+  app.get("/sitemap.xml", async (_req, res) => {
     const staticUrls = [
       { loc: "/", lastmod: STATIC_PAGE_DATES["/"], priority: "1.0" },
       { loc: "/blog", lastmod: STATIC_PAGE_DATES["/blog"], priority: "0.8" },
@@ -372,7 +449,17 @@ export async function registerRoutes(
       { loc: "/terms", lastmod: STATIC_PAGE_DATES["/terms"], priority: "0.3" },
       { loc: "/contact", lastmod: STATIC_PAGE_DATES["/contact"], priority: "0.4" },
     ];
-    const postUrls = readBlogPosts().map((p) => ({
+    const mdxPosts = readBlogPosts();
+    let generatedPosts: { slug: string; date: string }[] = [];
+    try {
+      const mdxSlugs = new Set(mdxPosts.map((p) => p.slug));
+      generatedPosts = (await storage.getPublishedGeneratedPosts())
+        .filter((p) => !mdxSlugs.has(p.slug))
+        .map((p) => ({ slug: p.slug, date: p.date }));
+    } catch (err) {
+      console.error("Error reading generated posts for sitemap:", err);
+    }
+    const postUrls = [...mdxPosts, ...generatedPosts].map((p) => ({
       loc: `/blog/${p.slug}`,
       lastmod: new Date(p.date).toISOString().slice(0, 10),
       priority: "0.7",

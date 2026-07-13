@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Clock } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { Seo, SITE_URL } from "@/lib/seo";
-import { getAllPosts, PILLARS } from "@/lib/blogLoader";
+import { getAllPosts, PILLARS, type PostFrontmatter } from "@/lib/blogLoader";
+import { useGeneratedPosts, toFrontmatter } from "@/lib/generatedPosts";
+
+/** Minimal card shape shared by build-time MDX posts and DB-backed posts. */
+interface PostCard {
+  frontmatter: PostFrontmatter;
+  readingMinutes: number;
+}
 
 function formatDate(date: string) {
   try {
@@ -16,7 +23,17 @@ function formatDate(date: string) {
 }
 
 export default function BlogIndex() {
-  const posts = getAllPosts();
+  const staticPosts = getAllPosts();
+  const { data: generated } = useGeneratedPosts();
+  const posts: PostCard[] = useMemo(() => {
+    const staticSlugs = new Set(staticPosts.map((p) => p.frontmatter.slug));
+    const dbCards: PostCard[] = (generated || [])
+      .filter((g) => !staticSlugs.has(g.slug))
+      .map((g) => ({ frontmatter: toFrontmatter(g), readingMinutes: g.readingMinutes }));
+    return [...staticPosts, ...dbCards].sort(
+      (a, b) => new Date(b.frontmatter.date).getTime() - new Date(a.frontmatter.date).getTime(),
+    );
+  }, [staticPosts, generated]);
   const [pillar, setPillar] = useState<string | null>(null);
   const filtered = pillar ? posts.filter((p) => p.frontmatter.pillar === pillar) : posts;
 

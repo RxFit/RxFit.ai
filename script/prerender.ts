@@ -54,6 +54,12 @@ export async function prerender() {
 
   const template = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
 
+  // Preserve the raw SPA shell (with the seo:start block + <!--app-html-->
+  // placeholder intact) so the server can render DB-backed blog posts at
+  // runtime (see server/blogSsr.ts). Must happen before index.html is
+  // overwritten by the "/" prerender below.
+  fs.writeFileSync(path.join(PUBLIC_DIR, "template.html"), template);
+
   const renderToFile = (route: string, file: string, status: string) => {
     const { html, head } = render(route);
     let page = template.replace(SEO_BLOCK, head);

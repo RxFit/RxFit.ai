@@ -155,6 +155,80 @@ export async function sendWelcomeEmail(email: string, name: string, planName: st
   }
 }
 
+/** Resolve the connected Gmail account's own address (the site owner). */
+async function getOwnerEmail(): Promise<string> {
+  const gmail = await getUncachableGmailClient();
+  const profile = await gmail.users.getProfile({ userId: 'me' });
+  const address = profile.data.emailAddress;
+  if (!address) throw new Error('Could not resolve owner Gmail address');
+  return address;
+}
+
+/** Notify the owner that the auto-publisher shipped a new blog post. Throws on failure. */
+export async function sendPostPublishedEmail(post: {
+  title: string;
+  slug: string;
+  keywordTheme: string;
+  pillar: string;
+  readingMinutes: number;
+}): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const to = await getOwnerEmail();
+  const url = `https://rxfit.ai/blog/${post.slug}`;
+  const html = `
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
+        <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#D4AF37;font-size:24px;margin:0;">RxFit.ai Auto-Publisher</h1></td></tr>
+        <tr><td>
+          <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 16px;">New blog post published</h2>
+          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 8px;"><strong style="color:#F8FAFC;">${escapeHtml(post.title)}</strong></p>
+          <p style="color:#94A3B8;font-size:14px;margin:0 0 4px;">Theme: ${escapeHtml(post.keywordTheme)} &middot; Pillar: ${escapeHtml(post.pillar)} &middot; ${post.readingMinutes} min read</p>
+          <p style="color:#94A3B8;font-size:14px;margin:0 0 24px;"><a href="${url}" style="color:#D4AF37;">${url}</a></p>
+          <p style="color:#64748B;font-size:13px;margin:0;">This post is live now — no redeploy needed. It appears on /blog and in sitemap.xml automatically.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  const raw = createMimeMessage(to, `✅ New RxFit.ai blog post live: ${post.title}`, html);
+  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+  console.log(`[blog-publisher] Publish notification sent to ${to}`);
+}
+
+/** Notify the owner that an auto-publish run failed. Best-effort (never throws). */
+export async function sendPostFailureEmail(stage: string, error: unknown): Promise<void> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
+    const html = `
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(239,68,68,0.4);border-radius:16px;padding:40px;">
+        <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#EF4444;font-size:24px;margin:0;">RxFit.ai Auto-Publisher</h1></td></tr>
+        <tr><td>
+          <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 16px;">Blog auto-publish FAILED</h2>
+          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 12px;">Stage: <strong style="color:#F8FAFC;">${escapeHtml(stage)}</strong></p>
+          <pre style="color:#FCA5A5;background:rgba(239,68,68,0.08);border-radius:8px;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(message.slice(0, 4000))}</pre>
+          <p style="color:#64748B;font-size:13px;margin:16px 0 0;">No post was published in this run. The next scheduled run will retry automatically.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+    const raw = createMimeMessage(to, `❌ RxFit.ai blog auto-publish failed (${stage})`, html);
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    console.log(`[blog-publisher] Failure notification sent to ${to}`);
+  } catch (notifyError) {
+    console.error('[blog-publisher] Could not send failure notification email:', notifyError);
+  }
+}
+
 export async function sendLeadEmail(email: string, name: string): Promise<void> {
   try {
     const gmail = await getUncachableGmailClient();
