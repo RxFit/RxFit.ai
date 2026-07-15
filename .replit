@@ -38,6 +38,10 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "seo"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -46,6 +50,17 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "seo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/validate-seo.mjs"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "MOCKUP_JS"
