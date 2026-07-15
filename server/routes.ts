@@ -14,6 +14,7 @@ import path from "path";
 import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
 import { renderGeneratedPostPage } from "./blogSsr";
+import { getHeroImageBytes } from "./heroImage";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -376,6 +377,27 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error loading generated post:", error);
       return res.status(500).json({ message: "Failed to load post." });
+    }
+  });
+
+  // AI-generated hero images live in object storage (they must survive
+  // redeploys); this route serves them under a stable site-relative path so
+  // heroImage values work in the client, the crawler HTML, and og:image.
+  app.get("/blog-heroes/:file", async (req, res) => {
+    const file = req.params.file;
+    // Slug-derived filenames only — no traversal, no other extensions.
+    if (!/^[a-z0-9-]+\.webp$/.test(file)) {
+      return res.status(404).json({ message: "Not found." });
+    }
+    try {
+      const bytes = await getHeroImageBytes(file);
+      if (!bytes) return res.status(404).json({ message: "Not found." });
+      res.setHeader("Content-Type", "image/webp");
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      return res.send(bytes);
+    } catch (error) {
+      console.error("Error serving hero image:", error);
+      return res.status(500).json({ message: "Failed to load image." });
     }
   });
 

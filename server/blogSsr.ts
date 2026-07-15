@@ -223,6 +223,11 @@ function formatDate(date: string): string {
 
 function buildArticleHtml(post: GeneratedPost): string {
   const bodyHtml = markdownToHtml(post.bodyMarkdown);
+  const heroSrc = post.heroImage ? sanitizeUrl(post.heroImage) : "";
+  const hero =
+    heroSrc && heroSrc !== "#"
+      ? `<div class="rounded-2xl overflow-hidden border border-border mb-12 max-w-4xl"><img src="${escapeHtml(heroSrc)}" alt="${escapeHtml(post.title)}" fetchpriority="high" decoding="sync" width="1200" height="675" class="w-full h-auto object-cover" /></div>`
+      : "";
   const tags = post.tags
     .map(
       (t) =>
@@ -262,6 +267,7 @@ function buildArticleHtml(post: GeneratedPost): string {
           </div>
         </div>
       </div>
+      ${hero}
       <div class="max-w-3xl min-w-0">
         <div class="glass-card rounded-2xl p-6 my-8 border-l-4 border-l-primary">
           <div class="hud-label font-bold text-primary mb-3">TL;DR</div>

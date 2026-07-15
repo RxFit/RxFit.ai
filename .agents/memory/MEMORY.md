@@ -1,2 +1,3 @@
 - [Theming + SSR prerender](theming-ssr.md) — Tailwind v4 CSS-first tokens; theme must default dark on server + no-flash inline script to survive prerender/hydration.
 - [LLM content safety](llm-generated-content-safety.md) — AI-written markdown is untrusted input: sanitize URL schemes at render time AND reject them at publish time.
+- [Object storage at runtime](object-storage-runtime.md) — pass bucketId explicitly to the SDK; runtime-generated assets must live in object storage (deploy FS is ephemeral) behind a serving route.

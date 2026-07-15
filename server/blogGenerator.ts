@@ -13,6 +13,7 @@ import { parse as parseYaml } from "yaml";
 import { storage } from "./storage";
 import { researchTheme, type ExaResult } from "./exaClient";
 import { sendPostPublishedEmail, sendPostFailureEmail } from "./emailService";
+import { generateAndStoreHeroImage } from "./heroImage";
 import {
   extractToc,
   computeReadingMinutes,
@@ -245,9 +246,21 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
       }
     }
 
-    stage = "publish";
+    stage = "hero-image";
     let slug = slugifyHeading(draft.slug);
     if (existingSlugs.has(slug)) slug = `${slug}-${new Date().getFullYear()}`;
+    // Best-effort: a hero-image failure must never block the post itself.
+    let heroImage: string | null = null;
+    try {
+      heroImage = await generateAndStoreHeroImage(slug, draft.title.trim(), theme.pillar);
+    } catch (heroError) {
+      console.error(
+        `[blog-publisher] Hero image generation failed for "${slug}" — publishing without one:`,
+        heroError,
+      );
+    }
+
+    stage = "publish";
     const bodyMarkdown = draft.bodyMarkdown.trim();
     const toc = extractToc(bodyMarkdown);
     const readingMinutes = computeReadingMinutes(bodyMarkdown);
@@ -264,7 +277,7 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
       tags: draft.tags.map((t) => t.trim()).filter(Boolean),
       author: AUTHOR,
       authorBio: AUTHOR_BIO,
-      heroImage: null,
+      heroImage,
       recommendedPlan: draft.recommendedPlan,
       tldr: draft.tldr.trim(),
       keyTakeaways: draft.keyTakeaways.map((k) => k.trim()).filter(Boolean),
