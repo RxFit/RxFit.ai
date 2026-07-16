@@ -55,7 +55,15 @@ export function metaImagesPlugin(): Plugin {
   };
 }
 
+const CANONICAL_DOMAIN = 'rxfit.ai';
+
 function getDeploymentUrl(): string | null {
+  if (process.env.REPLIT_DEPLOYMENT || process.env.NODE_ENV === 'production') {
+    const url = `https://${CANONICAL_DOMAIN}`;
+    log('[meta-images] using canonical brand domain:', url);
+    return url;
+  }
+
   if (process.env.REPLIT_INTERNAL_APP_DOMAIN) {
     const url = `https://${process.env.REPLIT_INTERNAL_APP_DOMAIN}`;
     log('[meta-images] using internal app domain:', url);
