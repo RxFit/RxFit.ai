@@ -155,7 +155,8 @@ export type TierPriceCandidate = {
  * with the expected amount. Empty array = everything matches.
  *
  * This mirrors what SignupModalProvider does with /api/stripe/products
- * (metadata.tier → price id, silent hardcoded fallback) — but loudly.
+ * (metadata.tier → price id; checkout is disabled when a tier can't
+ * resolve) — but loudly, so the owner hears about it.
  */
 export function findTierPriceProblems(prices: TierPriceCandidate[]): string[] {
   const problems: string[] = [];
@@ -167,8 +168,8 @@ export function findTierPriceProblems(prices: TierPriceCandidate[]): string[] {
       const archivedOnly = prices.some((p) => p.product?.metadata?.tier === tier);
       problems.push(
         archivedOnly
-          ? `${tier}: product with metadata.tier="${tier}" is archived (buyers silently get the hardcoded fallback price)`
-          : `${tier}: no active Stripe product has metadata.tier="${tier}" (buyers silently get the hardcoded fallback price)`,
+          ? `${tier}: product with metadata.tier="${tier}" is archived (checkout for this tier is disabled until fixed)`
+          : `${tier}: no active Stripe product has metadata.tier="${tier}" (checkout for this tier is disabled until fixed)`,
       );
       continue;
     }
@@ -212,8 +213,8 @@ async function checkProducts(): Promise<void> {
   // Verify the live Stripe catalog still matches the site's plan tiers:
   // each PLAN_PRICING tier must resolve (via product metadata.tier) to an
   // active recurring price with the advertised amount. If a product is
-  // renamed/archived or loses its tier metadata, SignupModalProvider silently
-  // falls back to hardcoded LIVE_PRICE_IDS — this check makes that loud.
+  // renamed/archived or loses its tier metadata, the signup modal disables
+  // checkout for that tier — this check tells the owner why, loudly.
   const stripe = await getUncachableStripeClient();
   const prices = await stripe.prices.list({
     active: true,

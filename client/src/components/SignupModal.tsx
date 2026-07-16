@@ -10,11 +10,13 @@ export default function SignupModal({
   onClose,
   plan,
   priceId,
+  pricingStatus = "ready",
 }: {
   isOpen: boolean;
   onClose: () => void;
   plan: string;
   priceId: string | null;
+  pricingStatus?: "loading" | "ready" | "error";
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -124,13 +126,20 @@ export default function SignupModal({
                 />
               </div>
 
+              {pricingStatus === "error" && (
+                <p className="text-sm text-destructive" data-testid="text-pricing-error">
+                  We couldn't load current pricing. Please refresh the page or try
+                  again in a few minutes — you won't be charged an outdated price.
+                </p>
+              )}
+
               {errorMsg && (
                 <p className="text-sm text-destructive" data-testid="text-error">{errorMsg}</p>
               )}
 
               <button
                 type="submit"
-                disabled={mutation.isPending || isRedirecting}
+                disabled={mutation.isPending || isRedirecting || pricingStatus !== "ready" || !priceId}
                 className="w-full btn-primary py-4 rounded-xl text-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 data-testid="button-submit-signup"
               >

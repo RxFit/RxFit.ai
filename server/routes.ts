@@ -93,6 +93,12 @@ export async function registerRoutes(
     }
   });
 
+  // Last-known-good snapshot of the products list. If both the DB sync and
+  // the live Stripe API are unavailable, we serve this instead of failing —
+  // it always reflects a previously-verified live catalog (never hardcoded),
+  // so checkout can't use a price ID that never matched the live catalog.
+  let productsCache: { data: any[]; cachedAt: number } | null = null;
+
   app.get("/api/stripe/products", async (_req, res) => {
     try {
       let productsData: any[] = [];
@@ -161,9 +167,18 @@ export async function registerRoutes(
         }
       }
 
+      if (productsData.length > 0) {
+        productsCache = { data: productsData, cachedAt: Date.now() };
+      }
       return res.json({ data: productsData });
     } catch (error) {
       console.error("Error listing products:", error);
+      if (productsCache) {
+        console.warn(
+          `Serving last-known-good products snapshot from ${new Date(productsCache.cachedAt).toISOString()}`,
+        );
+        return res.json({ data: productsCache.data, stale: true });
+      }
       return res.status(500).json({ message: "Failed to list products." });
     }
   });

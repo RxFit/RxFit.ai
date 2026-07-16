@@ -163,10 +163,45 @@ describe("SignupModal checkout path", () => {
     expect(locationMock.href).toBe("https://rxfit.ai/");
   });
 
-  it("missing priceId shows an error and never calls the API", async () => {
-    renderModal({ priceId: null });
-    fillAndSubmit("ada@example.com");
+  it("pricingStatus='error' shows a visible pricing error and disables the submit button", async () => {
+    renderModal({ priceId: null, pricingStatus: "error" });
 
+    expect(screen.getByTestId("text-pricing-error").textContent).toContain(
+      "couldn't load current pricing",
+    );
+    expect(
+      (screen.getByTestId("button-submit-signup") as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    // Even a programmatic submit never reaches the API.
+    fireEvent.submit(screen.getByTestId("input-email").closest("form")!);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(locationMock.href).toBe("https://rxfit.ai/");
+  });
+
+  it("pricingStatus='loading' disables the submit button without an error message", () => {
+    renderModal({ priceId: null, pricingStatus: "loading" });
+
+    expect(screen.queryByTestId("text-pricing-error")).toBeNull();
+    expect(
+      (screen.getByTestId("button-submit-signup") as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("missing priceId disables checkout and never calls the API", async () => {
+    renderModal({ priceId: null });
+
+    // Submit is disabled the moment the price ID is unavailable…
+    expect(
+      (screen.getByTestId("button-submit-signup") as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    // …and even a programmatic submit is guarded and never reaches the API.
+    fireEvent.change(screen.getByTestId("input-email"), {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.submit(screen.getByTestId("input-email").closest("form")!);
     await waitFor(() => {
       expect(screen.getByTestId("text-error")).toBeTruthy();
     });
