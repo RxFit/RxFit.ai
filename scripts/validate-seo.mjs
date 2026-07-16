@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims } from "./priceGuards.mjs";
+import { dbSslConfig } from "../shared/db-ssl.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BLOG_DIR = path.join(ROOT, "content", "blog");
@@ -555,7 +556,7 @@ async function validateDbPostLinks(mdxSlugs, staticRoutes) {
   }
   const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    ssl: dbSslConfig(),
     connectionTimeoutMillis: 15000,
   });
   try {

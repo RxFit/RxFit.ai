@@ -37,6 +37,19 @@ describe("validate-seo DB broken-link gate", () => {
     expect(out).toContain("SEO validation passed");
   }, 120_000);
 
+  it("connects successfully over SSL in a production build context (NODE_ENV=production)", async () => {
+    // Deploy builds run this gate with NODE_ENV=production, which switches the
+    // pool to ssl: { rejectUnauthorized: false } (shared/db-ssl.mjs — same
+    // config as server/db.ts). Verify that path actually connects, so an SSL
+    // config drift can't silently start failing every deploy.
+    if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required for this test");
+    const { code, out } = await runScript({ NODE_ENV: "production" });
+    expect(out).not.toContain("failed to validate DB-published post links");
+    expect(out).not.toContain("DATABASE_URL not set");
+    expect(code).toBe(0);
+    expect(out).toContain("SEO validation passed");
+  }, 120_000);
+
   it("fails hard (exit 1) when the DB query fails — never downgraded to a warning", async () => {
     // Port 1 on localhost refuses connections immediately.
     const { code, out } = await runScript({

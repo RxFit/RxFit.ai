@@ -49,7 +49,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `client/src/components/blog/GeneratedPostContent.tsx` — Renders DB posts with the same brand primitives (TLDR/KeyTakeaways/CTACard/FAQ) via ReactMarkdown
 - `server/routes.ts` — API routes (leads, Stripe checkout, products, session retrieval, email+sheets triggers)
 - `server/storage.ts` — Database storage interface using Drizzle ORM
-- `server/db.ts` — PostgreSQL connection pool (with SSL for production)
+- `server/db.ts` — PostgreSQL connection pool; SSL config comes from `shared/db-ssl.mjs` (`dbSslConfig()` — `{rejectUnauthorized:false}` in production, off otherwise), the single source of truth shared with the validate-seo DB link gate so the app and deploy gate can't drift (unit-tested in `shared/db-ssl.test.ts`; a `scripts/validate-seo.dbgate.test.ts` case runs the gate with NODE_ENV=production to prove the SSL path actually connects)
 - `server/stripeClient.ts` — Stripe client with Replit connector credentials
 - `server/webhookHandlers.ts` — Stripe webhook processing via stripe-replit-sync
 - `server/seed-products.ts` — Script to create Stripe products/prices (run manually)
