@@ -1,4 +1,5 @@
 import { SITE_URL } from "./site";
+import { PLAN_PRICING, TRIAL_COPY, jsonLdPrice } from "./stripe-constants";
 
 /**
  * Landing-page structured data (FAQPage + Product/Offer JSON-LD) used by
@@ -22,11 +23,11 @@ export const FAQ_ITEMS = [
   },
   {
     q: "How much does RxFit.ai cost?",
-    a: "RxFit has three plans: The Kickstart at $49/month with a 7-day free trial (AI dashboard, device sync, weekly coach check-in), The Committed at $490/year paid upfront (saves $98 and adds priority coach access), and The Transformation at $997 one-time (1-on-1 deep-dive coaching and an executive wellness audit).",
+    a: `RxFit has three plans: ${PLAN_PRICING.kickstart.name} at ${PLAN_PRICING.kickstart.perMonth} with a ${TRIAL_COPY} (AI dashboard, device sync, weekly coach check-in), ${PLAN_PRICING.committed.name} at ${PLAN_PRICING.committed.perYear} paid upfront (saves ${PLAN_PRICING.committed.savings} and adds priority coach access), and ${PLAN_PRICING.transformation.name} at ${PLAN_PRICING.transformation.oneTime} (1-on-1 deep-dive coaching and an executive wellness audit).`,
   },
   {
     q: "Is there a free trial, and can I cancel anytime?",
-    a: "Yes. The Kickstart plan includes a 7-day free trial, and you can cancel your subscription at any time from the billing portal — no long-term contract or cancellation fee.",
+    a: `Yes. ${PLAN_PRICING.kickstart.name} plan includes a ${TRIAL_COPY}, and you can cancel your subscription at any time from the billing portal — no long-term contract or cancellation fee.`,
   },
   {
     q: "Who is RxFit.ai for?",
@@ -56,15 +57,15 @@ export const PRICING_JSONLD = {
   offers: [
     {
       "@type": "Offer",
-      name: "The Kickstart",
-      description: "AI dashboard access, device sync for all brands, and a weekly coach check-in. Includes a 7-day free trial.",
-      price: "49.00",
+      name: PLAN_PRICING.kickstart.name,
+      description: `AI dashboard access, device sync for all brands, and a weekly coach check-in. Includes a ${TRIAL_COPY}.`,
+      price: jsonLdPrice("kickstart"),
       priceCurrency: "USD",
       url: `${SITE_URL}/#pricing`,
       availability: "https://schema.org/InStock",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
-        price: "49.00",
+        price: jsonLdPrice("kickstart"),
         priceCurrency: "USD",
         billingDuration: 1,
         billingIncrement: 1,
@@ -73,15 +74,15 @@ export const PRICING_JSONLD = {
     },
     {
       "@type": "Offer",
-      name: "The Committed",
-      description: "Everything in Kickstart plus priority coach access, paid annually upfront — saves $98 per year.",
-      price: "490.00",
+      name: PLAN_PRICING.committed.name,
+      description: `Everything in Kickstart plus priority coach access, paid annually upfront — saves ${PLAN_PRICING.committed.savings} per year.`,
+      price: jsonLdPrice("committed"),
       priceCurrency: "USD",
       url: `${SITE_URL}/#pricing`,
       availability: "https://schema.org/InStock",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
-        price: "490.00",
+        price: jsonLdPrice("committed"),
         priceCurrency: "USD",
         billingDuration: 1,
         billingIncrement: 1,
@@ -90,9 +91,9 @@ export const PRICING_JSONLD = {
     },
     {
       "@type": "Offer",
-      name: "The Transformation",
+      name: PLAN_PRICING.transformation.name,
       description: "One-time VIP program: 1-on-1 deep-dive strategy, executive wellness audit, daily live coaching, lifetime community access.",
-      price: "997.00",
+      price: jsonLdPrice("transformation"),
       priceCurrency: "USD",
       url: `${SITE_URL}/#pricing`,
       availability: "https://schema.org/InStock",

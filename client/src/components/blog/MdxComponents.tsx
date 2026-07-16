@@ -9,7 +9,7 @@ import {
 import { Check, Lightbulb, AlertTriangle, Info, ArrowUpRight, ChevronRight } from "lucide-react";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import { track } from "@/lib/analytics";
-import { type PlanTier } from "@shared/stripe-constants";
+import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
 
 /* ------------------------------------------------------------------ */
 /* TL;DR — top-of-post summary, optimized for AI extraction (AEO)      */
@@ -60,17 +60,17 @@ export function KeyTakeaways({
 /* ------------------------------------------------------------------ */
 const PLAN_COPY: Record<PlanTier, { name: string; pitch: string; cta: string }> = {
   kickstart: {
-    name: "The Kickstart",
-    pitch: "Try the full AI dashboard + weekly coach check-ins free for 7 days.",
+    name: PLAN_PRICING.kickstart.name,
+    pitch: `Try the full AI dashboard + weekly coach check-ins free for ${PLAN_PRICING.kickstart.trialDays} days.`,
     cta: "Start your free trial",
   },
   committed: {
-    name: "The Committed",
-    pitch: "Go all-in for a year with priority coach access and bonus gear — save $98.",
+    name: PLAN_PRICING.committed.name,
+    pitch: `Go all-in for a year with priority coach access and bonus gear — save ${PLAN_PRICING.committed.savings}.`,
     cta: "Claim the annual offer",
   },
   transformation: {
-    name: "The Transformation",
+    name: PLAN_PRICING.transformation.name,
     pitch: "1-on-1 deep-dive coaching and a full executive wellness audit.",
     cta: "Book a strategy call",
   },

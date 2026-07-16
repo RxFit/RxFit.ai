@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 import { Check, ChevronRight, Minus, X } from "lucide-react";
 
 import { useSignupModal } from "@/components/SignupModalProvider";
@@ -18,7 +19,7 @@ type CellValue = { text: string; tone: "good" | "bad" | "neutral" };
 const COMPARISON_ROWS: { label: string; rxfit: CellValue; trainer: CellValue; apps: CellValue }[] = [
   {
     label: "Typical monthly cost",
-    rxfit: { text: "$49/mo (7-day free trial)", tone: "good" },
+    rxfit: { text: `${PLAN_PRICING.kickstart.perMonthShort} (${TRIAL_COPY})`, tone: "good" },
     trainer: { text: "$400–$800/mo for 2–3 sessions a week", tone: "bad" },
     apps: { text: "$10–$40/mo", tone: "neutral" },
   },
@@ -61,7 +62,7 @@ const OPTIONS = [
     pros: [
       "A dedicated coach who sees your wearable data and adjusts your plan daily",
       "One dashboard for Oura, Garmin, Apple Health, Strava, and more",
-      "A fraction of the cost of in-person training ($49/mo vs $400+/mo)",
+      `A fraction of the cost of in-person training (${PLAN_PRICING.kickstart.perMonthShort} vs $400+/mo)`,
       "Accountability that follows you all week, not just at appointments",
     ],
     cons: [
@@ -124,7 +125,7 @@ const WHO_SHOULD = [
 const COMPARE_FAQ = [
   {
     q: "Is RxFit.ai a replacement for a personal trainer?",
-    a: "For most people whose main challenge is consistency, yes. RxFit gives you a real human coach who reviews your wearable data and adjusts your plan daily, for $49/month instead of $400–$800/month. A traditional in-person trainer is still the better choice if you need hands-on form correction or supervised injury rehab.",
+    a: `For most people whose main challenge is consistency, yes. RxFit gives you a real human coach who reviews your wearable data and adjusts your plan daily, for ${PLAN_PRICING.kickstart.perMonth} instead of $400–$800/month. A traditional in-person trainer is still the better choice if you need hands-on form correction or supervised injury rehab.`,
   },
   {
     q: "How is RxFit different from fitness apps like workout trackers?",
@@ -132,7 +133,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How much does RxFit cost compared to a personal trainer?",
-    a: "RxFit starts at $49/month with a 7-day free trial. A traditional personal trainer typically costs $400–$800/month for two to three sessions per week — roughly ten times the price for a few hours of weekly contact.",
+    a: `RxFit starts at ${PLAN_PRICING.kickstart.perMonth} with a ${TRIAL_COPY}. A traditional personal trainer typically costs $400–$800/month for two to three sessions per week — roughly ten times the price for a few hours of weekly contact.`,
   },
   {
     q: "Do I need a wearable device to use RxFit?",
@@ -213,7 +214,7 @@ export default function ComparePage() {
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed" data-testid="text-compare-intro">
               There are three ways to get fit with help: hire an in-person personal trainer
               ($400–$800/month), use a self-serve fitness app ($10–$40/month), or combine AI data
-              analysis with a real human coach — which is what RxFit.ai does, from $49/month.
+              analysis with a real human coach — which is what RxFit.ai does, from {PLAN_PRICING.kickstart.perMonth}.
               Here's an honest look at when each one makes sense.
             </p>
           </div>
@@ -326,8 +327,8 @@ export default function ComparePage() {
               Get a coach who actually sees your data
             </h2>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Try RxFit.ai free for 7 days — AI dashboard, device sync, and a real human coach
-              for $49/month after your trial.
+              Try RxFit.ai free for {PLAN_PRICING.kickstart.trialDays} days — AI dashboard, device sync, and a real human coach
+              for {PLAN_PRICING.kickstart.perMonth} after your trial.
             </p>
             <button
               onClick={() => {

@@ -22,6 +22,7 @@ import SiteFooter from "@/components/SiteFooter";
 import ThemeToggle from "@/components/theme-toggle";
 import { Seo } from "@/lib/seo";
 import { FAQ_ITEMS, FAQ_JSONLD, PRICING_JSONLD } from "@shared/landing-seo";
+import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 import {
   Accordion,
   AccordionContent,
@@ -218,7 +219,7 @@ export default function LandingPage() {
             </motion.p>
 
             <motion.p variants={fadeIn} className="text-sm text-muted-foreground/80 max-w-2xl mx-auto leading-relaxed" data-testid="text-hero-definition">
-              RxFit.ai is an AI-powered health coaching service that combines wearable data from Oura, Garmin, and Apple Health with a dedicated human coach — from $49/month with a 7-day free trial.
+              RxFit.ai is an AI-powered health coaching service that combines wearable data from Oura, Garmin, and Apple Health with a dedicated human coach — from {PLAN_PRICING.kickstart.perMonth} with a {TRIAL_COPY}.
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -440,11 +441,11 @@ export default function LandingPage() {
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-foreground/80 mb-2">The Kickstart</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-kickstart">$49</span>
-                        <span className="text-muted-foreground/70">/mo</span>
+                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-kickstart">{PLAN_PRICING.kickstart.display}</span>
+                        <span className="text-muted-foreground/70">/{PLAN_PRICING.kickstart.interval === "month" ? "mo" : PLAN_PRICING.kickstart.interval}</span>
                      </div>
                      <div className="mt-4 inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
-                        7-Day Free Trial
+                        {PLAN_PRICING.kickstart.trialDays}-Day Free Trial
                      </div>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1">
@@ -476,10 +477,10 @@ export default function LandingPage() {
                      <div className="mb-6">
                         <h3 className="text-xl font-bold text-foreground mb-2">The Committed</h3>
                         <div className="flex items-baseline gap-1">
-                           <span className="text-5xl font-bold text-foreground" data-testid="text-price-committed">$490</span>
-                           <span className="text-muted-foreground/70">/yr</span>
+                           <span className="text-5xl font-bold text-foreground" data-testid="text-price-committed">{PLAN_PRICING.committed.display}</span>
+                           <span className="text-muted-foreground/70">/{PLAN_PRICING.committed.interval === "year" ? "yr" : PLAN_PRICING.committed.interval}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">Paid upfront. Save $98/year.</p>
+                        <p className="text-xs text-muted-foreground mt-2">Paid upfront. Save {PLAN_PRICING.committed.savings}/year.</p>
                      </div>
                      
                      <div className="space-y-6 mb-8 flex-1">
@@ -523,8 +524,8 @@ export default function LandingPage() {
                   <div className="mb-6">
                      <h3 className="text-xl font-medium text-foreground/80 mb-2">The Transformation</h3>
                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-transformation">$997</span>
-                        <span className="text-muted-foreground/70">/one-time</span>
+                        <span className="text-4xl font-bold text-foreground" data-testid="text-price-transformation">{PLAN_PRICING.transformation.display}</span>
+                        <span className="text-muted-foreground/70">/{PLAN_PRICING.transformation.interval}</span>
                      </div>
                      <div className="mt-4 inline-block px-3 py-1 rounded-full bg-muted text-foreground/80 text-xs font-bold border border-border">
                         VIP Access

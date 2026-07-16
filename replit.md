@@ -25,7 +25,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `client/src/lib/analytics.ts` — Plausible `track(event, props)` wrapper (safe no-op when not loaded)
 - `client/src/lib/utm.ts` — UTM capture/persistence, `appendUtm`, and `getClientReferenceId` for Stripe attribution
 - `remark-blog-meta.ts` — Build-time remark plugin: injects `readingMinutes` + `toc` exports and assigns H2 ids
-- `shared/stripe-constants.ts` — Live Stripe price IDs (single source of truth for landing + blog CTAs)
+- `shared/stripe-constants.ts` — Live Stripe price IDs + `PLAN_PRICING`/`TRIAL_COPY`/`jsonLdPrice()` (single source of truth for all price copy: landing pricing cards + hero sentence, compare-page copy, FAQ answers, Product/Offer JSON-LD, blog PLAN_COPY names/pitches; consistency guarded by shared/landing-seo.test.ts)
 - `content/blog/*.mdx` — Blog posts (frontmatter + MDX body); see `content/blog/README.md` author guide
 - `client/public/llms.txt` — AI-assistant summary of the site (AEO/GEO)
 - `server/*.test.ts` + `vitest.config.ts` — Vitest unit tests for the publishing safety gates (`validateDraft`, `sanitizeUrl`/`markdownToHtml`, scheduler `isPostDue`); run with `npm test` (registered as the `test` validation step). Tests also run automatically at the start of `npm run build` (`script/build.ts` runs `vitest run` first and exits non-zero on failure), so a failing safety test blocks every deploy.
