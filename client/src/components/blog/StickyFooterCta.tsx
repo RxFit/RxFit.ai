@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { X, Sparkles } from "lucide-react";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import { track } from "@/lib/analytics";
+import { PLAN_PRICING } from "@shared/stripe-constants";
 
 const DISMISS_KEY = "rxfit_sticky_dismissed";
 
@@ -36,7 +37,7 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
             <Sparkles className="w-4 h-4" />
           </div>
           <p className="text-sm text-foreground truncate">
-            Ready to turn your data into action? <span className="hidden sm:inline text-muted-foreground">Coach + AI, free for 7 days.</span>
+            Ready to turn your data into action? <span className="hidden sm:inline text-muted-foreground">Coach + AI, free for {PLAN_PRICING.kickstart.trialDays} days.</span>
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -48,7 +49,7 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
             className="btn-primary px-5 py-2.5 rounded-full text-sm whitespace-nowrap"
             data-testid="button-sticky-trial"
           >
-            Try RxFit free for 7 days
+            Try RxFit free for {PLAN_PRICING.kickstart.trialDays} days
           </button>
           <button
             onClick={dismiss}

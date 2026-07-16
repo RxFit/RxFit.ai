@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronRight, X, Loader2 } from "lucide-react";
 import { getClientReferenceId } from "@/lib/utm";
+import { PLAN_PRICING } from "@shared/stripe-constants";
 
 export default function SignupModal({
   isOpen,
@@ -54,9 +55,9 @@ export default function SignupModal({
   };
 
   const planLabels: Record<string, string> = {
-    kickstart: "The Kickstart — 7-Day Free Trial",
-    committed: "The Committed — Annual Plan",
-    transformation: "The Transformation — VIP Access",
+    kickstart: `${PLAN_PRICING.kickstart.name} — ${PLAN_PRICING.kickstart.trialDays}-Day Free Trial`,
+    committed: `${PLAN_PRICING.committed.name} — Annual Plan`,
+    transformation: `${PLAN_PRICING.transformation.name} — VIP Access`,
   };
 
   const handleClose = () => {
