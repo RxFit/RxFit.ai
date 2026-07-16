@@ -519,6 +519,7 @@ export async function registerRoutes(
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 # Explicitly welcome AI crawlers so our content can be cited (AEO/GEO)
 # Each group repeats the shared disallows so dedicated groups don't override them
@@ -526,26 +527,31 @@ User-agent: GPTBot
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 User-agent: PerplexityBot
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 User-agent: ClaudeBot
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 User-agent: Google-Extended
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 User-agent: CCBot
 Allow: /
 Disallow: /api/
 Disallow: /success
+Disallow: /admin
 
 Sitemap: ${baseUrl}/sitemap.xml
 `;

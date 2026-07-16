@@ -23,6 +23,9 @@ const CONTENT_DIR = path.resolve(import.meta.dirname, "..", "content", "blog");
 function isKnownRoute(reqPath: string): boolean {
   const clean = reqPath.replace(/\/+$/, "") || "/";
   if ((STATIC_ROUTES as readonly string[]).includes(clean)) return true;
+  // Internal admin dashboard — real route, but deliberately kept out of
+  // STATIC_ROUTES so it never appears in the sitemap.
+  if (clean === "/admin") return true;
 
   const blogMatch = clean.match(/^\/blog\/(.+)$/);
   if (blogMatch) {

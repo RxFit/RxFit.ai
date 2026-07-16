@@ -12,6 +12,7 @@ import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
 import { PrivacyPage, TermsPage, ContactPage } from "@/pages/LegalPages";
 import ComparePage from "@/pages/ComparePage";
+import AdminPage from "@/pages/AdminPage";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/terms" component={TermsPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/compare" component={ComparePage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -89,7 +89,10 @@ export async function prerender() {
     console.log(`  prerendered ${route} -> ${path.relative(PUBLIC_DIR, file)} (${status})`);
   };
 
-  const routes = [...STATIC_ROUTES, ...blogSlugs().map((s) => `/blog/${s}`)];
+  // "/admin" is intentionally NOT in STATIC_ROUTES (kept out of the sitemap
+  // and internal-link validation) but still needs a prerendered shell so
+  // production serves it with HTTP 200.
+  const routes = [...STATIC_ROUTES, "/admin", ...blogSlugs().map((s) => `/blog/${s}`)];
   console.log(`prerendering ${routes.length} route(s)...`);
   for (const route of routes) {
     renderToFile(route, outFile(route), "200");
