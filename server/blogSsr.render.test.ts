@@ -112,3 +112,85 @@ describe("renderGeneratedPostPage output", () => {
     expect(renderGeneratedPostPage(POST)).toBeNull();
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Edge-case fixtures — real generated posts vary: hero generation is   */
+/* best-effort (can publish without an image), FAQ can come back empty, */
+/* and titles/descriptions can contain characters needing HTML escaping.*/
+/* ------------------------------------------------------------------ */
+
+function jsonLdScripts(html: string): Record<string, any>[] {
+  const scripts =
+    html.match(/<script type="application\/ld\+json" data-seo-jsonld="true">([\s\S]*?)<\/script>/g) ?? [];
+  return scripts.map((s) => JSON.parse(s.replace(/<\/?script[^>]*>/g, "")));
+}
+
+describe("renderGeneratedPostPage edge cases", () => {
+  it("hero-less post: default OG image, no hero <img>, Article JSON-LD uses the default", () => {
+    const page = renderGeneratedPostPage({ ...POST, heroImage: null }, TEMPLATE)!;
+    expect(page).not.toBeNull();
+    expect(page).toContain(
+      `<meta property="og:image" content="${SITE_URL}/opengraph.jpg" data-seo="true" />`,
+    );
+    expect(page).toContain(
+      `<meta name="twitter:image" content="${SITE_URL}/opengraph.jpg" data-seo="true" />`,
+    );
+    expect(page).not.toContain("blog-heroes");
+    expect(page).not.toContain("<img"); // hero block omitted entirely
+    const article = jsonLdScripts(page).find((j) => j["@type"] === "Article")!;
+    expect(article.image).toBe(`${SITE_URL}/opengraph.jpg`);
+  });
+
+  it("empty faq: 4 JSON-LD scripts (no FAQPage) and no FAQ section", () => {
+    const page = renderGeneratedPostPage({ ...POST, faq: [] }, TEMPLATE)!;
+    const jsonLd = jsonLdScripts(page);
+    expect(jsonLd.length).toBe(4); // Organization, WebSite, BreadcrumbList, Article
+    expect(jsonLd.map((j) => j["@type"])).not.toContain("FAQPage");
+    expect(page).not.toContain("Frequently Asked Questions");
+  });
+
+  it("title/description with quotes, ampersands, angle brackets: escaped in title, meta, and JSON-LD", () => {
+    const page = renderGeneratedPostPage(
+      {
+        ...POST,
+        title: `Zone 2 & "HRV" <basics>`,
+        seoTitle: `Zone 2 & "HRV" <basics> | RxFit.ai`,
+        description: `Data & coaching: "trends" > <single readings>.`,
+      },
+      TEMPLATE,
+    )!;
+
+    // Head: escaped everywhere, never raw.
+    expect(page).toContain(
+      "<title>Zone 2 &amp; &quot;HRV&quot; &lt;basics&gt; | RxFit.ai</title>",
+    );
+    expect(page).toContain(
+      '<meta property="og:title" content="Zone 2 &amp; &quot;HRV&quot; &lt;basics&gt; | RxFit.ai" data-seo="true" />',
+    );
+    expect(page).toContain(
+      '<meta name="description" content="Data &amp; coaching: &quot;trends&quot; &gt; &lt;single readings&gt;." data-seo="true" />',
+    );
+    expect(page).not.toContain(`<title>Zone 2 & "HRV" <basics>`);
+    expect(page).not.toContain('content="Zone 2 & "');
+
+    // Body: H1 and breadcrumb use the escaped title.
+    expect(page).toContain("Zone 2 &amp; &quot;HRV&quot; &lt;basics&gt;</h1>");
+    expect(page).toContain(
+      'aria-current="page">Zone 2 &amp; &quot;HRV&quot; &lt;basics&gt;</span>',
+    );
+
+    // JSON-LD: parses back to the raw strings, with < escaped as \u003c in
+    // the serialized script so it can never close the tag early.
+    const article = jsonLdScripts(page).find((j) => j["@type"] === "Article")!;
+    expect(article.headline).toBe(`Zone 2 & "HRV" <basics>`);
+    expect(article.description).toBe(`Data & coaching: "trends" > <single readings>.`);
+    const breadcrumbs = jsonLdScripts(page).find((j) => j["@type"] === "BreadcrumbList")!;
+    expect(breadcrumbs.itemListElement[2].name).toBe(`Zone 2 & "HRV" <basics>`);
+    expect(page).toContain("\\u003cbasics>"); // jsonLdSafe applied
+    const rawScripts =
+      page.match(/<script type="application\/ld\+json" data-seo-jsonld="true">([\s\S]*?)<\/script>/g) ?? [];
+    for (const s of rawScripts) {
+      expect(s.replace(/<\/?script[^>]*>/g, "")).not.toContain("<");
+    }
+  });
+});
