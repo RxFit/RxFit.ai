@@ -310,7 +310,7 @@ function checkInternalLinks(file, body, knownSlugs, staticRoutes) {
     const blogMatch = target.match(/^\/blog\/([^/]+)$/);
     if (blogMatch) {
       if (!knownSlugs.has(blogMatch[1]))
-        err(file, `internal link points to unknown blog post: ${raw} (no MDX post with slug "${blogMatch[1]}")`);
+        err(file, `internal link points to unknown blog post: ${raw} (no MDX or published DB post with slug "${blogMatch[1]}")`);
       continue;
     }
     if (!staticRoutes.includes(target))
@@ -428,6 +428,49 @@ function validateLandingJsonLdWiring() {
   }
 }
 
+/**
+ * DB-published post link check: AI-generated posts in generated_posts are
+ * link-validated once at publish time, but if a static route is later removed
+ * or renamed (STATIC_ROUTES changes) the links inside already-published posts
+ * silently break. Re-validate every live DB post's internal links against the
+ * CURRENT routes + slugs so a route change fails the build loudly instead.
+ * Skips (with a warning) only when DATABASE_URL is not set; any DB error is a
+ * hard failure so this gate can't be silently bypassed.
+ */
+async function validateDbPostLinks(mdxSlugs, staticRoutes) {
+  const label = "generated_posts";
+  if (!process.env.DATABASE_URL) {
+    warn(label, "DATABASE_URL not set — skipping link validation for DB-published posts");
+    return;
+  }
+  let pg;
+  try {
+    pg = (await import("pg")).default;
+  } catch (e) {
+    err(label, `could not load pg driver: ${e.message}`);
+    return;
+  }
+  const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 15000,
+  });
+  try {
+    const { rows } = await pool.query(
+      `SELECT slug, body_markdown FROM generated_posts WHERE status = 'published'`,
+    );
+    const allSlugs = new Set([...mdxSlugs, ...rows.map((r) => r.slug)]);
+    for (const row of rows) {
+      checkInternalLinks(`generated_posts/${row.slug}`, row.body_markdown ?? "", allSlugs, staticRoutes);
+    }
+    console.log(`Checked internal links in ${rows.length} DB-published post(s).`);
+  } catch (e) {
+    err(label, `failed to validate DB-published post links: ${e.message}`);
+  } finally {
+    await pool.end().catch(() => {});
+  }
+}
+
 /* ---------------- run ------------------------------------------------------ */
 
 const files = fs
@@ -455,6 +498,7 @@ for (const post of posts) checkInternalLinks(post.file, post.body, knownSlugs, s
 
 validateSiteDefaults();
 validateLandingJsonLdWiring();
+await validateDbPostLinks(knownSlugs, staticRoutes);
 
 for (const w of warnings) console.warn(`WARN  ${w}`);
 if (errors.length > 0) {
