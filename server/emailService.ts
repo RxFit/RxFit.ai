@@ -166,17 +166,25 @@ async function recordCustomerEmailFailure(
   }
 }
 
+/**
+ * Send the branded welcome email, throwing on failure. Used by the resend CLI
+ * (server/resend-email.ts), which needs a loud failure instead of the
+ * record-and-continue behavior of sendWelcomeEmail.
+ */
+export async function sendWelcomeEmailOrThrow(email: string, name: string, planName: string): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const html = getWelcomeEmailHtml(name, planName);
+  const raw = createMimeMessage(email, `Welcome to RxFit.ai — Let's Get Started!`, html);
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+  console.log(`Welcome email sent to ${email}`);
+}
+
 export async function sendWelcomeEmail(email: string, name: string, planName: string): Promise<void> {
   try {
-    const gmail = await getUncachableGmailClient();
-    const html = getWelcomeEmailHtml(name, planName);
-    const raw = createMimeMessage(email, `Welcome to RxFit.ai — Let's Get Started!`, html);
-
-    await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw },
-    });
-    console.log(`Welcome email sent to ${email}`);
+    await sendWelcomeEmailOrThrow(email, name, planName);
   } catch (error) {
     console.error('Failed to send welcome email:', error);
     await recordCustomerEmailFailure('welcome', email, name, error);
@@ -335,17 +343,24 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
   }
 }
 
+/**
+ * Send the branded lead nurture email, throwing on failure. Used by the
+ * resend CLI (server/resend-email.ts).
+ */
+export async function sendLeadEmailOrThrow(email: string, name: string): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const html = getLeadWelcomeEmailHtml(name);
+  const raw = createMimeMessage(email, `You're on the RxFit.ai list!`, html);
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+  console.log(`Lead welcome email sent to ${email}`);
+}
+
 export async function sendLeadEmail(email: string, name: string): Promise<void> {
   try {
-    const gmail = await getUncachableGmailClient();
-    const html = getLeadWelcomeEmailHtml(name);
-    const raw = createMimeMessage(email, `You're on the RxFit.ai list!`, html);
-
-    await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw },
-    });
-    console.log(`Lead welcome email sent to ${email}`);
+    await sendLeadEmailOrThrow(email, name);
   } catch (error) {
     console.error('Failed to send lead email:', error);
     await recordCustomerEmailFailure('lead', email, name, error);
