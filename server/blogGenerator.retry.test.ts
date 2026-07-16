@@ -85,6 +85,7 @@ function makeDraft(overrides: Record<string, unknown> = {}) {
 describe("generateAndPublishPost retry feedback", () => {
   beforeEach(() => {
     createMock.mockReset();
+    vi.clearAllMocks();
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "test-key";
     process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = "https://example.com/v1";
   });
@@ -120,5 +121,34 @@ describe("generateAndPublishPost retry feedback", () => {
     expect(retryPrompt).toContain("REJECTED");
     expect(retryPrompt).toContain("missing or empty field: title");
     expect(retryPrompt).toContain("invalid recommendedPlan: nope");
+  });
+
+  it("fails loudly when both drafts are rejected: rethrows, emails the owner, publishes nothing", async () => {
+    const badDraft = () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify(makeDraft({ title: "", recommendedPlan: "nope" })),
+          },
+        },
+      ],
+    });
+    createMock.mockResolvedValueOnce(badDraft()).mockResolvedValueOnce(badDraft());
+
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { sendPostFailureEmail } = await import("./emailService");
+    const { storage } = await import("./storage");
+
+    await expect(generateAndPublishPost()).rejects.toThrow(
+      /failed validation twice[\s\S]*missing or empty field: title[\s\S]*invalid recommendedPlan: nope/,
+    );
+
+    expect(createMock).toHaveBeenCalledTimes(2);
+    expect(sendPostFailureEmail).toHaveBeenCalledTimes(1);
+    const [stage, error] = vi.mocked(sendPostFailureEmail).mock.calls[0];
+    expect(stage).toBe("validation");
+    expect(String(error)).toContain("failed validation twice");
+    expect(storage.createGeneratedPost).not.toHaveBeenCalled();
+    expect(storage.markKeywordThemeUsed).not.toHaveBeenCalled();
   });
 });
