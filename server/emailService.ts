@@ -255,8 +255,13 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
   }
 }
 
-/** Notify the owner that Stripe or Gmail credentials stopped resolving. Best-effort (never throws). */
-export async function sendCredentialAlertEmail(service: string, error: unknown): Promise<void> {
+/**
+ * Notify the owner that Stripe or Gmail credentials stopped resolving.
+ * Best-effort (never throws). Returns true when the email was actually sent,
+ * false when sending failed — callers can use this to fall back to a second
+ * alert channel (e.g. the Google Sheet) when Gmail itself is down.
+ */
+export async function sendCredentialAlertEmail(service: string, error: unknown): Promise<boolean> {
   try {
     const gmail = await getUncachableGmailClient();
     const to = await getOwnerEmail();
@@ -286,8 +291,10 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     const raw = createMimeMessage(to, `🚨 RxFit.ai: ${serviceLabel} credentials are broken`, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[credential-check] Alert email sent to ${to} for ${service}`);
+    return true;
   } catch (notifyError) {
     console.error(`[credential-check] Could not send credential alert email for ${service}:`, notifyError);
+    return false;
   }
 }
 

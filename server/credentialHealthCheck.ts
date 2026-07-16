@@ -21,6 +21,7 @@
 import { getStripeSecretKey } from "./stripeClient";
 import { getUncachableGmailClient } from "./gmailClient";
 import { sendCredentialAlertEmail } from "./emailService";
+import { appendCredentialAlertToSheet } from "./sheetsService";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
@@ -107,9 +108,20 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
   );
 
   if (shouldAlert) {
-    // Best-effort: if Gmail itself is the broken service this may fail too,
-    // in which case the loud console error above is the fallback signal.
-    await sendCredentialAlertEmail(name, result.error);
+    // Primary channel: email. If Gmail itself is the broken service the email
+    // can't be sent — fall back to appending an alert row to the Google Sheet
+    // (separate google-sheet connector, so it survives a Gmail outage).
+    const emailSent = await sendCredentialAlertEmail(name, result.error);
+    if (!emailSent) {
+      try {
+        await appendCredentialAlertToSheet({ service: name, message });
+      } catch (sheetError) {
+        console.error(
+          `[credential-check] BOTH alert channels failed for ${name} — email and Google Sheet fallback. Sheet error:`,
+          sheetError,
+        );
+      }
+    }
   } else {
     console.error(`[credential-check] ${name} still broken (owner already alerted)`);
   }
