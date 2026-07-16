@@ -109,6 +109,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - Mobile responsive
 
 ## User Preferences
+- The owner does NOT manually operate this site. All features and recommended tasks must be fully automated/self-operating (scheduled jobs, automatic alerts, self-healing checks) — never assume the owner will run CLIs, click dashboard buttons, or perform manual publish/maintenance steps. Manual CLIs may exist as emergency fallbacks only, with an automated primary path.
 - "RxFit Concierge" champagne-gold Lux-Industrial / Command-HUD aesthetic (supersedes the prior teal/coral palette)
 - Support BOTH light and dark themes with a nav theme toggle; dark is the default
 - Original landing page layout (not sidebar/dashboard layout)
