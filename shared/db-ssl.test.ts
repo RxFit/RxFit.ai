@@ -7,8 +7,8 @@ import { describe, it, expect } from "vitest";
 import { dbSslConfig } from "./db-ssl.mjs";
 
 describe("dbSslConfig", () => {
-  it("enables SSL (rejectUnauthorized: false) in production", () => {
-    expect(dbSslConfig("production")).toEqual({ rejectUnauthorized: false });
+  it("enables SSL with full certificate verification in production", () => {
+    expect(dbSslConfig("production")).toEqual({ rejectUnauthorized: true });
   });
 
   it("disables SSL in development / test / unset environments", () => {

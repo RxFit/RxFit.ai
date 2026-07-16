@@ -39,9 +39,12 @@ describe("validate-seo DB broken-link gate", () => {
 
   it("connects successfully over SSL in a production build context (NODE_ENV=production)", async () => {
     // Deploy builds run this gate with NODE_ENV=production, which switches the
-    // pool to ssl: { rejectUnauthorized: false } (shared/db-ssl.mjs — same
+    // pool to ssl: { rejectUnauthorized: true } (shared/db-ssl.mjs — same
     // config as server/db.ts). Verify that path actually connects, so an SSL
-    // config drift can't silently start failing every deploy.
+    // config drift can't silently start failing every deploy. Note: pg merges
+    // the parsed connection string OVER the pool config, so the URL's sslmode
+    // still governs (dev's sslmode=disable → plaintext to the local proxy;
+    // prod's sslmode=require → verify-full in pg >= 8.16).
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required for this test");
     const { code, out } = await runScript({ NODE_ENV: "production" });
     expect(out).not.toContain("failed to validate DB-published post links");
