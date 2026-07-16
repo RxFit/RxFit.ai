@@ -428,6 +428,27 @@ function validateLandingJsonLdWiring() {
   }
 }
 
+function validateCompareJsonLdWiring() {
+  const file = "client/src/pages/ComparePage.tsx";
+  const abs = path.join(ROOT, file);
+  if (!fs.existsSync(abs)) {
+    err(file, "ComparePage.tsx not found");
+    return;
+  }
+  const src = fs.readFileSync(abs, "utf8");
+  if (!/import\s*\{[^}]*COMPARE_FAQ_JSONLD[^}]*\}\s*from\s*["']@shared\/compare-seo["']/.test(src)) {
+    err(file, "must import COMPARE_FAQ_JSONLD from @shared/compare-seo (FAQPage JSON-LD wiring)");
+  }
+  const jsonLdProp = src.match(/jsonLd=\{\[([\s\S]*?)\]\}/);
+  if (!jsonLdProp) {
+    err(file, "Seo jsonLd prop not found — compare page no longer emits FAQPage JSON-LD");
+    return;
+  }
+  if (!jsonLdProp[1].includes("COMPARE_FAQ_JSONLD")) {
+    err(file, "Seo jsonLd prop no longer includes COMPARE_FAQ_JSONLD (FAQPage structured data dropped)");
+  }
+}
+
 /**
  * Hardcoded-price drift guard: all plan price/trial copy must derive from
  * PLAN_PRICING/TRIAL_COPY in shared/stripe-constants.ts. This scan fails the
@@ -604,6 +625,7 @@ for (const post of posts) checkInternalLinks(post.file, post.body, knownSlugs, s
 
 validateSiteDefaults();
 validateLandingJsonLdWiring();
+validateCompareJsonLdWiring();
 
 const planPricing = loadPlanPricing();
 scanForHardcodedPrices(planPricing);
