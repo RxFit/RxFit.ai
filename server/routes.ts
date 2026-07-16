@@ -13,6 +13,7 @@ import fs from "fs";
 import path from "path";
 import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
+import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
 
@@ -454,27 +455,10 @@ export async function registerRoutes(
   // hostname requested them.
   const baseUrl = SITE_URL;
 
-  // Stable last-modified dates for static pages. Update a page's date here
-  // whenever its content is intentionally changed so crawlers receive accurate
-  // freshness signals rather than "today" on every request.
-  const STATIC_PAGE_DATES: Record<string, string> = {
-    "/": "2026-06-18",
-    "/blog": "2026-06-18",
-    "/compare": "2026-07-16",
-    "/privacy": "2026-06-18",
-    "/terms": "2026-06-18",
-    "/contact": "2026-06-18",
-  };
-
   app.get("/sitemap.xml", async (_req, res) => {
-    const staticUrls = [
-      { loc: "/", lastmod: STATIC_PAGE_DATES["/"], priority: "1.0" },
-      { loc: "/blog", lastmod: STATIC_PAGE_DATES["/blog"], priority: "0.8" },
-      { loc: "/compare", lastmod: STATIC_PAGE_DATES["/compare"], priority: "0.8" },
-      { loc: "/privacy", lastmod: STATIC_PAGE_DATES["/privacy"], priority: "0.3" },
-      { loc: "/terms", lastmod: STATIC_PAGE_DATES["/terms"], priority: "0.3" },
-      { loc: "/contact", lastmod: STATIC_PAGE_DATES["/contact"], priority: "0.4" },
-    ];
+    // Static-page entries live in server/sitemapStatic.ts (unit-tested to
+    // stay in sync with shared/site.ts STATIC_ROUTES).
+    const staticUrls = STATIC_SITEMAP_URLS;
     const mdxPosts = readBlogPosts();
     let generatedPosts: { slug: string; date: string }[] = [];
     try {
