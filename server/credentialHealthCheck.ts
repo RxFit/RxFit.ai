@@ -31,7 +31,7 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
 const RETRY_DELAY_MS = 15 * 1000;
 
-export type ServiceName = "stripe" | "gmail" | "sheets" | "products";
+export type ServiceName = "stripe" | "gmail" | "sheets" | "products" | "pricing";
 
 type ServiceState = { healthy: boolean; alerted: boolean };
 
@@ -40,6 +40,7 @@ const state: Record<ServiceName, ServiceState> = {
   gmail: { healthy: true, alerted: false },
   sheets: { healthy: true, alerted: false },
   products: { healthy: true, alerted: false },
+  pricing: { healthy: true, alerted: false },
 };
 
 /** On-demand status metadata (per service), surfaced by the internal
@@ -55,6 +56,7 @@ const status: Record<ServiceName, ServiceStatus> = {
   gmail: { healthy: null, lastCheckedAt: null, lastError: null },
   sheets: { healthy: null, lastCheckedAt: null, lastError: null },
   products: { healthy: null, lastCheckedAt: null, lastError: null },
+  pricing: { healthy: null, lastCheckedAt: null, lastError: null },
 };
 
 export interface CredentialHealthStatus {
@@ -70,6 +72,7 @@ export function getCredentialHealthStatus(): CredentialHealthStatus {
       gmail: { ...status.gmail },
       sheets: { ...status.sheets },
       products: { ...status.products },
+      pricing: { ...status.pricing },
     },
     checkedAt: new Date().toISOString(),
   };
@@ -243,33 +246,36 @@ async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; e
   }
 }
 
-async function checkService(name: ServiceName, fn: () => Promise<void>): Promise<void> {
-  const result = await checkWithRetry(fn);
-  const { next, shouldAlert, recovered } = evaluateTransition(state[name], result.ok);
+/**
+ * Shared outcome recorder: applies the healthy→broken transition logic,
+ * updates the on-demand status snapshot, and dispatches the owner alert
+ * (email → sheet fallback) on the transition. Used by the periodic
+ * credential checks AND by event-driven reporters like the pricing monitor.
+ */
+async function recordOutcome(
+  name: ServiceName,
+  ok: boolean,
+  error: unknown,
+  failureContext: string,
+): Promise<void> {
+  const { next, shouldAlert, recovered } = evaluateTransition(state[name], ok);
   state[name] = next;
 
   status[name] = {
-    healthy: result.ok,
+    healthy: ok,
     lastCheckedAt: new Date().toISOString(),
-    lastError: result.ok
-      ? null
-      : result.error instanceof Error
-        ? result.error.message
-        : String(result.error),
+    lastError: ok ? null : error instanceof Error ? error.message : String(error),
   };
 
-  if (result.ok) {
+  if (ok) {
     if (recovered) {
-      console.log(`[credential-check] ${name} credentials RECOVERED — service healthy again`);
+      console.log(`[credential-check] ${name} RECOVERED — service healthy again`);
     }
     return;
   }
 
-  const message =
-    result.error instanceof Error ? result.error.message : String(result.error);
-  console.error(
-    `[credential-check] ALERT: ${name.toUpperCase()} credentials failed to resolve (twice, ${RETRY_DELAY_MS / 1000}s apart): ${message}`,
-  );
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[credential-check] ALERT: ${name.toUpperCase()} ${failureContext}: ${message}`);
 
   if (shouldAlert) {
     // Primary channel: email. If Gmail itself is the broken service the email
@@ -277,7 +283,7 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
     // (separate google-sheet connector, so it survives a Gmail outage).
     // Exception: when Sheets ITSELF is the broken service, the sheet fallback
     // is pointless — rely on email only and log loudly if that also fails.
-    const emailSent = await sendCredentialAlertEmail(name, result.error);
+    const emailSent = await sendCredentialAlertEmail(name, error);
     if (!emailSent) {
       if (name === "sheets") {
         console.error(
@@ -296,6 +302,38 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
     }
   } else {
     console.error(`[credential-check] ${name} still broken (owner already alerted)`);
+  }
+}
+
+async function checkService(name: ServiceName, fn: () => Promise<void>): Promise<void> {
+  const result = await checkWithRetry(fn);
+  await recordOutcome(
+    name,
+    result.ok,
+    result.error,
+    `credentials failed to resolve (twice, ${RETRY_DELAY_MS / 1000}s apart)`,
+  );
+}
+
+/**
+ * Event-driven pricing-serving monitor, reported from /api/stripe/products:
+ * `ok=false` when the endpoint served a stale last-known-good snapshot or
+ * failed entirely (buyers are seeing stale or unavailable pricing);
+ * `ok=true` when a fresh catalog was served. Uses the same healthy→broken
+ * transition + alert chain (email → sheet fallback) as the periodic checks,
+ * so the owner is alerted once per outage and recovery resets the state.
+ */
+export async function reportPricingServing(ok: boolean, error?: unknown): Promise<void> {
+  try {
+    await recordOutcome(
+      "pricing",
+      ok,
+      error ?? new Error("Pricing endpoint failure"),
+      "buyers are seeing stale or unavailable pricing",
+    );
+  } catch (e) {
+    // Never let monitoring break the products endpoint itself.
+    console.error("[credential-check] Failed to record pricing serving outcome:", e);
   }
 }
 

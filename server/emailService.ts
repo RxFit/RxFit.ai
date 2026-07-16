@@ -357,7 +357,7 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     const gmail = await getUncachableGmailClient();
     const to = await getOwnerEmail();
     const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
-    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service === 'products' ? 'Stripe plan tiers' : service;
+    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service === 'products' ? 'Stripe plan tiers' : service === 'pricing' ? 'Pricing served to buyers' : service;
     const impact =
       service === 'stripe'
         ? 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.'
@@ -365,6 +365,8 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
         ? 'Lead rows will silently stop syncing to the spreadsheet AND the backup alert channel is dead until this is fixed.'
         : service === 'products'
         ? 'The live Stripe catalog no longer matches the site\'s plan tiers — buyers are silently getting the hardcoded fallback price, which may be stale. Fix the product metadata.tier / prices in Stripe.'
+        : service === 'pricing'
+        ? 'Buyers on rxfit.ai are seeing STALE pricing (last-known-good snapshot) or no pricing at all — the live catalog (DB sync and Stripe API) is unreachable. Check the Stripe connection and database.'
         : 'Welcome/lead emails and blog notifications will fail until this is fixed.';
     const html = `
 <!DOCTYPE html>

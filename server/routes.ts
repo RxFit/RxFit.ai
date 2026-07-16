@@ -18,7 +18,7 @@ import { buildRobotsTxt } from "./robots";
 import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
-import { getCredentialHealthStatus, runCredentialHealthCheck } from "./credentialHealthCheck";
+import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 
 function parseFrontmatter(raw: string): Record<string, any> {
@@ -175,6 +175,9 @@ export async function registerRoutes(
       if (productsData.length > 0) {
         await productsSnapshotStore.record(productsData);
       }
+      // Fresh catalog served — mark the pricing-serving monitor healthy
+      // (fire-and-forget; must never delay or fail the response).
+      void reportPricingServing(true);
       return res.json({ data: productsData });
     } catch (error) {
       console.error("Error listing products:", error);
@@ -183,8 +186,23 @@ export async function registerRoutes(
         console.warn(
           `Serving last-known-good products snapshot from ${new Date(snapshot.cachedAt).toISOString()}`,
         );
+        // Buyers are seeing a stale last-known-good catalog — alert the owner
+        // via the credential-health chain (once per outage).
+        void reportPricingServing(
+          false,
+          new Error(
+            `Serving STALE last-known-good products snapshot from ${new Date(snapshot.cachedAt).toISOString()} — live catalog unavailable: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
         return res.json({ data: snapshot.data, stale: true });
       }
+      // No snapshot at all — buyers see no pricing and checkout is disabled.
+      void reportPricingServing(
+        false,
+        new Error(
+          `Products endpoint FAILED with no snapshot fallback — buyers see no pricing and checkout is disabled: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
       return res.status(500).json({ message: "Failed to list products." });
     }
   });

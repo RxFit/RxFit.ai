@@ -11,7 +11,7 @@ type ServiceStatus = {
 };
 
 type HealthResponse = {
-  services: Record<"stripe" | "gmail" | "sheets" | "products", ServiceStatus>;
+  services: Record<"stripe" | "gmail" | "sheets" | "products" | "pricing", ServiceStatus>;
   checkedAt: string;
 };
 
@@ -28,6 +28,7 @@ const SERVICE_LABELS: Record<string, string> = {
   gmail: "Gmail (customer emails)",
   sheets: "Google Sheets (lead sync & alerts)",
   products: "Stripe plan tiers (catalog matches site pricing)",
+  pricing: "Pricing served to buyers (fresh vs stale/unavailable)",
 };
 
 async function adminFetch<T>(path: string, key: string, init?: RequestInit): Promise<T> {
