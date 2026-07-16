@@ -155,7 +155,12 @@ export async function sendWelcomeEmail(email: string, name: string, planName: st
   }
 }
 
-/** Resolve the connected Gmail account's own address (the site owner). */
+/**
+ * Resolve the site owner's notification address.
+ * Primary source: OWNER_NOTIFICATION_EMAIL env var (set explicitly; no connector dependency).
+ * Fallbacks: Gmail getProfile (needs a profile-capable scope), then the Google
+ * account behind the Sheets connection (same owner) via Drive "about".
+ */
 async function getOwnerEmail(): Promise<string> {
   if (process.env.OWNER_NOTIFICATION_EMAIL) {
     return process.env.OWNER_NOTIFICATION_EMAIL;

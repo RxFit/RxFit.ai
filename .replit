@@ -86,6 +86,7 @@ integrations = ["stripe:2.0.0", "google-mail:1.0.0", "google-sheet:1.0.0", "gith
 
 [userenv.shared]
 LEADS_SPREADSHEET_ID = "1vkqBUAVduvLvUGehEG0LhhTdhA9SNKwuWIsMnaJsoCA"
+OWNER_NOTIFICATION_EMAIL = "Danny@rxfitatx.com"
 
 [postMerge]
 path = "scripts/post-merge.sh"
