@@ -78,9 +78,22 @@ async function checkGmail(): Promise<void> {
 }
 
 async function checkSheets(): Promise<void> {
-  // getUncachableGoogleSheetClient resolves the connector access token and
-  // throws if the connection is missing or the token can't be fetched.
-  await getUncachableGoogleSheetClient();
+  // Resolve the connector access token (throws if the connection is missing
+  // or the token can't be fetched)…
+  const sheets = await getUncachableGoogleSheetClient();
+
+  // …then verify REAL API access: a token can resolve while actual access is
+  // revoked (spreadsheet permission removed, OAuth scope revoked). A minimal
+  // metadata read on the leads spreadsheet confirms the sync can still reach
+  // it. (Gmail can't get the same upgrade — its connector token is send-only,
+  // so any read probe like getProfile fails even when sending works.)
+  const spreadsheetId = process.env.LEADS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    // Without the spreadsheet ID the sync/alert channel is unconfigured
+    // anyway; token resolution is the deepest check available.
+    return;
+  }
+  await sheets.spreadsheets.get({ spreadsheetId, fields: "spreadsheetId" });
 }
 
 async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; error?: unknown }> {

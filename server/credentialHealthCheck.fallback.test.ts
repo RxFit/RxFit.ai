@@ -33,7 +33,10 @@ describe("credential health check alert fallback", () => {
     // Default: both services healthy.
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
     getUncachableGmailClient.mockResolvedValue({});
-    getUncachableGoogleSheetClient.mockResolvedValue({});
+    // Healthy sheets client: token resolves AND the metadata probe succeeds.
+    getUncachableGoogleSheetClient.mockResolvedValue({
+      spreadsheets: { get: vi.fn().mockResolvedValue({ data: { spreadsheetId: "sheet-1" } }) },
+    });
     sendCredentialAlertEmail.mockResolvedValue(true);
     appendCredentialAlertToSheet.mockResolvedValue(undefined);
   });
