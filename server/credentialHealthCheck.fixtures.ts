@@ -8,12 +8,18 @@ import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
 import type { TierPriceCandidate } from "./credentialHealthCheck";
 
 export function healthyTierPrices(): TierPriceCandidate[] {
-  return (Object.keys(PLAN_PRICING) as PlanTier[]).map((tier) => ({
-    active: true,
-    recurring: { interval: PLAN_PRICING[tier].interval === "month" ? "month" : "year" },
-    unit_amount: PLAN_PRICING[tier].amount * 100,
-    product: { active: true, metadata: { tier } },
-  }));
+  return (Object.keys(PLAN_PRICING) as PlanTier[]).map((tier) => {
+    const plan = PLAN_PRICING[tier] as { trialDays?: number };
+    return {
+      active: true,
+      recurring: {
+        interval: PLAN_PRICING[tier].interval === "month" ? "month" : "year",
+        ...(plan.trialDays ? { trial_period_days: plan.trialDays } : {}),
+      },
+      unit_amount: PLAN_PRICING[tier].amount * 100,
+      product: { active: true, metadata: { tier } },
+    };
+  });
 }
 
 /** vi-free mock factory: a stripe client whose probes all succeed. */

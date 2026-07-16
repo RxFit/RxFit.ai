@@ -91,6 +91,38 @@ describe("findTierPriceProblems (pure)", () => {
     expect(problems[0]).toContain("5900");
   });
 
+  it("flags kickstart when the advertised free trial is missing from the price", async () => {
+    const prices = healthyTierPrices().map((p) =>
+      p.product?.metadata?.tier === "kickstart"
+        ? { ...p, recurring: { interval: "month" } }
+        : p,
+    );
+    const problems = await problemsOf(prices);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("kickstart");
+    expect(problems[0]).toContain(`${PLAN_PRICING.kickstart.trialDays}-day free trial is missing`);
+    expect(problems[0]).toContain("found: none");
+  });
+
+  it("flags kickstart when the trial length drifted from PLAN_PRICING", async () => {
+    const prices = healthyTierPrices().map((p) =>
+      p.product?.metadata?.tier === "kickstart"
+        ? { ...p, recurring: { interval: "month", trial_period_days: 3 } }
+        : p,
+    );
+    const problems = await problemsOf(prices);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("kickstart");
+    expect(problems[0]).toContain("found: 3");
+  });
+
+  it("does not require a trial on tiers that don't advertise one", async () => {
+    // healthyTierPrices only sets trial_period_days where PLAN_PRICING has
+    // trialDays — committed/transformation have none and must stay green.
+    expect(await problemsOf(healthyTierPrices())).toEqual([]);
+    expect((PLAN_PRICING.committed as { trialDays?: number }).trialDays).toBeUndefined();
+  });
+
   it("accepts extra unrelated prices alongside the matching ones", async () => {
     const prices = [
       { active: true, recurring: null, unit_amount: 123, product: { active: true, metadata: {} } },

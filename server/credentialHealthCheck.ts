@@ -143,7 +143,7 @@ async function checkSheets(): Promise<void> {
 /** Minimal shape of a Stripe price (with expanded product) for tier matching. */
 export type TierPriceCandidate = {
   active?: boolean | null;
-  recurring?: unknown | null;
+  recurring?: { trial_period_days?: number | null } | null;
   unit_amount?: number | null;
   product?: { active?: boolean | null; metadata?: Record<string, string> | null } | null;
 };
@@ -180,10 +180,28 @@ export function findTierPriceProblems(prices: TierPriceCandidate[]): string[] {
       continue;
     }
     const expectedAmount = PLAN_PRICING[tier].amount * 100;
-    if (!usable.some((p) => p.unit_amount === expectedAmount)) {
+    const amountMatches = usable.filter((p) => p.unit_amount === expectedAmount);
+    if (amountMatches.length === 0) {
       const seen = usable.map((p) => p.unit_amount).join(", ");
       problems.push(
         `${tier}: no active recurring price matches the site's ${PLAN_PRICING[tier].display} (expected unit_amount ${expectedAmount}, found: ${seen})`,
+      );
+      continue;
+    }
+    // If the site advertises a free trial for this tier, the live price must
+    // still carry it — otherwise buyers get charged immediately while the site
+    // promises a trial (trust/compliance problem the amount check won't catch).
+    const plan = PLAN_PRICING[tier] as { trialDays?: number };
+    const expectedTrial = plan.trialDays;
+    if (
+      expectedTrial &&
+      !amountMatches.some((p) => p.recurring?.trial_period_days === expectedTrial)
+    ) {
+      const seenTrials = amountMatches
+        .map((p) => p.recurring?.trial_period_days ?? "none")
+        .join(", ");
+      problems.push(
+        `${tier}: price amount matches but the advertised ${expectedTrial}-day free trial is missing (expected trial_period_days ${expectedTrial}, found: ${seenTrials}) — buyers would be charged immediately`,
       );
     }
   }
