@@ -21,7 +21,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `client/src/components/blog/MdxComponents.tsx` — Brand MDX primitives (`TLDR`, `KeyTakeaways`, `CTACard`, `FAQ`, `Stat`, `Callout`, `Comparison`) + element overrides
 - `client/src/components/blog/StickyFooterCta.tsx` / `ExitIntentModal.tsx` — CRO surfaces (dismissable sticky bar; desktop exit-intent → `/api/leads`)
 - `client/src/lib/blogLoader.ts` — Loads `content/blog/*.mdx` at build time; reads `readingMinutes`/`toc` injected by `remarkBlogMeta`
-- `client/src/lib/seo.tsx` — `<Seo>` head manager + Article/BreadcrumbList/Organization JSON-LD (shared Organization w/ `sameAs`)
+- `client/src/lib/seo.tsx` — `<Seo>` head manager + Article/BreadcrumbList/Organization JSON-LD (shared Organization w/ `sameAs`); the pure `computeSeo()` builder is exported and shape-guarded by `client/src/lib/seo.jsonld.test.ts` (Article headline/url/author/dates, ordered BreadcrumbList, Organization `sameAs` w/ app.rxfit.ai, website-route negative case; vitest include now covers `client/src/**/*.test.ts`), and `scripts/validate-seo.mjs` (`validateBlogPostJsonLdWiring`) guards that BlogPost.tsx still renders `<Seo type="article">` with the `article`, `breadcrumbs`, and `schemaHeadline` props — so dropping blog Article/BreadcrumbList JSON-LD fails npm test and every build
 - `client/src/lib/analytics.ts` — Plausible `track(event, props)` wrapper (safe no-op when not loaded)
 - `client/src/lib/utm.ts` — UTM capture/persistence, `appendUtm`, and `getClientReferenceId` for Stripe attribution
 - `remark-blog-meta.ts` — Build-time remark plugin: injects `readingMinutes` + `toc` exports and assigns H2 ids

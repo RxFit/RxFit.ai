@@ -84,7 +84,7 @@ interface ComputedSeo {
  * effect (which mutates document.head) and the server-side prerender (which
  * serializes the result into the initial HTML head).
  */
-function computeSeo(props: SeoProps): ComputedSeo {
+export function computeSeo(props: SeoProps): ComputedSeo {
   const {
     title,
     description,

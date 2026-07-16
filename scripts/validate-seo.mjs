@@ -451,6 +451,40 @@ function validateCompareJsonLdWiring() {
 }
 
 /**
+ * Blog post JSON-LD wiring: the Article + BreadcrumbList structured data for
+ * blog posts is computed inside client/src/lib/seo.tsx (shape-guarded by
+ * client/src/lib/seo.jsonld.test.ts), but it only ships if BlogPost.tsx keeps
+ * passing type="article", the article metadata, and breadcrumbs into Seo.
+ * Guard that wiring so a refactor can't silently drop Article JSON-LD from
+ * every post.
+ */
+function validateBlogPostJsonLdWiring() {
+  const file = "client/src/pages/BlogPost.tsx";
+  const abs = path.join(ROOT, file);
+  if (!fs.existsSync(abs)) {
+    err(file, "BlogPost.tsx not found");
+    return;
+  }
+  const src = fs.readFileSync(abs, "utf8");
+  // Match the main post <Seo ... /> usage (the not-found branch has no article prop).
+  const seoUsages = [...src.matchAll(/<Seo\b([\s\S]*?)\/>/g)].map((m) => m[1]);
+  const articleUsage = seoUsages.find((attrs) => /type=["']article["']/.test(attrs));
+  if (!articleUsage) {
+    err(file, 'no <Seo type="article"> found — blog posts no longer emit Article JSON-LD');
+    return;
+  }
+  if (!/article=\{\{/.test(articleUsage)) {
+    err(file, "Seo article prop dropped — Article JSON-LD loses datePublished/author");
+  }
+  if (!/breadcrumbs=\{\[/.test(articleUsage)) {
+    err(file, "Seo breadcrumbs prop dropped — BreadcrumbList JSON-LD no longer emitted for posts");
+  }
+  if (!/schemaHeadline=/.test(articleUsage)) {
+    err(file, "Seo schemaHeadline prop dropped — Article headline falls back to the truncated SEO title");
+  }
+}
+
+/**
  * Hardcoded-price drift guard: all plan price/trial copy must derive from
  * PLAN_PRICING/TRIAL_COPY in shared/stripe-constants.ts. This scan fails the
  * build when a literal plan amount ("$49") or trial phrase ("7-day free
@@ -568,6 +602,7 @@ for (const post of posts) checkInternalLinks(post.file, post.body, knownSlugs, s
 validateSiteDefaults();
 validateLandingJsonLdWiring();
 validateCompareJsonLdWiring();
+validateBlogPostJsonLdWiring();
 
 const planPricing = loadPlanPricing();
 scanForHardcodedPrices(planPricing);
