@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { parse as parseYaml } from "yaml";
 import { STATIC_ROUTES } from "../shared/site";
+import { verifyPrerenderedRoute } from "./prerenderVerify";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -62,10 +63,19 @@ export async function prerender() {
 
   const renderToFile = (route: string, file: string, status: string) => {
     const { html, head } = render(route);
+    if (status === "200") {
+      // Fail the build if a sitemap-advertised route renders empty or falls
+      // through to the NotFound page (e.g. route added to STATIC_ROUTES but
+      // never registered in client/src/App.tsx).
+      verifyPrerenderedRoute(route, html, head);
+    }
     let page = template.replace(SEO_BLOCK, head);
     page = page.replace("<!--app-html-->", html);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, page);
+    if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
+      throw new Error(`Prerender verification failed: no output written for route "${route}".`);
+    }
     console.log(`  prerendered ${route} -> ${path.relative(PUBLIC_DIR, file)} (${status})`);
   };
 
