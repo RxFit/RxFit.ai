@@ -1,11 +1,13 @@
 /**
- * Periodic credential health check for the Stripe and Gmail connectors.
+ * Periodic credential health check for the Stripe, Gmail, and Google Sheets
+ * connectors (Sheets both syncs every lead and serves as the backup alert
+ * channel, so its silent failure would otherwise go unnoticed).
  *
  * The Replit connector API once silently stopped returning credentials
  * (its name filter began returning empty results), which broke checkout
  * (500s on pricing/checkout) and outbound email until manually fixed.
  * This check verifies — shortly after boot and hourly thereafter — that
- * both credential sets still resolve, and alerts loudly when they don't.
+ * all three credential sets still resolve, and alerts loudly when they don't.
  *
  * False-alarm avoidance:
  *  - each failing check is retried once after a short delay (transient
@@ -20,6 +22,7 @@
  */
 import { getStripeSecretKey } from "./stripeClient";
 import { getUncachableGmailClient } from "./gmailClient";
+import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
 
@@ -27,13 +30,14 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
 const RETRY_DELAY_MS = 15 * 1000;
 
-export type ServiceName = "stripe" | "gmail";
+export type ServiceName = "stripe" | "gmail" | "sheets";
 
 type ServiceState = { healthy: boolean; alerted: boolean };
 
 const state: Record<ServiceName, ServiceState> = {
   stripe: { healthy: true, alerted: false },
   gmail: { healthy: true, alerted: false },
+  sheets: { healthy: true, alerted: false },
 };
 
 /**
@@ -71,6 +75,12 @@ async function checkGmail(): Promise<void> {
   // getUncachableGmailClient resolves the connector access token and throws
   // if the connection is missing or the token can't be fetched.
   await getUncachableGmailClient();
+}
+
+async function checkSheets(): Promise<void> {
+  // getUncachableGoogleSheetClient resolves the connector access token and
+  // throws if the connection is missing or the token can't be fetched.
+  await getUncachableGoogleSheetClient();
 }
 
 async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; error?: unknown }> {
@@ -111,15 +121,23 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
     // Primary channel: email. If Gmail itself is the broken service the email
     // can't be sent — fall back to appending an alert row to the Google Sheet
     // (separate google-sheet connector, so it survives a Gmail outage).
+    // Exception: when Sheets ITSELF is the broken service, the sheet fallback
+    // is pointless — rely on email only and log loudly if that also fails.
     const emailSent = await sendCredentialAlertEmail(name, result.error);
     if (!emailSent) {
-      try {
-        await appendCredentialAlertToSheet({ service: name, message });
-      } catch (sheetError) {
+      if (name === "sheets") {
         console.error(
-          `[credential-check] BOTH alert channels failed for ${name} — email and Google Sheet fallback. Sheet error:`,
-          sheetError,
+          `[credential-check] ALERT EMAIL FAILED for sheets and the Google Sheet fallback IS the broken service — owner is unreachable by both channels. Sheets error: ${message}`,
         );
+      } else {
+        try {
+          await appendCredentialAlertToSheet({ service: name, message });
+        } catch (sheetError) {
+          console.error(
+            `[credential-check] BOTH alert channels failed for ${name} — email and Google Sheet fallback. Sheet error:`,
+            sheetError,
+          );
+        }
       }
     }
   } else {
@@ -135,6 +153,7 @@ export async function runCredentialHealthCheck(): Promise<void> {
   try {
     await checkService("stripe", checkStripe);
     await checkService("gmail", checkGmail);
+    await checkService("sheets", checkSheets);
   } catch (error) {
     console.error("[credential-check] Unexpected error during health check:", error);
   } finally {
@@ -151,7 +170,7 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe & Gmail credentials at boot and hourly");
+  console.log("[credential-check] Enabled — verifying Stripe, Gmail & Sheets credentials at boot and hourly");
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }

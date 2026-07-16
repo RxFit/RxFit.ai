@@ -7,11 +7,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const getStripeSecretKey = vi.fn();
 const getUncachableGmailClient = vi.fn();
+const getUncachableGoogleSheetClient = vi.fn();
 const sendCredentialAlertEmail = vi.fn();
 const appendCredentialAlertToSheet = vi.fn();
 
 vi.mock("./stripeClient", () => ({ getStripeSecretKey }));
 vi.mock("./gmailClient", () => ({ getUncachableGmailClient }));
+vi.mock("./sheetsClient", () => ({ getUncachableGoogleSheetClient }));
 vi.mock("./emailService", () => ({ sendCredentialAlertEmail }));
 vi.mock("./sheetsService", () => ({ appendCredentialAlertToSheet }));
 
@@ -31,6 +33,7 @@ describe("credential health check alert fallback", () => {
     // Default: both services healthy.
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
     getUncachableGmailClient.mockResolvedValue({});
+    getUncachableGoogleSheetClient.mockResolvedValue({});
     sendCredentialAlertEmail.mockResolvedValue(true);
     appendCredentialAlertToSheet.mockResolvedValue(undefined);
   });
@@ -76,6 +79,34 @@ describe("credential health check alert fallback", () => {
     expect(
       consoleError.mock.calls.some((call) =>
         String(call[0]).includes("BOTH alert channels failed"),
+      ),
+    ).toBe(true);
+    consoleError.mockRestore();
+  });
+
+  it("alerts by email when the Sheets connector breaks", async () => {
+    getUncachableGoogleSheetClient.mockRejectedValue(new Error("sheets connection missing"));
+    sendCredentialAlertEmail.mockResolvedValue(true);
+
+    await freshRun();
+
+    expect(sendCredentialAlertEmail).toHaveBeenCalledTimes(1);
+    expect(sendCredentialAlertEmail).toHaveBeenCalledWith("sheets", expect.any(Error));
+    expect(appendCredentialAlertToSheet).not.toHaveBeenCalled();
+  });
+
+  it("never uses the sheet fallback for a sheets outage — logs loudly when the email also fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    getUncachableGoogleSheetClient.mockRejectedValue(new Error("sheets connection missing"));
+    sendCredentialAlertEmail.mockResolvedValue(false);
+
+    await expect(freshRun()).resolves.toBeUndefined();
+
+    expect(sendCredentialAlertEmail).toHaveBeenCalledWith("sheets", expect.any(Error));
+    expect(appendCredentialAlertToSheet).not.toHaveBeenCalled();
+    expect(
+      consoleError.mock.calls.some((call) =>
+        String(call[0]).includes("owner is unreachable by both channels"),
       ),
     ).toBe(true);
     consoleError.mockRestore();
