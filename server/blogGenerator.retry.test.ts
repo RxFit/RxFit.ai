@@ -151,4 +151,30 @@ describe("generateAndPublishPost retry feedback", () => {
     expect(storage.createGeneratedPost).not.toHaveBeenCalled();
     expect(storage.markKeywordThemeUsed).not.toHaveBeenCalled();
   });
+
+  it("still publishes (without an image) when hero image generation fails", async () => {
+    createMock.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify(makeDraft()) } }],
+    });
+
+    const { generateAndStoreHeroImage } = await import("./heroImage");
+    vi.mocked(generateAndStoreHeroImage).mockRejectedValueOnce(
+      new Error("gpt-image-1 exploded"),
+    );
+
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { sendPostFailureEmail, sendPostPublishedEmail } = await import("./emailService");
+    const { storage } = await import("./storage");
+
+    const post = await generateAndPublishPost();
+
+    expect(post.slug).toBe("hrv-training-guide-test");
+    expect(storage.createGeneratedPost).toHaveBeenCalledTimes(1);
+    const inserted = vi.mocked(storage.createGeneratedPost).mock.calls[0][0] as {
+      heroImage: string | null;
+    };
+    expect(inserted.heroImage).toBeNull();
+    expect(sendPostFailureEmail).not.toHaveBeenCalled();
+    expect(sendPostPublishedEmail).toHaveBeenCalledTimes(1);
+  });
 });
