@@ -2,7 +2,7 @@ import { build as viteBuild } from "vite";
 import fs from "fs";
 import path from "path";
 import { parse as parseYaml } from "yaml";
-import { STATIC_ROUTES } from "../shared/site";
+import { prerenderRoutePaths } from "./prerenderRoutes";
 import { verifyPrerenderedRoute } from "./prerenderVerify";
 import { verifySsrTemplateMarkers } from "../server/blogSsr";
 
@@ -89,10 +89,11 @@ export async function prerender() {
     console.log(`  prerendered ${route} -> ${path.relative(PUBLIC_DIR, file)} (${status})`);
   };
 
-  // "/admin" is intentionally NOT in STATIC_ROUTES (kept out of the sitemap
-  // and internal-link validation) but still needs a prerendered shell so
-  // production serves it with HTTP 200.
-  const routes = [...STATIC_ROUTES, "/admin", ...blogSlugs().map((s) => `/blog/${s}`)];
+  // Route list lives in script/prerenderRoutes.ts (unit-tested): STATIC_ROUTES
+  // plus deliberate extras like "/admin", which is NOT in STATIC_ROUTES (kept
+  // out of the sitemap and internal-link validation) but still needs a
+  // prerendered shell so production serves it with HTTP 200.
+  const routes = prerenderRoutePaths(blogSlugs());
   console.log(`prerendering ${routes.length} route(s)...`);
   for (const route of routes) {
     renderToFile(route, outFile(route), "200");

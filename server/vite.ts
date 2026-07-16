@@ -7,6 +7,7 @@ import path from "path";
 import { nanoid } from "nanoid";
 import { parse as parseYaml } from "yaml";
 import { STATIC_ROUTES } from "@shared/site";
+import { EXTRA_PRERENDER_ROUTES } from "../script/prerenderRoutes";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -23,9 +24,10 @@ const CONTENT_DIR = path.resolve(import.meta.dirname, "..", "content", "blog");
 function isKnownRoute(reqPath: string): boolean {
   const clean = reqPath.replace(/\/+$/, "") || "/";
   if ((STATIC_ROUTES as readonly string[]).includes(clean)) return true;
-  // Internal admin dashboard — real route, but deliberately kept out of
-  // STATIC_ROUTES so it never appears in the sitemap.
-  if (clean === "/admin") return true;
+  // Deliberate extras like the internal /admin dashboard — real routes kept
+  // out of STATIC_ROUTES so they never appear in the sitemap. Shares the
+  // constant with script/prerenderRoutes.ts so dev and prod can't drift.
+  if (EXTRA_PRERENDER_ROUTES.includes(clean)) return true;
 
   const blogMatch = clean.match(/^\/blog\/(.+)$/);
   if (blogMatch) {

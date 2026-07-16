@@ -14,6 +14,7 @@ import path from "path";
 import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
 import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
+import { buildRobotsTxt } from "./robots";
 import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
@@ -517,48 +518,10 @@ export async function registerRoutes(
   });
 
   app.get("/robots.txt", (_req, res) => {
-    const body = `User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-# Explicitly welcome AI crawlers so our content can be cited (AEO/GEO)
-# Each group repeats the shared disallows so dedicated groups don't override them
-User-agent: GPTBot
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-User-agent: PerplexityBot
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-User-agent: ClaudeBot
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-User-agent: Google-Extended
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-User-agent: CCBot
-Allow: /
-Disallow: /api/
-Disallow: /success
-Disallow: /admin
-
-Sitemap: ${baseUrl}/sitemap.xml
-`;
+    // Body built in server/robots.ts (unit-tested: every UA group must
+    // disallow /admin, /api/ and /success).
     res.header("Content-Type", "text/plain");
-    res.send(body);
+    res.send(buildRobotsTxt(baseUrl));
   });
 
   return httpServer;
