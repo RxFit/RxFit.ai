@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims } from "./priceGuards.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BLOG_DIR = path.join(ROOT, "content", "blog");
@@ -459,26 +460,16 @@ function validateCompareJsonLdWiring() {
  */
 function loadPlanPricing() {
   const src = fs.readFileSync(path.join(ROOT, "shared", "stripe-constants.ts"), "utf8");
-  // Scope parsing to the PLAN_PRICING block so unrelated numbers elsewhere in
-  // the file can never leak into the allowed set.
-  const block = src.match(/PLAN_PRICING\s*=\s*\{([\s\S]*?)\}\s*as\s*const/);
-  if (!block) {
-    errors.push("shared/stripe-constants.ts: could not locate the PLAN_PRICING block");
+  const parsed = parsePlanPricing(src);
+  if (parsed.error) {
+    errors.push(`shared/stripe-constants.ts: ${parsed.error}`);
     return null;
   }
-  const amounts = [...block[1].matchAll(/amount:\s*(\d+)/g)].map((m) => Number(m[1]));
-  const savings = [...block[1].matchAll(/savings:\s*"\$(\d+)"/g)].map((m) => Number(m[1]));
-  const trial = block[1].match(/trialDays:\s*(\d+)/);
-  if (amounts.length === 0 || !trial) {
-    errors.push("shared/stripe-constants.ts: could not parse PLAN_PRICING amounts/trialDays");
-    return null;
-  }
-  return { amounts, savings, trialDays: Number(trial[1]) };
+  return parsed;
 }
 
 function scanForHardcodedPrices(pricing) {
   if (!pricing) return;
-  const { amounts, trialDays } = pricing;
   const codeDirs = ["client/src/pages", "client/src/components"];
   const codeFiles = [];
   for (const dir of codeDirs) {
@@ -493,66 +484,17 @@ function scanForHardcodedPrices(pricing) {
       }
     }
   }
-  // In code, literal plan amounts and trial phrases are always violations —
-  // they must come from PLAN_PRICING / TRIAL_COPY instead.
-  const amountRes = amounts.map((a) => ({
-    amount: a,
-    re: new RegExp(`\\$${a}(?![\\d.])`, "g"),
-  }));
-  const trialRes = [
-    new RegExp(`\\b${trialDays}[-\\s][Dd]ay\\b`, "g"),
-    new RegExp(`free for ${trialDays} days`, "gi"),
-  ];
   for (const f of codeFiles) {
     const rel = path.relative(ROOT, f);
-    const lines = fs.readFileSync(f, "utf8").split(/\r?\n/);
-    lines.forEach((line, i) => {
-      for (const { amount, re } of amountRes) {
-        if (re.test(line))
-          err(rel, `line ${i + 1}: hardcoded plan price "$${amount}" — derive it from PLAN_PRICING in shared/stripe-constants.ts`);
-        re.lastIndex = 0;
-      }
-      for (const re of trialRes) {
-        if (re.test(line))
-          err(rel, `line ${i + 1}: hardcoded trial copy ("${line.trim().slice(0, 80)}") — derive it from PLAN_PRICING.kickstart.trialDays / TRIAL_COPY`);
-        re.lastIndex = 0;
-      }
-    });
+    for (const e of scanCodeForHardcodedPrices(pricing, rel, fs.readFileSync(f, "utf8"))) {
+      errors.push(e);
+    }
   }
 }
 
-/**
- * MDX prose can't import constants inside <FAQ items> (validate-seo evals
- * them standalone), so instead of banning literals we verify any RxFit price
- * or trial claim still matches the current constants.
- */
-function scanMdxPriceClaims(pricing, file, body) {
+function scanMdxPricing(pricing, file, body) {
   if (!pricing) return;
-  const { amounts, savings, trialDays } = pricing;
-  const allowedDollars = new Set([...amounts, ...savings]);
-  // Trial claims are checked everywhere in the body ("7-day free trial",
-  // "free for 7 days" are always about OUR trial; "7-day trend" is not
-  // matched, so HRV-style prose stays clean).
-  for (const m of body.matchAll(/(\d+)[-\s]day free trial/gi)) {
-    if (Number(m[1]) !== trialDays)
-      err(file, `trial claim "${m[0]}" no longer matches PLAN_PRICING trialDays (${trialDays})`);
-  }
-  for (const m of body.matchAll(/free for (\d+) days/gi)) {
-    if (Number(m[1]) !== trialDays)
-      err(file, `trial claim "${m[0]}" no longer matches PLAN_PRICING trialDays (${trialDays})`);
-  }
-  // Dollar claims are checked per sentence: any $N inside a sentence that
-  // mentions RxFit must equal a current plan amount (or documented savings).
-  // Competitor/trainer prices live in sentences that don't mention RxFit.
-  const sentences = body.split(/(?<=[.!?])\s+|\n/);
-  for (const sentence of sentences) {
-    if (!/rxfit/i.test(sentence)) continue;
-    for (const m of sentence.matchAll(/\$(\d+)(?![\d.])/g)) {
-      const val = Number(m[1]);
-      if (!allowedDollars.has(val))
-        err(file, `RxFit price mention "$${m[1]}" does not match any PLAN_PRICING amount/savings (${[...allowedDollars].join(", ")}) — update this sentence: "${sentence.trim().slice(0, 100)}"`);
-    }
-  }
+  for (const e of scanMdxPriceClaims(pricing, file, body)) errors.push(e);
 }
 
 /**
@@ -629,7 +571,7 @@ validateCompareJsonLdWiring();
 
 const planPricing = loadPlanPricing();
 scanForHardcodedPrices(planPricing);
-for (const post of posts) scanMdxPriceClaims(planPricing, post.file, post.body);
+for (const post of posts) scanMdxPricing(planPricing, post.file, post.body);
 
 await validateDbPostLinks(knownSlugs, staticRoutes);
 
