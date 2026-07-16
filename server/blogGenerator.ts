@@ -13,6 +13,7 @@ import { parse as parseYaml } from "yaml";
 import { storage } from "./storage";
 import { researchTheme, type ExaResult } from "./exaClient";
 import { sendPostPublishedEmail, sendPostFailureEmail } from "./emailService";
+import { appendAlertToSheet } from "./sheetsService";
 import { generateAndStoreHeroImage } from "./heroImage";
 import {
   extractToc,
@@ -344,7 +345,24 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
     return post;
   } catch (error) {
     console.error(`[blog-publisher] FAILED at stage "${stage}":`, error);
-    await sendPostFailureEmail(stage, error);
+    const emailSent = await sendPostFailureEmail(stage, error);
+    if (!emailSent) {
+      // Gmail itself may be down — fall back to the "RxFit Alerts" sheet tab
+      // (separate google-sheet connector) so the owner still finds out.
+      try {
+        const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ""}` : String(error);
+        await appendAlertToSheet({
+          title: `Blog auto-publish FAILED at stage "${stage}" (failure email could not be sent)`,
+          message,
+        });
+        console.log("[blog-publisher] Fallback failure alert row appended to Google Sheet");
+      } catch (sheetError) {
+        console.error(
+          "[blog-publisher] BOTH failure alert channels failed (Gmail email + Google Sheet):",
+          sheetError,
+        );
+      }
+    }
     throw error;
   }
 }

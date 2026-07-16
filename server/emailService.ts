@@ -224,8 +224,13 @@ export async function sendPostPublishedEmail(post: {
   console.log(`[blog-publisher] Publish notification sent to ${to}`);
 }
 
-/** Notify the owner that an auto-publish run failed. Best-effort (never throws). */
-export async function sendPostFailureEmail(stage: string, error: unknown): Promise<void> {
+/**
+ * Notify the owner that an auto-publish run failed. Best-effort (never throws).
+ * Returns true when the email was actually sent, false when sending failed —
+ * callers can use this to fall back to a second alert channel (e.g. the
+ * Google Sheet) when Gmail itself is down.
+ */
+export async function sendPostFailureEmail(stage: string, error: unknown): Promise<boolean> {
   try {
     const gmail = await getUncachableGmailClient();
     const to = await getOwnerEmail();
@@ -250,8 +255,10 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
     const raw = createMimeMessage(to, `❌ RxFit.ai blog auto-publish failed (${stage})`, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[blog-publisher] Failure notification sent to ${to}`);
+    return true;
   } catch (notifyError) {
     console.error('[blog-publisher] Could not send failure notification email:', notifyError);
+    return false;
   }
 }
 

@@ -40,7 +40,11 @@ vi.mock("./heroImage", () => ({
 
 vi.mock("./emailService", () => ({
   sendPostPublishedEmail: vi.fn().mockResolvedValue(undefined),
-  sendPostFailureEmail: vi.fn().mockResolvedValue(undefined),
+  sendPostFailureEmail: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("./sheetsService", () => ({
+  appendAlertToSheet: vi.fn().mockResolvedValue(undefined),
 }));
 
 function makeBody(): string {
@@ -150,6 +154,53 @@ describe("generateAndPublishPost retry feedback", () => {
     expect(String(error)).toContain("failed validation twice");
     expect(storage.createGeneratedPost).not.toHaveBeenCalled();
     expect(storage.markKeywordThemeUsed).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a Google Sheet alert row when the failure email can't be sent", async () => {
+    const badDraft = () => ({
+      choices: [
+        { message: { content: JSON.stringify(makeDraft({ title: "", recommendedPlan: "nope" })) } },
+      ],
+    });
+    createMock.mockResolvedValueOnce(badDraft()).mockResolvedValueOnce(badDraft());
+
+    const { sendPostFailureEmail } = await import("./emailService");
+    vi.mocked(sendPostFailureEmail).mockResolvedValueOnce(false); // Gmail is down
+
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { appendAlertToSheet } = await import("./sheetsService");
+
+    await expect(generateAndPublishPost()).rejects.toThrow(/failed validation twice/);
+
+    expect(appendAlertToSheet).toHaveBeenCalledTimes(1);
+    const [alert] = vi.mocked(appendAlertToSheet).mock.calls[0];
+    expect(alert.title).toContain('Blog auto-publish FAILED at stage "validation"');
+    expect(alert.title).toContain("failure email could not be sent");
+    expect(alert.message).toContain("failed validation twice");
+  });
+
+  it("does not touch the sheet when the failure email sends, and still rethrows when both channels fail", async () => {
+    const badDraft = () => ({
+      choices: [
+        { message: { content: JSON.stringify(makeDraft({ title: "", recommendedPlan: "nope" })) } },
+      ],
+    });
+
+    // Case 1: email sends fine -> no sheet write.
+    createMock.mockResolvedValueOnce(badDraft()).mockResolvedValueOnce(badDraft());
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { appendAlertToSheet } = await import("./sheetsService");
+    const { sendPostFailureEmail } = await import("./emailService");
+
+    await expect(generateAndPublishPost()).rejects.toThrow(/failed validation twice/);
+    expect(appendAlertToSheet).not.toHaveBeenCalled();
+
+    // Case 2: email fails AND the sheet write fails -> original error still thrown.
+    createMock.mockResolvedValueOnce(badDraft()).mockResolvedValueOnce(badDraft());
+    vi.mocked(sendPostFailureEmail).mockResolvedValueOnce(false);
+    vi.mocked(appendAlertToSheet).mockRejectedValueOnce(new Error("sheets down too"));
+
+    await expect(generateAndPublishPost()).rejects.toThrow(/failed validation twice/);
   });
 
   it("still publishes (without an image) when hero image generation fails", async () => {

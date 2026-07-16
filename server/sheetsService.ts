@@ -100,6 +100,23 @@ export async function appendCredentialAlertToSheet(alert: {
   service: string;
   message: string;
 }): Promise<void> {
+  await appendAlertToSheet({
+    title: `${alert.service.toUpperCase()} credentials are BROKEN (alert email could not be sent)`,
+    message: alert.message,
+  });
+  console.log(`[credential-check] Fallback alert row appended to Google Sheet for ${alert.service}`);
+}
+
+/**
+ * Generalized fallback alert channel: append a row to the "RxFit Alerts" tab
+ * of the leads spreadsheet. Used when the Gmail alert email can't be sent
+ * (e.g. the Gmail connection itself is what broke). Throws on failure so the
+ * caller can log that BOTH channels failed.
+ */
+export async function appendAlertToSheet(alert: {
+  title: string;
+  message: string;
+}): Promise<void> {
   if (!SPREADSHEET_ID) {
     throw new Error('LEADS_SPREADSHEET_ID not set — cannot write alert to Google Sheets');
   }
@@ -115,10 +132,9 @@ export async function appendCredentialAlertToSheet(alert: {
     requestBody: {
       values: [[
         new Date().toISOString(),
-        `${alert.service.toUpperCase()} credentials are BROKEN (alert email could not be sent)`,
+        alert.title,
         alert.message.slice(0, 2000),
       ]],
     },
   });
-  console.log(`[credential-check] Fallback alert row appended to Google Sheet for ${alert.service}`);
 }
