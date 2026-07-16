@@ -36,6 +36,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `server/blogGenerator.ts` — AI post pipeline: theme → Exa research → gpt-5.4 (json_object) → validate w/ one retry (incl. disallowed-URL-scheme rejection) → hero image (best-effort) → publish to DB → Gmail notification; loud failure email + rethrow
 - `server/heroImage.ts` — gpt-image-1 hero image generation (brand Lux-Industrial prompt, per-pillar scenes) + Replit Object Storage upload (`public/blog-heroes/<slug>.webp`); served via `GET /blog-heroes/:file`
 - `server/backfill-hero-images.ts` — Manual CLI: `npx tsx server/backfill-hero-images.ts` generates hero images for published posts missing one
+- `server/credentialHealthCheck.ts` — Boot + hourly check that Stripe/Gmail connector credentials still resolve; retries once (15s) to avoid transient false alarms, alerts owner by email only on the healthy→broken transition (via `sendCredentialAlertEmail` in `emailService.ts`), logs recovery. Production-only (or `CREDENTIAL_HEALTHCHECK=true` in dev)
 - `server/blogScheduler.ts` — Hourly + boot check; publishes when the newest post is ≥3 days old; pg advisory lock prevents double-publish; runs in production (or `BLOG_AUTOPUBLISH=true` in dev)
 - `server/blogSsr.ts` — Runtime crawler HTML for DB posts (head mirrors seo.tsx incl. JSON-LD; marked-rendered body with raw-HTML escaping + URL scheme sanitization, brand classes, TOC ids)
 - `server/generate-post.ts` — Manual CLI: `npx tsx server/generate-post.ts` publishes one post now

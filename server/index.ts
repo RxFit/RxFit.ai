@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { startBlogScheduler } from "./blogScheduler";
+import { startCredentialHealthCheck } from "./credentialHealthCheck";
 import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
@@ -161,6 +162,7 @@ export function log(message: string, source = "express") {
     () => {
       log(`serving on port ${port}`);
       startBlogScheduler();
+      startCredentialHealthCheck();
     },
   );
 })();

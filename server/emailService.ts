@@ -250,6 +250,42 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
   }
 }
 
+/** Notify the owner that Stripe or Gmail credentials stopped resolving. Best-effort (never throws). */
+export async function sendCredentialAlertEmail(service: string, error: unknown): Promise<void> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
+    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service;
+    const impact =
+      service === 'stripe'
+        ? 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.'
+        : 'Welcome/lead emails and blog notifications will fail until this is fixed.';
+    const html = `
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(239,68,68,0.4);border-radius:16px;padding:40px;">
+        <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#EF4444;font-size:24px;margin:0;">RxFit.ai Credential Monitor</h1></td></tr>
+        <tr><td>
+          <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 16px;">${escapeHtml(serviceLabel)} credentials are BROKEN</h2>
+          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 12px;">The hourly health check could not resolve ${escapeHtml(serviceLabel)} credentials (checked twice). ${escapeHtml(impact)}</p>
+          <pre style="color:#FCA5A5;background:rgba(239,68,68,0.08);border-radius:8px;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(message.slice(0, 4000))}</pre>
+          <p style="color:#64748B;font-size:13px;margin:16px 0 0;">Fix: open the Replit workspace → Integrations and re-authorize the ${escapeHtml(serviceLabel)} connection. You'll only get this email once per outage; recovery is logged automatically.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+    const raw = createMimeMessage(to, `🚨 RxFit.ai: ${serviceLabel} credentials are broken`, html);
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    console.log(`[credential-check] Alert email sent to ${to} for ${service}`);
+  } catch (notifyError) {
+    console.error(`[credential-check] Could not send credential alert email for ${service}:`, notifyError);
+  }
+}
+
 export async function sendLeadEmail(email: string, name: string): Promise<void> {
   try {
     const gmail = await getUncachableGmailClient();
