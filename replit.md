@@ -33,7 +33,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `shared/schema.ts` — Database schema (users, leads, generated_posts, keyword_themes tables)
 - `shared/generated-blog.ts` — Types/zod schemas shared by the AI blog publisher (server + client)
 - `server/exaClient.ts` — Exa research API client (EXA_API_KEY secret)
-- `server/blogGenerator.ts` — AI post pipeline: theme → Exa research → gpt-5.4 (json_object) → validate w/ one retry (incl. disallowed-URL-scheme rejection) → hero image (best-effort) → publish to DB → Gmail notification; loud failure email + rethrow
+- `server/blogGenerator.ts` — AI post pipeline: theme → Exa research → gpt-5.4 (json_object) → validate w/ one retry (incl. disallowed-URL-scheme rejection + internal-link target check: `/blog/...` links must match an existing MDX/DB slug, other root-relative links must be in `shared/site.ts` STATIC_ROUTES) → hero image (best-effort) → publish to DB → Gmail notification; loud failure email + rethrow
 - `server/heroImage.ts` — gpt-image-1 hero image generation (brand Lux-Industrial prompt, per-pillar scenes) + Replit Object Storage upload (`public/blog-heroes/<slug>.webp`); served via `GET /blog-heroes/:file`
 - `server/backfill-hero-images.ts` — Manual CLI: `npx tsx server/backfill-hero-images.ts` generates hero images for published posts missing one
 - `server/credentialHealthCheck.ts` — Boot + hourly check that Stripe/Gmail connector credentials still resolve; retries once (15s) to avoid transient false alarms, alerts owner by email only on the healthy→broken transition (via `sendCredentialAlertEmail` in `emailService.ts`), logs recovery. Production-only (or `CREDENTIAL_HEALTHCHECK=true` in dev)

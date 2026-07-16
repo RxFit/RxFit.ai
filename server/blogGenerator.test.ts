@@ -35,7 +35,9 @@ function makeDraft(overrides: Partial<LlmPostDraft> = {}): LlmPostDraft {
   };
 }
 
-const noSlugs = new Set<string>();
+// Slugs the goodBody() fixture links to must exist, or the internal-link
+// target check would reject the otherwise-valid draft.
+const noSlugs = new Set<string>(["wearable-guide", "x", "y"]);
 
 describe("validateDraft", () => {
   it("accepts a well-formed draft", () => {
@@ -112,6 +114,23 @@ describe("validateDraft", () => {
 
   it("allows http, https, mailto, tel, and relative links", () => {
     const body = `${goodBody()}\n\n[a](https://x.com) [b](http://x.com) [c](mailto:hi@x.com) [d](tel:+15551234) [e](/blog) [f](#anchor)`;
+    expect(validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs)).toEqual([]);
+  });
+
+  it("rejects internal links to nonexistent blog posts", () => {
+    const body = `${goodBody()}\n\nAlso see [this guide](/blog/made-up-slug) for more.`;
+    const errors = validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs);
+    expect(errors.some((e) => e.includes('unknown blog post: /blog/made-up-slug'))).toBe(true);
+  });
+
+  it("rejects internal links to unknown routes", () => {
+    const body = `${goodBody()}\n\nVisit [our features](/features) today.`;
+    const errors = validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs);
+    expect(errors.some((e) => e.includes("unknown route: /features"))).toBe(true);
+  });
+
+  it("allows static routes, fragments, query strings, and asset paths", () => {
+    const body = `${goodBody()}\n\n[a](/) [b](/blog) [c](/#pricing) [d](/blog?utm_source=x) [e](/success) [f](/blog-heroes/some-post.webp) [g](/logo.png)`;
     expect(validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs)).toEqual([]);
   });
 

@@ -22,6 +22,7 @@ import {
   SEED_KEYWORD_THEMES,
 } from "@shared/generated-blog";
 import type { GeneratedPost, FaqItem } from "@shared/schema";
+import { STATIC_ROUTES } from "@shared/site";
 
 const AUTHOR = "RxFit.ai Research Team";
 const AUTHOR_BIO =
@@ -104,6 +105,7 @@ REQUIREMENTS:
 - 1200-1800 words in the markdown body.
 - Structure the body with 4-6 H2 sections ("## Heading"). Use H3 sparingly. NO H1 in the body. Do not repeat the title in the body. Do not include TL;DR, key takeaways, or FAQ in the body — those are separate fields.
 - At least 3 internal links in the body (markdown links starting with "/", e.g. [our AI coaching guide](/blog/some-slug), [pricing](/#pricing)).
+- CRITICAL: every internal /blog/... link MUST use a slug copied EXACTLY from the EXISTING POSTS list above. Never invent or guess a slug. Other internal links must be one of: ${STATIC_ROUTES.join(", ")} (fragments like /#pricing are fine). Posts with made-up links are rejected.
 - At least 2 external citation links to the research source URLs.
 - Use short paragraphs, bolded key phrases, and occasional bulleted lists. No raw HTML, no images, no tables.
 - End the body with a short section that naturally leads the reader toward trying RxFit.ai.
@@ -148,6 +150,11 @@ async function draftPost(
   return JSON.parse(content) as LlmPostDraft;
 }
 
+/** Root-relative link targets in the markdown body (mirrors scripts/validate-seo.mjs). */
+function extractInternalLinks(body: string): string[] {
+  return Array.from(body.matchAll(/\]\(\s*(\/[^)\s]*)\s*(?:"[^"]*"\s*)?\)/g), (m) => m[1]);
+}
+
 export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): string[] {
   const errors: string[] = [];
   const required: (keyof LlmPostDraft)[] = [
@@ -189,6 +196,22 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
       const url = m[1].trim();
       if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^(https?:|mailto:|tel:)/i.test(url)) {
         errors.push(`body contains link with disallowed URL scheme: ${url.slice(0, 60)}`);
+      }
+    }
+    // Every internal link must resolve to a real page: a static route, an
+    // existing blog post slug, or an asset path — otherwise readers hit 404s.
+    for (const raw of extractInternalLinks(draft.bodyMarkdown)) {
+      const target = raw.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+      if (target.startsWith("/blog-heroes/") || /\.[a-z0-9]+$/i.test(target)) continue;
+      const blogMatch = target.match(/^\/blog\/([^/]+)$/);
+      if (blogMatch) {
+        if (!existingSlugs.has(blogMatch[1])) {
+          errors.push(`body links to unknown blog post: ${raw} (no post with slug "${blogMatch[1]}")`);
+        }
+        continue;
+      }
+      if (!(STATIC_ROUTES as readonly string[]).includes(target)) {
+        errors.push(`body links to unknown route: ${raw} (not a static route or /blog/:slug)`);
       }
     }
   }
