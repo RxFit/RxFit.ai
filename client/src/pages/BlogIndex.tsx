@@ -4,7 +4,12 @@ import { motion } from "framer-motion";
 import { ArrowRight, Clock } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
-import { Seo, SITE_URL } from "@/lib/seo";
+import { Seo } from "@/lib/seo";
+import {
+  BLOG_INDEX_TITLE,
+  BLOG_INDEX_DESCRIPTION,
+  buildBlogCollectionJsonLd,
+} from "@shared/blog-index-seo";
 import { getAllPosts, PILLARS, type PostFrontmatter } from "@/lib/blogLoader";
 import { useGeneratedPosts, toFrontmatter } from "@/lib/generatedPosts";
 
@@ -37,58 +42,23 @@ export default function BlogIndex() {
   const [pillar, setPillar] = useState<string | null>(null);
   const filtered = pillar ? posts.filter((p) => p.frontmatter.pillar === pillar) : posts;
 
-  const blogCollectionJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: "The RxFit.ai Blog",
-    description:
-      "Evidence-based guides on AI fitness coaching, reading your wearable data, and closing the accountability gap that makes most fitness apps fail.",
-    url: `${SITE_URL}/blog`,
-    publisher: {
-      "@type": "Organization",
-      name: "RxFit.ai",
-      url: SITE_URL,
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
-    },
-    mainEntity: {
-      "@type": "ItemList",
-      name: "RxFit.ai Blog Posts",
-      numberOfItems: posts.length,
-      itemListElement: posts.map((post, i) => ({
-        "@type": "ListItem",
-        position: i + 1,
-        url: `${SITE_URL}/blog/${post.frontmatter.slug}`,
-        name: post.frontmatter.title,
-        item: {
-          "@type": "BlogPosting",
-          headline: post.frontmatter.title,
-          url: `${SITE_URL}/blog/${post.frontmatter.slug}`,
-          datePublished: post.frontmatter.date,
-          ...(post.frontmatter.updatedDate
-            ? { dateModified: post.frontmatter.updatedDate }
-            : {}),
-          description: post.frontmatter.description,
-          ...(post.frontmatter.heroImage
-            ? {
-                image: post.frontmatter.heroImage.startsWith("http")
-                  ? post.frontmatter.heroImage
-                  : `${SITE_URL}${post.frontmatter.heroImage}`,
-              }
-            : {}),
-          author: {
-            "@type": "Person",
-            name: post.frontmatter.author,
-          },
-        },
-      })),
-    },
-  };
+  const blogCollectionJsonLd = buildBlogCollectionJsonLd(
+    posts.map((post) => ({
+      slug: post.frontmatter.slug,
+      title: post.frontmatter.title,
+      description: post.frontmatter.description,
+      date: post.frontmatter.date,
+      updatedDate: post.frontmatter.updatedDate,
+      heroImage: post.frontmatter.heroImage,
+      author: post.frontmatter.author,
+    })),
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Seo
-        title="The RxFit.ai Blog — AI Coaching, Wearables & Accountability"
-        description="Evidence-based guides on AI fitness coaching, reading your wearable data, and closing the accountability gap that makes most fitness apps fail."
+        title={BLOG_INDEX_TITLE}
+        description={BLOG_INDEX_DESCRIPTION}
         canonicalPath="/blog"
         type="website"
         breadcrumbs={[

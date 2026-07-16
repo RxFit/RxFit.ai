@@ -486,6 +486,64 @@ function validateBlogPostJsonLdWiring() {
 }
 
 /**
+ * Blog index JSON-LD wiring: the Blog + ItemList structured data for /blog is
+ * built by buildBlogCollectionJsonLd in shared/blog-index-seo.ts (shape-tested
+ * by shared/blog-index-seo.test.ts), but it only ships if BlogIndex.tsx keeps
+ * calling the builder and passing the result into the Seo jsonLd prop (along
+ * with the shared title/description constants and the /blog canonical). Guard
+ * that wiring so a refactor can't silently drop the blog hub's structured data
+ * or SEO head.
+ */
+function validateBlogIndexJsonLdWiring() {
+  const file = "client/src/pages/BlogIndex.tsx";
+  const abs = path.join(ROOT, file);
+  if (!fs.existsSync(abs)) {
+    err(file, "BlogIndex.tsx not found");
+    return;
+  }
+  const src = fs.readFileSync(abs, "utf8");
+  if (
+    !/import\s*\{[^}]*buildBlogCollectionJsonLd[^}]*\}\s*from\s*["']@shared\/blog-index-seo["']/.test(
+      src,
+    )
+  ) {
+    err(file, "must import buildBlogCollectionJsonLd from @shared/blog-index-seo (Blog JSON-LD wiring)");
+  }
+  if (!/buildBlogCollectionJsonLd\s*\(/.test(src)) {
+    err(file, "buildBlogCollectionJsonLd is no longer called — /blog Blog JSON-LD dropped");
+  }
+  if (!/import\s*\{[^}]*BLOG_INDEX_TITLE[^}]*\}\s*from\s*["']@shared\/blog-index-seo["']/.test(src)) {
+    err(file, "must import BLOG_INDEX_TITLE from @shared/blog-index-seo (shared SEO title wiring)");
+  }
+  if (!/import\s*\{[^}]*BLOG_INDEX_DESCRIPTION[^}]*\}\s*from\s*["']@shared\/blog-index-seo["']/.test(src)) {
+    err(file, "must import BLOG_INDEX_DESCRIPTION from @shared/blog-index-seo (shared SEO description wiring)");
+  }
+  const seoUsages = [...src.matchAll(/<Seo\b([\s\S]*?)\/>/g)].map((m) => m[1]);
+  const blogUsage = seoUsages.find((attrs) => /canonicalPath=["']\/blog["']/.test(attrs));
+  if (!blogUsage) {
+    err(file, 'no <Seo canonicalPath="/blog"> found — blog index no longer emits its SEO head');
+    return;
+  }
+  if (!/title=\{BLOG_INDEX_TITLE\}/.test(blogUsage)) {
+    err(file, "Seo title no longer uses BLOG_INDEX_TITLE — title/JSON-LD description can drift");
+  }
+  if (!/description=\{BLOG_INDEX_DESCRIPTION\}/.test(blogUsage)) {
+    err(file, "Seo description no longer uses BLOG_INDEX_DESCRIPTION — meta/JSON-LD description can drift");
+  }
+  const jsonLdProp = blogUsage.match(/jsonLd=\{\[([\s\S]*?)\]\}/);
+  if (!jsonLdProp) {
+    err(file, "Seo jsonLd prop not found — blog index no longer emits Blog JSON-LD");
+    return;
+  }
+  if (!jsonLdProp[1].includes("blogCollectionJsonLd")) {
+    err(file, "Seo jsonLd prop no longer includes the built Blog JSON-LD (structured data dropped)");
+  }
+  if (!/breadcrumbs=\{\[/.test(blogUsage)) {
+    err(file, "Seo breadcrumbs prop dropped — BreadcrumbList JSON-LD no longer emitted for /blog");
+  }
+}
+
+/**
  * Hardcoded-price drift guard: all plan price/trial copy must derive from
  * PLAN_PRICING/TRIAL_COPY in shared/stripe-constants.ts. This scan fails the
  * build when a literal plan amount ("$49") or trial phrase ("7-day free
@@ -610,6 +668,7 @@ validateSiteDefaults();
 validateLandingJsonLdWiring();
 validateCompareJsonLdWiring();
 validateBlogPostJsonLdWiring();
+validateBlogIndexJsonLdWiring();
 
 const planPricing = loadPlanPricing();
 scanForHardcodedPrices(planPricing);
