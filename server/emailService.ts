@@ -344,6 +344,69 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
 }
 
 /**
+ * Weekly digest of alert rows that landed in the "RxFit Alerts" sheet tab
+ * since the last digest. Throws on failure so the digest scheduler can skip
+ * bumping its state and retry hourly — that retry loop is what guarantees
+ * sheet-only alerts (written during a Gmail outage) eventually reach the
+ * inbox once Gmail recovers.
+ */
+export async function sendAlertsDigestEmailOrThrow(
+  rows: { date: string; title: string; details: string }[],
+  since: Date | null,
+): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const to = await getOwnerEmail();
+  const MAX_ROWS = 50;
+  const shown = rows.slice(0, MAX_ROWS);
+  const sinceLabel = since
+    ? `since the last digest (${since.toISOString().slice(0, 10)})`
+    : 'awaiting their first digest';
+  const rowsHtml = shown
+    .map((row) => {
+      const day = row.date ? escapeHtml(row.date.slice(0, 10)) : '—';
+      return `
+          <tr>
+            <td style="padding:10px 12px 10px 0;color:#94A3B8;font-size:12px;vertical-align:top;white-space:nowrap;">${day}</td>
+            <td style="padding:10px 0;border-bottom:1px solid rgba(148,163,184,0.15);">
+              <p style="color:#F8FAFC;font-size:14px;margin:0 0 4px;font-weight:600;">${escapeHtml(row.title)}</p>
+              <p style="color:#94A3B8;font-size:12px;line-height:1.5;margin:0;white-space:pre-wrap;">${escapeHtml(row.details.slice(0, 500))}</p>
+            </td>
+          </tr>`;
+    })
+    .join('');
+  const overflow =
+    rows.length > MAX_ROWS
+      ? `<p style="color:#94A3B8;font-size:13px;margin:12px 0 0;">…and ${rows.length - MAX_ROWS} more row(s) — see the "RxFit Alerts" tab in the leads spreadsheet.</p>`
+      : '';
+  const html = `
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
+        <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#D4AF37;font-size:24px;margin:0;">RxFit.ai Alerts Digest</h1></td></tr>
+        <tr><td>
+          <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 8px;">${rows.length} alert row(s) need your attention</h2>
+          <p style="color:#CBD5E1;font-size:14px;line-height:1.6;margin:0 0 20px;">These landed in the "RxFit Alerts" sheet tab ${sinceLabel}. They usually mean an email or credential failure was routed to the sheet fallback — review each row and re-send / re-authorize where needed.</p>
+          <table cellpadding="0" cellspacing="0" width="100%">${rowsHtml}
+          </table>
+          ${overflow}
+          <p style="color:#64748B;font-size:13px;margin:20px 0 0;border-top:1px solid rgba(148,163,184,0.2);padding-top:16px;">This weekly digest is sent automatically whenever new alert rows exist. Missed customer emails can be re-sent with the resend CLI noted in each row's runbook.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  const raw = createMimeMessage(
+    to,
+    `📋 RxFit.ai weekly alerts digest — ${rows.length} unresolved alert row(s)`,
+    html,
+  );
+  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+  console.log(`[alerts-digest] Digest email sent to ${to} (${rows.length} row(s))`);
+}
+
+/**
  * Send the branded lead nurture email, throwing on failure. Used by the
  * resend CLI (server/resend-email.ts).
  */
