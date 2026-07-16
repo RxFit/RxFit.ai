@@ -395,6 +395,39 @@ function validateSiteDefaults() {
   validateOrganization(ORGANIZATION_JSONLD, "client/src/lib/seo.tsx");
 }
 
+/**
+ * Landing page AEO wiring: the FAQPage + Product/Offer JSON-LD lives in
+ * shared/landing-seo.ts (shape-validated by shared/landing-seo.test.ts), but
+ * it only ships if LandingPage.tsx actually passes it into the Seo jsonLd
+ * prop. Guard that wiring so a refactor can't silently drop it.
+ */
+function validateLandingJsonLdWiring() {
+  const file = "client/src/pages/LandingPage.tsx";
+  const abs = path.join(ROOT, file);
+  if (!fs.existsSync(abs)) {
+    err(file, "LandingPage.tsx not found");
+    return;
+  }
+  const src = fs.readFileSync(abs, "utf8");
+  if (!/import\s*\{[^}]*PRICING_JSONLD[^}]*\}\s*from\s*["']@shared\/landing-seo["']/.test(src)) {
+    err(file, "must import PRICING_JSONLD from @shared/landing-seo (Product/Offer JSON-LD wiring)");
+  }
+  if (!/import\s*\{[^}]*FAQ_JSONLD[^}]*\}\s*from\s*["']@shared\/landing-seo["']/.test(src)) {
+    err(file, "must import FAQ_JSONLD from @shared/landing-seo (FAQPage JSON-LD wiring)");
+  }
+  const jsonLdProp = src.match(/jsonLd=\{\[([\s\S]*?)\]\}/);
+  if (!jsonLdProp) {
+    err(file, "Seo jsonLd prop not found — landing page no longer emits FAQPage/Product JSON-LD");
+    return;
+  }
+  if (!jsonLdProp[1].includes("PRICING_JSONLD")) {
+    err(file, "Seo jsonLd prop no longer includes PRICING_JSONLD (Product/Offer structured data dropped)");
+  }
+  if (!jsonLdProp[1].includes("FAQ_JSONLD")) {
+    err(file, "Seo jsonLd prop no longer includes FAQ_JSONLD (FAQPage structured data dropped)");
+  }
+}
+
 /* ---------------- run ------------------------------------------------------ */
 
 const files = fs
@@ -421,6 +454,7 @@ const knownSlugs = new Set(slugs.keys());
 for (const post of posts) checkInternalLinks(post.file, post.body, knownSlugs, staticRoutes);
 
 validateSiteDefaults();
+validateLandingJsonLdWiring();
 
 for (const w of warnings) console.warn(`WARN  ${w}`);
 if (errors.length > 0) {
