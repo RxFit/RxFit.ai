@@ -40,6 +40,37 @@ const state: Record<ServiceName, ServiceState> = {
   sheets: { healthy: true, alerted: false },
 };
 
+/** On-demand status metadata (per service), surfaced by the internal
+ *  /api/internal/credential-health endpoint. `healthy: null` = not yet checked. */
+type ServiceStatus = {
+  healthy: boolean | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+};
+
+const status: Record<ServiceName, ServiceStatus> = {
+  stripe: { healthy: null, lastCheckedAt: null, lastError: null },
+  gmail: { healthy: null, lastCheckedAt: null, lastError: null },
+  sheets: { healthy: null, lastCheckedAt: null, lastError: null },
+};
+
+export interface CredentialHealthStatus {
+  services: Record<ServiceName, ServiceStatus>;
+  checkedAt: string;
+}
+
+/** Snapshot of the in-memory credential health state (deep-copied). */
+export function getCredentialHealthStatus(): CredentialHealthStatus {
+  return {
+    services: {
+      stripe: { ...status.stripe },
+      gmail: { ...status.gmail },
+      sheets: { ...status.sheets },
+    },
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 /**
  * Pure transition logic (unit-tested): given the previous state and the
  * latest check result, decide whether to alert and compute the next state.
@@ -125,6 +156,16 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
   const result = await checkWithRetry(fn);
   const { next, shouldAlert, recovered } = evaluateTransition(state[name], result.ok);
   state[name] = next;
+
+  status[name] = {
+    healthy: result.ok,
+    lastCheckedAt: new Date().toISOString(),
+    lastError: result.ok
+      ? null
+      : result.error instanceof Error
+        ? result.error.message
+        : String(result.error),
+  };
 
   if (result.ok) {
     if (recovered) {

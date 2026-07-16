@@ -16,6 +16,8 @@ import { SITE_URL } from "@shared/site";
 import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
+import { isAdminAuthorized } from "./adminAuth";
+import { getCredentialHealthStatus, runCredentialHealthCheck } from "./credentialHealthCheck";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -68,8 +70,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/leads", async (req, res) => {
-    const adminKey = process.env.ADMIN_API_KEY;
-    if (!adminKey || req.headers["x-admin-key"] !== adminKey) {
+    if (!isAdminAuthorized(req.headers["x-admin-key"], process.env.ADMIN_API_KEY)) {
       return res.status(401).json({ message: "Unauthorized." });
     }
     try {
@@ -322,6 +323,34 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ---- Internal credential health status (admin-key protected) ----
+  // On-demand view of the hourly credential health check state (Stripe
+  // balance probe, Gmail token, Sheets metadata probe) so the owner can
+  // confirm recovery after an alert without waiting for the next cycle.
+  // Same x-admin-key/ADMIN_API_KEY guard as /api/leads: unset key = 401
+  // always, so nothing is ever public (threat model: no public sensitive
+  // routes).
+
+  app.get("/api/internal/credential-health", (req, res) => {
+    if (!isAdminAuthorized(req.headers["x-admin-key"], process.env.ADMIN_API_KEY)) {
+      return res.status(401).json({ message: "Unauthorized." });
+    }
+    return res.json(getCredentialHealthStatus());
+  });
+
+  app.post("/api/internal/credential-health/run", async (req, res) => {
+    if (!isAdminAuthorized(req.headers["x-admin-key"], process.env.ADMIN_API_KEY)) {
+      return res.status(401).json({ message: "Unauthorized." });
+    }
+    try {
+      await runCredentialHealthCheck();
+      return res.json(getCredentialHealthStatus());
+    } catch (error) {
+      console.error("Error running credential health check:", error);
+      return res.status(500).json({ message: "Health check run failed." });
     }
   });
 
