@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { sendWelcomeEmail } from "./emailService";
+import { sendWelcomeEmail, sendLeadEmail } from "./emailService";
 import { appendLeadToSheet } from "./sheetsService";
 import fs from "fs";
 import path from "path";
@@ -53,6 +53,8 @@ export async function registerRoutes(
         source: 'lead_capture',
         status: 'lead',
       }).catch(() => {});
+
+      sendLeadEmail(parsed.email, parsed.name || 'there').catch(() => {});
 
       return res.status(200).json({ message: "You're in! Check your email for next steps." });
     } catch (error) {

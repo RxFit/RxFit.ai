@@ -157,11 +157,32 @@ export async function sendWelcomeEmail(email: string, name: string, planName: st
 
 /** Resolve the connected Gmail account's own address (the site owner). */
 async function getOwnerEmail(): Promise<string> {
-  const gmail = await getUncachableGmailClient();
-  const profile = await gmail.users.getProfile({ userId: 'me' });
-  const address = profile.data.emailAddress;
-  if (!address) throw new Error('Could not resolve owner Gmail address');
-  return address;
+  if (process.env.OWNER_NOTIFICATION_EMAIL) {
+    return process.env.OWNER_NOTIFICATION_EMAIL;
+  }
+  try {
+    const gmail = await getUncachableGmailClient();
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    const address = profile.data.emailAddress;
+    if (address) return address;
+  } catch {
+    // The Gmail connection may lack the scope for getProfile (send-only token).
+    // Fall back to the Google account behind the Sheets connection (same owner).
+  }
+  const { getConnectionSettings } = await import('./connectorSettings');
+  const sheets = await getConnectionSettings('google-sheet');
+  const token = sheets?.settings?.access_token || sheets?.settings?.oauth?.credentials?.access_token;
+  if (token) {
+    const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const address = data?.user?.emailAddress;
+      if (address) return address;
+    }
+  }
+  throw new Error('Could not resolve owner email (set OWNER_NOTIFICATION_EMAIL to override)');
 }
 
 /** Notify the owner that the auto-publisher shipped a new blog post. Throws on failure. */

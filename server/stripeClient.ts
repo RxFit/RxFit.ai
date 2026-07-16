@@ -28,24 +28,11 @@ async function getCredentials() {
     throw new Error('No Stripe credentials found. Set STRIPE_SECRET_KEY in Replit Secrets, or configure the Stripe Connector.');
   }
 
-  const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
   const targetEnvironment = isProduction ? 'production' : 'development';
 
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set('include_secrets', 'true');
-  url.searchParams.set('connector_names', connectorName);
-  url.searchParams.set('environment', targetEnvironment);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-      'X_REPLIT_TOKEN': xReplitToken
-    }
-  });
-
-  const data = await response.json();
-  const connectionSettings = data.items?.[0];
+  const { getConnectionSettings } = await import('./connectorSettings');
+  const connectionSettings = await getConnectionSettings('stripe', targetEnvironment);
 
   if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
     throw new Error(`Stripe ${targetEnvironment} connection not found via Connector. Set STRIPE_SECRET_KEY in Replit Secrets instead.`);
