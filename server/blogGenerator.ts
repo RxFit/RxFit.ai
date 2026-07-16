@@ -133,15 +133,32 @@ Respond with ONLY a JSON object with exactly these keys:
 }`;
 }
 
+/**
+ * Feedback message appended to the retry prompt when the first draft fails
+ * validation, so the model knows exactly what to fix instead of guessing.
+ * Exported for testing.
+ */
+export function buildRetryFeedback(errors: string[]): string {
+  return `IMPORTANT — YOUR PREVIOUS DRAFT WAS REJECTED. It failed validation for these exact reasons:
+${errors.map((e) => `- ${e}`).join("\n")}
+
+Write a fresh draft that fixes EVERY one of these problems while still meeting all of the original requirements above. This is your final attempt; if any of these issues remain, the post will not be published.`;
+}
+
 async function draftPost(
   theme: string,
   pillar: string,
   research: ExaResult[],
   existingPosts: ExistingPostRef[],
+  previousErrors?: string[],
 ): Promise<LlmPostDraft> {
+  let prompt = buildPrompt(theme, pillar, research, existingPosts);
+  if (previousErrors && previousErrors.length > 0) {
+    prompt += `\n\n${buildRetryFeedback(previousErrors)}`;
+  }
   const response = await getOpenAI().chat.completions.create({
     model: "gpt-5.4",
-    messages: [{ role: "user", content: buildPrompt(theme, pillar, research, existingPosts) }],
+    messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
 
@@ -261,7 +278,7 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
     if (errors.length > 0) {
       console.warn(`[blog-publisher] Draft failed validation, retrying once:\n- ${errors.join("\n- ")}`);
       stage = "llm-draft-retry";
-      draft = await draftPost(theme.theme, theme.pillar, research, existingPosts);
+      draft = await draftPost(theme.theme, theme.pillar, research, existingPosts, errors);
       stage = "validation";
       errors = validateDraft(draft, existingSlugs);
       if (errors.length > 0) {

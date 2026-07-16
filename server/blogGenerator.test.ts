@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateDraft, type LlmPostDraft } from "./blogGenerator";
+import { validateDraft, buildRetryFeedback, type LlmPostDraft } from "./blogGenerator";
 
 function goodBody(): string {
   const para = "This is a sentence about wearable data and coaching consistency. ".repeat(6);
@@ -167,5 +167,17 @@ describe("validateDraft", () => {
       noSlugs,
     );
     expect(errors.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("buildRetryFeedback", () => {
+  it("includes every validation error verbatim", () => {
+    const errors = [
+      "body has only 2 internal links (need >= 3)",
+      "description is 90 chars (want 100-180)",
+    ];
+    const feedback = buildRetryFeedback(errors);
+    for (const e of errors) expect(feedback).toContain(e);
+    expect(feedback).toContain("REJECTED");
   });
 });
