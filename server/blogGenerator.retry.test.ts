@@ -203,6 +203,31 @@ describe("generateAndPublishPost retry feedback", () => {
     await expect(generateAndPublishPost()).rejects.toThrow(/failed validation twice/);
   });
 
+  it("keeps the post live when the publish notification email fails (no rollback, no failure alarm)", async () => {
+    createMock.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify(makeDraft()) } }],
+    });
+
+    const { sendPostPublishedEmail, sendPostFailureEmail } = await import("./emailService");
+    vi.mocked(sendPostPublishedEmail).mockRejectedValueOnce(new Error("gmail exploded"));
+
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { storage } = await import("./storage");
+    const { appendAlertToSheet } = await import("./sheetsService");
+
+    const post = await generateAndPublishPost();
+
+    // The pipeline resolves with the inserted post — the notification failure
+    // is swallowed, not treated as a publish failure.
+    expect(post.slug).toBe("hrv-training-guide-test");
+    expect(storage.createGeneratedPost).toHaveBeenCalledTimes(1);
+    expect(storage.markKeywordThemeUsed).toHaveBeenCalledTimes(1);
+
+    // No false alarm on either channel.
+    expect(sendPostFailureEmail).not.toHaveBeenCalled();
+    expect(appendAlertToSheet).not.toHaveBeenCalled();
+  });
+
   it("still publishes (without an image) when hero image generation fails", async () => {
     createMock.mockResolvedValueOnce({
       choices: [{ message: { content: JSON.stringify(makeDraft()) } }],
