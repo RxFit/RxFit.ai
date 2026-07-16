@@ -73,7 +73,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **Seed script:** `npx tsx server/seed-products.ts` to create products in Stripe
 
 ## Email & Sheets Integrations
-- **Gmail:** Sends branded welcome emails after Stripe checkout and lead signup emails on form submission
+- **Gmail:** Sends branded welcome emails after Stripe checkout and lead signup emails on form submission (customer templates use the champagne-gold palette — #D4AF37 accents, gold gradient button, gold card border — matching the owner-facing notification emails)
 - **Google Sheets:** Auto-syncs all leads to "RxFit Leads" tab in configured spreadsheet (LEADS_SPREADSHEET_ID env var)
 - **Spreadsheet columns:** Date, Email, Name, Plan, Source (lead_capture/stripe_checkout), Status (lead/paid)
 

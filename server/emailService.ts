@@ -43,43 +43,43 @@ function getWelcomeEmailHtml(name: string, planName: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(45,212,191,0.1),rgba(251,146,60,0.1));border:1px solid rgba(45,212,191,0.2);border-radius:16px;padding:40px;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(212,175,55,0.10),rgba(212,175,55,0.03));border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
           <tr>
             <td align="center" style="padding-bottom:30px;">
-              <h1 style="color:#2DD4BF;font-size:28px;margin:0;">RxFit<span style="color:#FB923C;">.ai</span></h1>
+              <h1 style="color:#D4AF37;font-size:28px;margin:0;">RxFit<span style="color:#F8FAFC;">.ai</span></h1>
             </td>
           </tr>
           <tr>
             <td>
               <h2 style="color:#F8FAFC;font-size:24px;margin:0 0 20px;">Welcome to RxFit.ai, ${firstName}!</h2>
               <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 20px;">
-                You've just taken the first step toward transforming your health with the <strong style="color:#2DD4BF;">${safePlanName}</strong> plan. We're excited to have you on board.
+                You've just taken the first step toward transforming your health with the <strong style="color:#D4AF37;">${safePlanName}</strong> plan. We're excited to have you on board.
               </p>
               <h3 style="color:#F8FAFC;font-size:18px;margin:0 0 15px;">Here's what happens next:</h3>
               <table cellpadding="0" cellspacing="0" style="margin-bottom:25px;">
                 <tr>
-                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#2DD4BF;font-size:20px;">1.</td>
+                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#D4AF37;font-size:20px;">1.</td>
                   <td style="padding:8px 0;color:#CBD5E1;font-size:15px;line-height:1.5;"><strong style="color:#F8FAFC;">Connect your wearables</strong> — Sync your Apple Watch, Fitbit, Garmin, or other devices to your AI Health Hub.</td>
                 </tr>
                 <tr>
-                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#2DD4BF;font-size:20px;">2.</td>
+                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#D4AF37;font-size:20px;">2.</td>
                   <td style="padding:8px 0;color:#CBD5E1;font-size:15px;line-height:1.5;"><strong style="color:#F8FAFC;">Meet your coach</strong> — Your personal trainer will reach out within 24 hours to schedule your first session.</td>
                 </tr>
                 <tr>
-                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#2DD4BF;font-size:20px;">3.</td>
+                  <td style="padding:8px 15px 8px 0;vertical-align:top;color:#D4AF37;font-size:20px;">3.</td>
                   <td style="padding:8px 0;color:#CBD5E1;font-size:15px;line-height:1.5;"><strong style="color:#F8FAFC;">Set your goals</strong> — Complete your health profile so our AI can start personalizing your experience.</td>
                 </tr>
               </table>
               <table cellpadding="0" cellspacing="0" style="margin:30px auto;">
                 <tr>
-                  <td align="center" style="background:linear-gradient(135deg,#2DD4BF,#14B8A6);border-radius:12px;padding:16px 40px;">
+                  <td align="center" style="background:linear-gradient(135deg,#D4AF37,#B8942C);border-radius:12px;padding:16px 40px;">
                     <a href="https://app.rxfit.ai" style="color:#0F172A;text-decoration:none;font-size:16px;font-weight:700;">Get Started Now</a>
                   </td>
                 </tr>
               </table>
               <p style="color:#94A3B8;font-size:14px;line-height:1.5;margin:25px 0 0;border-top:1px solid rgba(148,163,184,0.2);padding-top:20px;">
                 Questions? Just reply to this email — we're here to help.<br>
-                <span style="color:#FB923C;">— The RxFit.ai Team</span>
+                <span style="color:#D4AF37;">— The RxFit.ai Team</span>
               </p>
             </td>
           </tr>
@@ -104,30 +104,30 @@ function getLeadWelcomeEmailHtml(name: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(45,212,191,0.1),rgba(251,146,60,0.1));border:1px solid rgba(45,212,191,0.2);border-radius:16px;padding:40px;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(212,175,55,0.10),rgba(212,175,55,0.03));border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
           <tr>
             <td align="center" style="padding-bottom:30px;">
-              <h1 style="color:#2DD4BF;font-size:28px;margin:0;">RxFit<span style="color:#FB923C;">.ai</span></h1>
+              <h1 style="color:#D4AF37;font-size:28px;margin:0;">RxFit<span style="color:#F8FAFC;">.ai</span></h1>
             </td>
           </tr>
           <tr>
             <td>
               <h2 style="color:#F8FAFC;font-size:24px;margin:0 0 20px;">Hey ${firstName}, you're on the list!</h2>
               <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 20px;">
-                Thanks for your interest in RxFit.ai. We're building the future of personal fitness — combining <span style="color:#2DD4BF;">AI-powered health insights</span> with <span style="color:#FB923C;">real human coaching</span>.
+                Thanks for your interest in RxFit.ai. We're building the future of personal fitness — combining <span style="color:#D4AF37;">AI-powered health insights</span> with <span style="color:#E6C55C;">real human coaching</span>.
               </p>
               <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 25px;">
                 We'll keep you updated on our launch and send you exclusive early-access offers.
               </p>
               <table cellpadding="0" cellspacing="0" style="margin:25px auto;">
                 <tr>
-                  <td align="center" style="background:linear-gradient(135deg,#2DD4BF,#14B8A6);border-radius:12px;padding:16px 40px;">
+                  <td align="center" style="background:linear-gradient(135deg,#D4AF37,#B8942C);border-radius:12px;padding:16px 40px;">
                     <a href="https://rxfit.ai/#pricing" style="color:#0F172A;text-decoration:none;font-size:16px;font-weight:700;">View Our Plans</a>
                   </td>
                 </tr>
               </table>
               <p style="color:#94A3B8;font-size:14px;line-height:1.5;margin:25px 0 0;border-top:1px solid rgba(148,163,184,0.2);padding-top:20px;">
-                <span style="color:#FB923C;">— The RxFit.ai Team</span>
+                <span style="color:#D4AF37;">— The RxFit.ai Team</span>
               </p>
             </td>
           </tr>
