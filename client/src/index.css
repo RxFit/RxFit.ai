@@ -87,8 +87,8 @@
   --popover: 0 0% 100%;
   --popover-foreground: 224 28% 14%;
 
-  /* Signature champagne gold */
-  --primary: 38 60% 42%;
+  /* Signature champagne gold (36% L keeps white-on-gold + gold-on-white ≥ 4.5:1) */
+  --primary: 38 60% 36%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 40 12% 92%;
@@ -105,16 +105,16 @@
 
   --border: 40 10% 86%;
   --input: 40 10% 86%;
-  --ring: 38 60% 42%;
+  --ring: 38 60% 36%;
 
   --sidebar: 40 15% 95%;
   --sidebar-foreground: 224 28% 14%;
-  --sidebar-primary: 38 60% 42%;
+  --sidebar-primary: 38 60% 36%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 40 12% 92%;
   --sidebar-accent-foreground: 224 28% 14%;
   --sidebar-border: 40 10% 86%;
-  --sidebar-ring: 38 60% 42%;
+  --sidebar-ring: 38 60% 36%;
 
   --chart-1: 38 60% 42%;
   --chart-2: 180 50% 35%;
@@ -292,22 +292,30 @@
   }
 
   /* ---- Gold text gradients (legacy names kept) ---- */
+  /* Light mode uses deeper stops so display text stays ≥ 3:1 on warm white. */
   .text-gradient-teal {
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+    background-image: linear-gradient(90deg, hsl(43 60% 46%), hsl(38 62% 38%));
+  }
+  .dark .text-gradient-teal {
     background-image: linear-gradient(90deg, hsl(43 60% 62%), hsl(38 60% 44%));
   }
   .text-gradient-coral {
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+    background-image: linear-gradient(90deg, hsl(38 70% 42%), hsl(25 75% 42%));
+  }
+  .dark .text-gradient-coral {
     background-image: linear-gradient(90deg, hsl(38 70% 56%), hsl(25 75% 50%));
   }
 
   /* ---- Buttons ---- */
   .btn-primary {
-    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(43 55% 62%));
+    /* Light mode: keep the whole gradient deep enough for white text (≥ 4.5:1). */
+    background-image: linear-gradient(135deg, hsl(38 68% 30%), hsl(38 58% 38%));
     color: hsl(var(--primary-foreground));
     font-weight: 700;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -315,6 +323,9 @@
   .btn-primary:hover {
     transform: translateY(-1px);
     box-shadow: 0 10px 34px -8px hsl(var(--primary) / 0.45);
+  }
+  .dark .btn-primary {
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(43 55% 62%));
   }
   .dark .btn-primary:hover {
     box-shadow: 0 0 28px hsl(var(--primary) / 0.4);
@@ -348,9 +359,10 @@
   }
 
   .hud-glow-amber {
-    color: hsl(25 75% 50%);
+    color: hsl(25 75% 40%);
   }
   .dark .hud-glow-amber {
+    color: hsl(25 75% 50%);
     text-shadow: 0 0 12px hsl(38 70% 56% / 0.5);
   }
 
