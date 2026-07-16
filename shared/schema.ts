@@ -30,6 +30,14 @@ export const insertLeadSchema = createInsertSchema(leads)
     plan: z.enum(["kickstart", "committed", "transformation"]).optional(),
   });
 
+export const productsSnapshots = pgTable("products_snapshots", {
+  id: varchar("id").primaryKey().default("singleton"),
+  data: jsonb("data").notNull(),
+  cachedAt: timestamp("cached_at").notNull(),
+});
+
+export type ProductsSnapshotRow = typeof productsSnapshots.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;

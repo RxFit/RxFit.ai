@@ -19,6 +19,7 @@ import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck } from "./credentialHealthCheck";
+import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -97,7 +98,11 @@ export async function registerRoutes(
   // the live Stripe API are unavailable, we serve this instead of failing —
   // it always reflects a previously-verified live catalog (never hardcoded),
   // so checkout can't use a price ID that never matched the live catalog.
-  let productsCache: { data: any[]; cachedAt: number } | null = null;
+  // Persisted to the products_snapshots table so it survives restarts:
+  // a fresh boot during a Stripe outage still serves the snapshot.
+  const productsSnapshotStore = new ProductsSnapshotStore(
+    createDbSnapshotPersistence(db),
+  );
 
   app.get("/api/stripe/products", async (_req, res) => {
     try {
@@ -168,16 +173,17 @@ export async function registerRoutes(
       }
 
       if (productsData.length > 0) {
-        productsCache = { data: productsData, cachedAt: Date.now() };
+        await productsSnapshotStore.record(productsData);
       }
       return res.json({ data: productsData });
     } catch (error) {
       console.error("Error listing products:", error);
-      if (productsCache) {
+      const snapshot = await productsSnapshotStore.getFallback();
+      if (snapshot) {
         console.warn(
-          `Serving last-known-good products snapshot from ${new Date(productsCache.cachedAt).toISOString()}`,
+          `Serving last-known-good products snapshot from ${new Date(snapshot.cachedAt).toISOString()}`,
         );
-        return res.json({ data: productsCache.data, stale: true });
+        return res.json({ data: snapshot.data, stale: true });
       }
       return res.status(500).json({ message: "Failed to list products." });
     }

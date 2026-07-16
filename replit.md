@@ -71,7 +71,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 ## Stripe Integration
 - **Products:** Kickstart ($49/mo with 7-day trial), Committed ($490/yr), Transformation ($997/yr)
 - **Webhook:** Registered before express.json middleware, processes via stripe-replit-sync
-- **Products API:** Falls back to Stripe API if DB sync hasn't populated yet; on total failure serves an in-memory last-known-good snapshot (`stale: true`) from a previously successful response — never hardcoded IDs; 500 only when no snapshot exists yet
+- **Products API:** Falls back to Stripe API if DB sync hasn't populated yet; on total failure serves a last-known-good snapshot (`stale: true`) from a previously successful response — never hardcoded IDs. The snapshot lives in memory AND is persisted to the `products_snapshots` DB table (`ProductsSnapshotStore` in `server/productsSnapshot.ts`), so a fresh boot during a Stripe outage still serves it instead of 500ing; 500 only when neither memory nor DB has a snapshot. Store behavior (record/persist, restart-with-outage load, swallowed persistence errors, empty-catalog no-overwrite) tested in `server/productsSnapshot.test.ts`
 - **Checkout flow:** Modal collects email/name → creates Stripe Checkout session → redirects to Stripe → returns to /success page
 - **Customer Portal:** POST `/api/stripe/customer-portal` accepts `customerId` or `email`, creates a Stripe Billing Portal session, returns portal URL. CORS enabled for app.rxfit.ai.
 - **Cross-domain billing:** Success page passes Stripe customer ID (`cid` query param) to app.rxfit.ai for seamless subscription management
