@@ -4,8 +4,11 @@ import { X, Sparkles } from "lucide-react";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import { track } from "@/lib/analytics";
 import { PLAN_PRICING } from "@shared/stripe-constants";
-
-const DISMISS_KEY = "rxfit_sticky_dismissed";
+import {
+  STICKY_DISMISS_KEY,
+  CTA_ENGAGED_KEY,
+  isStickyDismissed,
+} from "@shared/cta-frequency";
 
 export default function StickyFooterCta({ slug }: { slug?: string }) {
   const { open } = useSignupModal();
@@ -13,7 +16,7 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
+    if (isStickyDismissed(localStorage.getItem(STICKY_DISMISS_KEY), Date.now())) return;
     const t = setTimeout(() => setVisible(true), 1200);
     return () => clearTimeout(t);
   }, []);
@@ -21,7 +24,7 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
   if (!visible || location === "/success") return null;
 
   const dismiss = () => {
-    sessionStorage.setItem(DISMISS_KEY, "1");
+    localStorage.setItem(STICKY_DISMISS_KEY, String(Date.now()));
     setVisible(false);
     track("cta_sticky_dismiss", { slug });
   };
@@ -43,6 +46,8 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => {
+              // High intent: suppress the exit-intent modal for this session.
+              sessionStorage.setItem(CTA_ENGAGED_KEY, "1");
               track("cta_sticky_click", { slug });
               open("kickstart");
             }}

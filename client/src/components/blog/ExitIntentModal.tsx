@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Mail } from "lucide-react";
 import { track } from "@/lib/analytics";
-
-const SHOWN_KEY = "rxfit_exit_shown";
+import { EXIT_SHOWN_KEY as SHOWN_KEY, CTA_ENGAGED_KEY, shouldShowExitModal } from "@shared/cta-frequency";
 
 export default function ExitIntentModal({ slug }: { slug?: string }) {
   const [open, setOpen] = useState(false);
@@ -14,10 +13,13 @@ export default function ExitIntentModal({ slug }: { slug?: string }) {
     // Desktop only (fine pointer), once per session.
     if (typeof window === "undefined") return;
     if (!window.matchMedia("(pointer: fine)").matches) return;
-    if (sessionStorage.getItem(SHOWN_KEY) === "1") return;
+    if (!shouldShowExitModal(sessionStorage.getItem(SHOWN_KEY), sessionStorage.getItem(CTA_ENGAGED_KEY))) return;
 
     const onLeave = (e: MouseEvent) => {
       if (e.clientY <= 0) {
+        // Re-check at trigger time: the user may have clicked the sticky CTA
+        // after this listener was attached.
+        if (sessionStorage.getItem(CTA_ENGAGED_KEY) === "1") return;
         sessionStorage.setItem(SHOWN_KEY, "1");
         setOpen(true);
         track("cta_exit_modal_show", { slug });
