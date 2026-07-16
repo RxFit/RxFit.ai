@@ -47,8 +47,22 @@ function runTests() {
   }
 }
 
+function runSeoValidation() {
+  console.log("validating SEO / structured data / internal links...");
+  const result = spawnSync("node", ["scripts/validate-seo.mjs"], {
+    stdio: "inherit",
+    env: { ...process.env, CI: "true" },
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `SEO validation failed (exit code ${result.status ?? "unknown"}). Aborting build.`,
+    );
+  }
+}
+
 async function buildAll() {
   runTests();
+  runSeoValidation();
 
   await rm("dist", { recursive: true, force: true });
 
