@@ -170,6 +170,9 @@ export default function BlogPost() {
                 <div className="text-foreground font-medium">{fm.author}</div>
                 <div className="flex items-center gap-3">
                   <span>{formatDate(fm.date)}</span>
+                  {fm.updatedDate && (
+                    <span data-testid="text-updated-date">Updated {formatDate(fm.updatedDate)}</span>
+                  )}
                   <span className="inline-flex items-center gap-1">
                     <Clock className="w-3 h-3" /> {readingMinutes} min read
                   </span>

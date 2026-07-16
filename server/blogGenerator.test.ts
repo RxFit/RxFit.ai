@@ -130,7 +130,8 @@ describe("validateDraft", () => {
   });
 
   it("allows static routes, fragments, query strings, and asset paths", () => {
-    const body = `${goodBody()}\n\n[a](/) [b](/blog) [c](/#pricing) [d](/blog?utm_source=x) [e](/success) [f](/blog-heroes/some-post.webp) [g](/logo.png)`;
+    // Pad the body so the internal-link cap (~5 per 1,000 words) isn't hit.
+    const body = `${goodBody()}\n\n${"word ".repeat(1000)}\n\n[a](/) [b](/blog) [c](/#pricing) [d](/blog?utm_source=x) [e](/success) [f](/blog-heroes/some-post.webp) [g](/logo.png)`;
     expect(validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs)).toEqual([]);
   });
 

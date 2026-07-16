@@ -129,7 +129,7 @@ function buildHead(post: GeneratedPost): string {
     url: canonical,
     mainEntityOfPage: canonical,
     datePublished: post.date,
-    dateModified: post.date,
+    dateModified: post.updatedDate || post.date,
     author: { "@type": "Person", name: post.author },
     publisher: {
       "@type": "Organization",
@@ -163,7 +163,7 @@ function buildHead(post: GeneratedPost): string {
     `<meta name="twitter:description" content="${escapeHtml(description)}" data-seo="true" />`,
     `<meta name="twitter:image" content="${escapeHtml(image)}" data-seo="true" />`,
     `<meta property="article:published_time" content="${escapeHtml(post.date)}" data-seo="true" />`,
-    `<meta property="article:modified_time" content="${escapeHtml(post.date)}" data-seo="true" />`,
+    `<meta property="article:modified_time" content="${escapeHtml(post.updatedDate || post.date)}" data-seo="true" />`,
     `<meta property="article:author" content="${escapeHtml(post.author)}" data-seo="true" />`,
     ...post.tags.map(
       (t) => `<meta property="article:tag" content="${escapeHtml(t)}" data-seo-tag="true" />`,
@@ -287,7 +287,7 @@ function buildArticleHtml(post: GeneratedPost): string {
           <div class="w-10 h-10 rounded-full bg-muted"></div>
           <div>
             <div class="text-foreground font-medium">${escapeHtml(post.author)}</div>
-            <div class="flex items-center gap-3"><span>${escapeHtml(formatDate(post.date))}</span><span>${post.readingMinutes} min read</span></div>
+            <div class="flex items-center gap-3"><span>${escapeHtml(formatDate(post.date))}</span>${post.updatedDate ? `<span>Updated ${escapeHtml(formatDate(post.updatedDate))}</span>` : ""}<span>${post.readingMinutes} min read</span></div>
           </div>
         </div>
       </div>

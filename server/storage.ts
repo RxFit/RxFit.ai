@@ -7,10 +7,13 @@ import {
   type InsertGeneratedPost,
   type KeywordTheme,
   type InsertKeywordTheme,
+  type GscQueryStat,
+  type InsertGscQueryStat,
   users,
   leads,
   generatedPosts,
   keywordThemes,
+  gscQueryStats,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, sql } from "drizzle-orm";
@@ -26,6 +29,12 @@ export interface IStorage {
   getPublishedGeneratedPosts(): Promise<GeneratedPost[]>;
   getGeneratedPostBySlug(slug: string): Promise<GeneratedPost | undefined>;
   getLatestGeneratedPost(): Promise<GeneratedPost | undefined>;
+  updateGeneratedPost(id: string, patch: Partial<InsertGeneratedPost>): Promise<GeneratedPost>;
+  getLatestRefreshedPost(): Promise<GeneratedPost | undefined>;
+  getGscSnapshotDates(): Promise<string[]>;
+  replaceGscSnapshot(fetchDate: string, rows: InsertGscQueryStat[]): Promise<void>;
+  getLatestGscSnapshot(): Promise<GscQueryStat[]>;
+  pruneGscSnapshotsBefore(fetchDate: string): Promise<void>;
   listKeywordThemes(): Promise<KeywordTheme[]>;
   seedKeywordThemes(themes: InsertKeywordTheme[]): Promise<void>;
   getNextKeywordTheme(): Promise<KeywordTheme | undefined>;
@@ -91,6 +100,54 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(generatedPosts.createdAt))
       .limit(1);
     return post;
+  }
+
+  async updateGeneratedPost(id: string, patch: Partial<InsertGeneratedPost>): Promise<GeneratedPost> {
+    const [updated] = await db
+      .update(generatedPosts)
+      .set(patch)
+      .where(eq(generatedPosts.id, id))
+      .returning();
+    if (!updated) throw new Error(`Generated post not found: ${id}`);
+    return updated;
+  }
+
+  async getLatestRefreshedPost(): Promise<GeneratedPost | undefined> {
+    const [post] = await db
+      .select()
+      .from(generatedPosts)
+      .where(sql`${generatedPosts.lastRefreshedAt} IS NOT NULL`)
+      .orderBy(desc(generatedPosts.lastRefreshedAt))
+      .limit(1);
+    return post;
+  }
+
+  async getGscSnapshotDates(): Promise<string[]> {
+    const rows = await db
+      .selectDistinct({ fetchDate: gscQueryStats.fetchDate })
+      .from(gscQueryStats)
+      .orderBy(desc(gscQueryStats.fetchDate));
+    return rows.map((r) => r.fetchDate);
+  }
+
+  async replaceGscSnapshot(fetchDate: string, rows: InsertGscQueryStat[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(gscQueryStats).where(eq(gscQueryStats.fetchDate, fetchDate));
+      for (let i = 0; i < rows.length; i += 500) {
+        const chunk = rows.slice(i, i + 500);
+        if (chunk.length > 0) await tx.insert(gscQueryStats).values(chunk);
+      }
+    });
+  }
+
+  async getLatestGscSnapshot(): Promise<GscQueryStat[]> {
+    const dates = await this.getGscSnapshotDates();
+    if (dates.length === 0) return [];
+    return db.select().from(gscQueryStats).where(eq(gscQueryStats.fetchDate, dates[0]));
+  }
+
+  async pruneGscSnapshotsBefore(fetchDate: string): Promise<void> {
+    await db.delete(gscQueryStats).where(sql`${gscQueryStats.fetchDate} < ${fetchDate}`);
   }
 
   async listKeywordThemes(): Promise<KeywordTheme[]> {

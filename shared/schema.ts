@@ -74,6 +74,12 @@ export const generatedPosts = pgTable("generated_posts", {
   sources: jsonb("sources").$type<{ title: string; url: string }[]>().notNull().default(sql`'[]'::jsonb`),
   status: text("status").notNull().default("published"),
   date: text("date").notNull(),
+  /** Set when the post content is refreshed/updated after initial publish (YYYY-MM-DD). */
+  updatedDate: text("updated_date"),
+  /** How many times the refresh pipeline has rewritten this post. */
+  refreshCount: integer("refresh_count").notNull().default(0),
+  /** Timestamp of the last automated refresh (used for cadence bounding). */
+  lastRefreshedAt: timestamp("last_refreshed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -107,3 +113,31 @@ export const insertKeywordThemeSchema = createInsertSchema(keywordThemes).omit({
 
 export type InsertKeywordTheme = z.infer<typeof insertKeywordThemeSchema>;
 export type KeywordTheme = typeof keywordThemes.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Google Search Console performance snapshots (SEO feedback loop)     */
+/* ------------------------------------------------------------------ */
+
+export const gscQueryStats = pgTable("gsc_query_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** YYYY-MM-DD the snapshot was fetched (one batch per day). */
+  fetchDate: text("fetch_date").notNull(),
+  /** Site-relative page path, e.g. /blog/some-slug */
+  page: text("page").notNull(),
+  query: text("query").notNull(),
+  clicks: integer("clicks").notNull().default(0),
+  impressions: integer("impressions").notNull().default(0),
+  /** CTR as a fraction (0-1), stored x10000 as integer for precision. */
+  ctrBps: integer("ctr_bps").notNull().default(0),
+  /** Average position x100 as integer (e.g. 750 = position 7.5). */
+  positionX100: integer("position_x100").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGscQueryStatSchema = createInsertSchema(gscQueryStats).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGscQueryStat = z.infer<typeof insertGscQueryStatSchema>;
+export type GscQueryStat = typeof gscQueryStats.$inferSelect;

@@ -33,7 +33,7 @@ const AUTHOR_BIO =
 /** Lazily construct the LLM client so importing this module never crashes the
  *  server when credentials are absent — the pipeline fails loudly at run time
  *  instead (failure email + rethrow). */
-function getOpenAI(): OpenAI {
+export function getOpenAI(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   if (!apiKey || !baseURL) {
@@ -44,13 +44,61 @@ function getOpenAI(): OpenAI {
   return new OpenAI({ apiKey, baseURL });
 }
 
-interface ExistingPostRef {
+export interface ExistingPostRef {
   slug: string;
   title: string;
+  pillar?: string;
+  tags?: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Topical relevance ranking for internal-link candidates               */
+/* ------------------------------------------------------------------ */
+
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "of", "to", "in", "for", "with", "your",
+  "how", "why", "what", "is", "are", "on", "vs", "you", "our", "at", "by",
+]);
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 2 && !STOPWORDS.has(t)),
+  );
+}
+
+/**
+ * Score existing posts by topical relevance to a theme/pillar/tags and return
+ * them most-relevant-first. Pure; used for both prompt-candidate selection and
+ * post-publish interlinking.
+ */
+export function rankPostsByRelevance(
+  target: { theme: string; pillar?: string; tags?: string[] },
+  posts: ExistingPostRef[],
+): ExistingPostRef[] {
+  const targetTokens = tokenize(`${target.theme} ${(target.tags ?? []).join(" ")}`);
+  const scored = posts.map((p) => {
+    const postTokens = tokenize(`${p.title} ${p.slug.replace(/-/g, " ")} ${(p.tags ?? []).join(" ")}`);
+    let overlap = 0;
+    targetTokens.forEach((t) => {
+      if (postTokens.has(t)) overlap++;
+    });
+    let score = overlap * 2;
+    if (target.pillar && p.pillar && target.pillar === p.pillar) score += 1;
+    return { post: p, score };
+  });
+  return scored.sort((a, b) => b.score - a.score).map((s) => s.post);
+}
+
+/** Internal-link cap: ~5 links per 1,000 words, floor of 5. */
+export function maxInternalLinks(wordCount: number): number {
+  return Math.max(5, Math.ceil((wordCount / 1000) * 5));
 }
 
 /** Frontmatter of the build-time MDX posts (for dedupe + internal link targets). */
-function getStaticPostRefs(): ExistingPostRef[] {
+export function getStaticPostRefs(): ExistingPostRef[] {
   const blogDir = path.resolve(process.cwd(), "content", "blog");
   if (!fs.existsSync(blogDir)) return [];
   return fs
@@ -60,7 +108,12 @@ function getStaticPostRefs(): ExistingPostRef[] {
       const raw = fs.readFileSync(path.join(blogDir, file), "utf-8");
       const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       const data: Record<string, any> = m ? (parseYaml(m[1]) ?? {}) : {};
-      return { slug: (data.slug as string) || file.replace(/\.mdx$/, ""), title: (data.title as string) || file };
+      return {
+        slug: (data.slug as string) || file.replace(/\.mdx$/, ""),
+        title: (data.title as string) || file,
+        pillar: (data.pillar as string) || undefined,
+        tags: Array.isArray(data.tags) ? (data.tags as string[]) : undefined,
+      };
     });
 }
 
@@ -91,7 +144,12 @@ function buildPrompt(
     )
     .join("\n\n---\n\n");
 
-  const existing = existingPosts.map((p) => `- "${p.title}" → /blog/${p.slug}`).join("\n");
+  // Most topically relevant posts first so the model links to related content,
+  // not just whatever happens to be at the top of a flat list.
+  const ranked = rankPostsByRelevance({ theme, pillar }, existingPosts);
+  const existing = ranked
+    .map((p, i) => `- "${p.title}" → /blog/${p.slug}${i < 5 ? "  (MOST RELEVANT)" : ""}`)
+    .join("\n");
 
   return `You are the senior content writer for RxFit.ai, a HealthTech SaaS that pairs an AI health dashboard (syncs wearables like Apple Watch, Oura, Whoop, Garmin) with a real human accountability coach. Brand voice: authoritative but warm, evidence-driven, practical, zero fluff. Audience: busy professionals 30-55 who own wearables but struggle with consistency.
 
@@ -102,7 +160,7 @@ RXFIT PRICING FACTS (if you mention RxFit pricing anywhere, use these EXACT curr
 RESEARCH SOURCES (use these for facts and statistics; cite claims inline as markdown links to the source URL):
 ${sources}
 
-EXISTING POSTS on the site (do NOT duplicate their angle; DO link to at least 2 of them as internal links, plus link to /#pricing or /blog where natural):
+EXISTING POSTS on the site, ordered by topical relevance to this theme (do NOT duplicate their angle; DO link to at least 2 of them — prefer the ones marked MOST RELEVANT — plus link to /#pricing or /blog where natural; keep internal links to at most ~5 per 1,000 words):
 ${existing}
 
 REQUIREMENTS:
@@ -172,7 +230,7 @@ async function draftPost(
 }
 
 /** Root-relative link targets in the markdown body (mirrors scripts/validate-seo.mjs). */
-function extractInternalLinks(body: string): string[] {
+export function extractInternalLinks(body: string): string[] {
   return Array.from(body.matchAll(/\]\(\s*(\/[^)\s]*)\s*(?:"[^"]*"\s*)?\)/g), (m) => m[1]);
 }
 
@@ -210,6 +268,10 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
     if (words < 700) errors.push(`body is only ${words} words (need >= 700)`);
     const internal = countInternalLinks(draft.bodyMarkdown);
     if (internal < 3) errors.push(`body has only ${internal} internal links (need >= 3)`);
+    const linkCap = maxInternalLinks(words);
+    if (internal > linkCap) {
+      errors.push(`body has ${internal} internal links (max ${linkCap} for ${words} words)`);
+    }
     // Defense in depth: reject any markdown link/image whose URL uses a scheme
     // other than http(s)/mailto/tel (e.g. javascript:, data:) before publishing.
     const urlMatches = Array.from(draft.bodyMarkdown.matchAll(/\]\(\s*<?([^)\s>]+)/g));
@@ -248,6 +310,52 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
   return errors;
 }
 
+/* ------------------------------------------------------------------ */
+/* Post-publish interlinking: link the new post from older DB posts     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Build the markdown appended to an older post that links the new one.
+ * Escapes markdown-significant characters in the title so LLM-authored titles
+ * can never alter link structure.
+ */
+export function buildRelatedReadingAppendix(newPost: { slug: string; title: string }): string {
+  const safeTitle = newPost.title.replace(/[\[\]()\\]/g, "").trim();
+  return `\n\n**Related reading:** [${safeTitle}](/blog/${newPost.slug})`;
+}
+
+/**
+ * Add a link to the freshly published post from 1-3 topically related older
+ * DB posts, skipping any that already link to it or are at their link cap.
+ * Only touches bodyMarkdown (no heading changes, so toc stays valid).
+ */
+async function linkNewPostFromOlderPosts(
+  newPost: GeneratedPost,
+  olderDbPosts: GeneratedPost[],
+): Promise<void> {
+  const candidates = rankPostsByRelevance(
+    { theme: newPost.keywordTheme, pillar: newPost.pillar, tags: newPost.tags },
+    olderDbPosts
+      .filter((p) => p.slug !== newPost.slug)
+      .map((p) => ({ slug: p.slug, title: p.title, pillar: p.pillar, tags: p.tags })),
+  ).slice(0, 3);
+
+  const bySlug = new Map(olderDbPosts.map((p) => [p.slug, p]));
+  for (const ref of candidates) {
+    const older = bySlug.get(ref.slug);
+    if (!older) continue;
+    if (older.bodyMarkdown.includes(`(/blog/${newPost.slug})`)) continue;
+    const words = older.bodyMarkdown.split(/\s+/).filter(Boolean).length;
+    if (countInternalLinks(older.bodyMarkdown) >= maxInternalLinks(words)) continue;
+    const updatedBody = older.bodyMarkdown.trimEnd() + buildRelatedReadingAppendix(newPost);
+    await storage.updateGeneratedPost(older.id, {
+      bodyMarkdown: updatedBody,
+      readingMinutes: computeReadingMinutes(updatedBody),
+    });
+    console.log(`[blog-publisher] Linked new post from /blog/${older.slug}`);
+  }
+}
+
 /**
  * Run one full generate-and-publish cycle. Returns the published post.
  * Sends a failure email and rethrows on any error.
@@ -271,7 +379,7 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
     const dbPosts = await storage.getPublishedGeneratedPosts();
     const existingPosts: ExistingPostRef[] = [
       ...staticPosts,
-      ...dbPosts.map((p) => ({ slug: p.slug, title: p.title })),
+      ...dbPosts.map((p) => ({ slug: p.slug, title: p.title, pillar: p.pillar, tags: p.tags })),
     ];
     const existingSlugs = new Set(existingPosts.map((p) => p.slug));
 
@@ -336,6 +444,15 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
 
     await storage.markKeywordThemeUsed(theme.id);
     console.log(`[blog-publisher] Published: /blog/${post.slug}`);
+
+    stage = "interlinking";
+    // Best-effort: link the new post FROM topically related older DB posts so
+    // it isn't orphaned. A failure here must never roll back the publish.
+    try {
+      await linkNewPostFromOlderPosts(post, dbPosts);
+    } catch (linkError) {
+      console.error("[blog-publisher] Interlinking failed (post is still live):", linkError);
+    }
 
     stage = "notification";
     try {

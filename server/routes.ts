@@ -372,6 +372,7 @@ export async function registerRoutes(
           heroImage: p.heroImage,
           recommendedPlan: p.recommendedPlan,
           date: p.date,
+          updatedDate: p.updatedDate ?? undefined,
           readingMinutes: p.readingMinutes,
         })),
       );
@@ -399,6 +400,7 @@ export async function registerRoutes(
         heroImage: post.heroImage,
         recommendedPlan: post.recommendedPlan,
         date: post.date,
+        updatedDate: post.updatedDate ?? undefined,
         readingMinutes: post.readingMinutes,
         tldr: post.tldr,
         keyTakeaways: post.keyTakeaways,
@@ -494,7 +496,7 @@ export async function registerRoutes(
       const mdxSlugs = new Set(mdxPosts.map((p) => p.slug));
       generatedPosts = (await storage.getPublishedGeneratedPosts())
         .filter((p) => !mdxSlugs.has(p.slug))
-        .map((p) => ({ slug: p.slug, date: p.date }));
+        .map((p) => ({ slug: p.slug, date: p.updatedDate || p.date }));
     } catch (err) {
       console.error("Error reading generated posts for sitemap:", err);
     }

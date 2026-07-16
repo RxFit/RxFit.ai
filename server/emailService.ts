@@ -299,6 +299,54 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
 }
 
 /**
+ * Notify the owner that an existing post was refreshed by the SEO feedback loop.
+ * Best-effort (never throws). Returns true when the email was actually sent,
+ * false when sending failed — callers can use this to fall back to a second
+ * alert channel (e.g. the Google Sheet) when Gmail itself is down.
+ */
+export async function sendPostRefreshedEmail(
+  post: { title: string; slug: string; refreshCount: number },
+  reason: string,
+  queries: string[],
+): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const url = `https://rxfit.ai/blog/${post.slug}`;
+    const queryLine =
+      queries.length > 0
+        ? `<p style="color:#94A3B8;font-size:14px;margin:0 0 4px;">Target queries: ${escapeHtml(queries.slice(0, 5).join(', '))}</p>`
+        : '';
+    const html = `
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
+        <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#D4AF37;font-size:24px;margin:0;">RxFit.ai SEO Feedback Loop</h1></td></tr>
+        <tr><td>
+          <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 16px;">Blog post refreshed</h2>
+          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 8px;"><strong style="color:#F8FAFC;">${escapeHtml(post.title)}</strong></p>
+          <p style="color:#94A3B8;font-size:14px;margin:0 0 4px;">Reason: ${escapeHtml(reason)} &middot; Refresh #${post.refreshCount}</p>
+          ${queryLine}
+          <p style="color:#94A3B8;font-size:14px;margin:0 0 24px;"><a href="${url}" style="color:#D4AF37;">${url}</a></p>
+          <p style="color:#64748B;font-size:13px;margin:0;">The URL is unchanged; the updated content and "Updated" date are live now.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+    const raw = createMimeMessage(to, `🔄 RxFit.ai post refreshed: ${post.title}`, html);
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    console.log(`[blog-refresher] Refresh notification sent to ${to}`);
+    return true;
+  } catch (notifyError) {
+    console.error('[blog-refresher] Could not send refresh notification email:', notifyError);
+    return false;
+  }
+}
+
+/**
  * Notify the owner that Stripe or Gmail credentials stopped resolving.
  * Best-effort (never throws). Returns true when the email was actually sent,
  * false when sending failed — callers can use this to fall back to a second

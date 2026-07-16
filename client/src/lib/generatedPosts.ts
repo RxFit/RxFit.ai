@@ -18,6 +18,8 @@ export interface GeneratedPostMeta {
   heroImage?: string | null;
   recommendedPlan: string;
   date: string;
+  /** Set when the post has been refreshed after initial publish (YYYY-MM-DD). */
+  updatedDate?: string;
   readingMinutes: number;
 }
 
@@ -35,6 +37,7 @@ export function toFrontmatter(p: GeneratedPostMeta): PostFrontmatter {
     seoTitle: p.seoTitle || undefined,
     slug: p.slug,
     date: p.date,
+    updatedDate: p.updatedDate || undefined,
     author: p.author,
     authorBio: p.authorBio || undefined,
     description: p.description,
