@@ -647,6 +647,13 @@ export default function LandingPage() {
                </div>
 
             </div>
+
+            <p className="text-center text-sm text-muted-foreground mt-10">
+              Weighing your options?{" "}
+              <a href="/compare" className="text-primary hover:underline font-medium" data-testid="link-pricing-compare">
+                See how RxFit compares to a personal trainer and fitness apps
+              </a>
+            </p>
          </div>
       </section>
 

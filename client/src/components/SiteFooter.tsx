@@ -27,6 +27,7 @@ export default function SiteFooter() {
               </li>
               <li><a href="/#features" className="hover:text-primary transition-colors">Features</a></li>
               <li><a href="/#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
+              <li><Link href="/compare" className="hover:text-primary transition-colors" data-testid="link-footer-compare">Compare Options</Link></li>
             </ul>
           </div>
 

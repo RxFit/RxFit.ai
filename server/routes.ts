@@ -460,6 +460,7 @@ export async function registerRoutes(
   const STATIC_PAGE_DATES: Record<string, string> = {
     "/": "2026-06-18",
     "/blog": "2026-06-18",
+    "/compare": "2026-07-16",
     "/privacy": "2026-06-18",
     "/terms": "2026-06-18",
     "/contact": "2026-06-18",
@@ -469,6 +470,7 @@ export async function registerRoutes(
     const staticUrls = [
       { loc: "/", lastmod: STATIC_PAGE_DATES["/"], priority: "1.0" },
       { loc: "/blog", lastmod: STATIC_PAGE_DATES["/blog"], priority: "0.8" },
+      { loc: "/compare", lastmod: STATIC_PAGE_DATES["/compare"], priority: "0.8" },
       { loc: "/privacy", lastmod: STATIC_PAGE_DATES["/privacy"], priority: "0.3" },
       { loc: "/terms", lastmod: STATIC_PAGE_DATES["/terms"], priority: "0.3" },
       { loc: "/contact", lastmod: STATIC_PAGE_DATES["/contact"], priority: "0.4" },

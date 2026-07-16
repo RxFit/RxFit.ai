@@ -10,6 +10,7 @@ export const APP_URL = "https://app.rxfit.ai";
 export const STATIC_ROUTES = [
   "/",
   "/blog",
+  "/compare",
   "/success",
   "/privacy",
   "/terms",
