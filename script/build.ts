@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { spawnSync } from "child_process";
 import { prerender } from "./prerender";
 
 // server deps to bundle to reduce openat(2) syscalls
@@ -33,7 +34,22 @@ const allowlist = [
   "zod-validation-error",
 ];
 
+function runTests() {
+  console.log("running tests (vitest)...");
+  const result = spawnSync("npx", ["vitest", "run"], {
+    stdio: "inherit",
+    env: { ...process.env, CI: "true" },
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `Tests failed (exit code ${result.status ?? "unknown"}). Aborting build.`,
+    );
+  }
+}
+
 async function buildAll() {
+  runTests();
+
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
