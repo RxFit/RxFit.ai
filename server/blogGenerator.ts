@@ -61,7 +61,7 @@ function getStaticPostRefs(): ExistingPostRef[] {
     });
 }
 
-interface LlmPostDraft {
+export interface LlmPostDraft {
   title: string;
   seoTitle: string;
   slug: string;
@@ -148,7 +148,7 @@ async function draftPost(
   return JSON.parse(content) as LlmPostDraft;
 }
 
-function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): string[] {
+export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): string[] {
   const errors: string[] = [];
   const required: (keyof LlmPostDraft)[] = [
     "title",

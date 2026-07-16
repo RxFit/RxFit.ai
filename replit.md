@@ -27,6 +27,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `shared/stripe-constants.ts` — Live Stripe price IDs (single source of truth for landing + blog CTAs)
 - `content/blog/*.mdx` — Blog posts (frontmatter + MDX body); see `content/blog/README.md` author guide
 - `client/public/llms.txt` — AI-assistant summary of the site (AEO/GEO)
+- `server/*.test.ts` + `vitest.config.ts` — Vitest unit tests for the publishing safety gates (`validateDraft`, `sanitizeUrl`/`markdownToHtml`, scheduler `isPostDue`); run with `npm test` (registered as the `test` validation step)
 - `scripts/validate-seo.mjs` — SEO/structured-data check for MDX posts (JSON-LD shapes, image files, default OG image); registered as the `seo` validation step
 - `client/src/index.css` — Design system (dark mode SaaS theme with glassmorphism utilities)
 - `shared/schema.ts` — Database schema (users, leads, generated_posts, keyword_themes tables)

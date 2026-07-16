@@ -177,7 +177,7 @@ export function sanitizeUrl(url: string): string {
   return SAFE_SCHEME_RE.test(trimmed) ? trimmed : "#";
 }
 
-function markdownToHtml(markdown: string): string {
+export function markdownToHtml(markdown: string): string {
   // Generated posts must not contain raw HTML; escape any that slipped in so
   // LLM output can never inject markup or scripts into the crawler page.
   const safeMarkdown = markdown.replace(/</g, "&lt;");
