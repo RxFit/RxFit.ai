@@ -139,6 +139,33 @@ function getLeadWelcomeEmailHtml(name: string): string {
 </html>`;
 }
 
+/**
+ * Record a failed customer-facing email in the "RxFit Alerts" sheet tab so
+ * the owner can re-send it manually. Best-effort: if the sheet write also
+ * fails, log loudly — the customer flow must never break over notifications.
+ */
+async function recordCustomerEmailFailure(
+  kind: 'welcome' | 'lead',
+  recipient: string,
+  name: string,
+  error: unknown,
+): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    const { appendAlertToSheet } = await import('./sheetsService');
+    await appendAlertToSheet({
+      title: `${kind === 'welcome' ? 'Welcome' : 'Lead nurture'} email FAILED to send — re-send manually to ${recipient}`,
+      message: `Recipient: ${recipient}${name ? ` (${name})` : ''}\nError: ${message}`,
+    });
+    console.log(`[email] Failure recorded in Google Sheet for ${kind} email to ${recipient}`);
+  } catch (sheetError) {
+    console.error(
+      `[email] ${kind} email to ${recipient} failed AND the failure could not be recorded in the sheet — this send is untracked:`,
+      sheetError,
+    );
+  }
+}
+
 export async function sendWelcomeEmail(email: string, name: string, planName: string): Promise<void> {
   try {
     const gmail = await getUncachableGmailClient();
@@ -152,6 +179,7 @@ export async function sendWelcomeEmail(email: string, name: string, planName: st
     console.log(`Welcome email sent to ${email}`);
   } catch (error) {
     console.error('Failed to send welcome email:', error);
+    await recordCustomerEmailFailure('welcome', email, name, error);
   }
 }
 
@@ -320,5 +348,6 @@ export async function sendLeadEmail(email: string, name: string): Promise<void> 
     console.log(`Lead welcome email sent to ${email}`);
   } catch (error) {
     console.error('Failed to send lead email:', error);
+    await recordCustomerEmailFailure('lead', email, name, error);
   }
 }

@@ -57,6 +57,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - `server/emailService.ts` — Automated email service (welcome email after payment, lead nurture email on signup)
 - `server/sheetsClient.ts` — Google Sheets API client via Replit connector
 - `server/sheetsService.ts` — Auto-sync leads to Google Sheets ("RxFit Leads" tab)
+- Customer email failure trail: if a welcome/lead email fails to send, `recordCustomerEmailFailure` in `emailService.ts` appends a row to the "RxFit Alerts" sheet tab with the recipient/name/error so missed sends can be re-sent manually (best-effort; loud log if the sheet write also fails; tested in `server/emailService.failure-trail.test.ts`)
 
 ## Stripe Integration
 - **Products:** Kickstart ($49/mo with 7-day trial), Committed ($490/yr), Transformation ($997/yr)
