@@ -5,6 +5,8 @@ import { Check, ChevronRight, Minus, X } from "lucide-react";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import { track } from "@/lib/analytics";
 import SiteHeader from "@/components/SiteHeader";
+import StickyFooterCta from "@/components/blog/StickyFooterCta";
+import ExitIntentModal from "@/components/blog/ExitIntentModal";
 import SiteFooter from "@/components/SiteFooter";
 import { Seo } from "@/lib/seo";
 import {
@@ -380,6 +382,9 @@ export default function ComparePage() {
       </main>
 
       <SiteFooter />
+
+      <StickyFooterCta slug="compare" />
+      <ExitIntentModal slug="compare" />
     </div>
   );
 }
