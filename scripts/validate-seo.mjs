@@ -278,6 +278,46 @@ function checkPublicImage(imgPath, label, file) {
   else if (fs.statSync(abs).size === 0) err(file, `${label} file is empty: client/public${imgPath}`);
 }
 
+/* ---------------- internal link extraction -------------------------------- */
+
+function loadStaticRoutes() {
+  const sitePath = path.join(ROOT, "shared", "site.ts");
+  const src = fs.readFileSync(sitePath, "utf8");
+  const m = src.match(/STATIC_ROUTES\s*=\s*\[([\s\S]*?)\]/);
+  if (!m) {
+    errors.push("shared/site.ts: could not locate STATIC_ROUTES array");
+    return [];
+  }
+  const routes = [...m[1].matchAll(/"([^"]+)"/g)].map((r) => r[1]);
+  if (routes.length === 0) errors.push("shared/site.ts: STATIC_ROUTES parsed as empty");
+  return routes;
+}
+
+function extractInternalLinks(body) {
+  const links = [];
+  // Markdown links/images: [text](/path) — capture root-relative targets only.
+  for (const m of body.matchAll(/\]\(\s*(\/[^)\s]*)\s*(?:"[^"]*"\s*)?\)/g)) links.push(m[1]);
+  // JSX/HTML href="/path" or href={"/path"} in the MDX body.
+  for (const m of body.matchAll(/href=\{?["'](\/[^"']*)["']\}?/g)) links.push(m[1]);
+  return links;
+}
+
+function checkInternalLinks(file, body, knownSlugs, staticRoutes) {
+  for (const raw of extractInternalLinks(body)) {
+    // Strip query string and fragment before route matching.
+    const target = raw.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+    if (target.startsWith("/blog-heroes/") || /\.[a-z0-9]+$/i.test(target)) continue; // asset paths checked elsewhere
+    const blogMatch = target.match(/^\/blog\/([^/]+)$/);
+    if (blogMatch) {
+      if (!knownSlugs.has(blogMatch[1]))
+        err(file, `internal link points to unknown blog post: ${raw} (no MDX post with slug "${blogMatch[1]}")`);
+      continue;
+    }
+    if (!staticRoutes.includes(target))
+      err(file, `internal link points to unknown route: ${raw} (not in shared/site.ts STATIC_ROUTES or /blog/:slug)`);
+  }
+}
+
 /* ---------------- per-post validation ------------------------------------ */
 
 const REQUIRED_FM = ["title", "slug", "date", "author", "description", "heroImage", "tags", "pillar"];
@@ -318,7 +358,7 @@ function validatePost(filePath) {
     validateFaq(buildFaqJsonLd(faqItems), file);
   }
 
-  return fm.slug;
+  return { slug: fm.slug, body, file };
 }
 
 /* ---------------- site-wide checks --------------------------------------- */
@@ -365,13 +405,20 @@ const files = fs
 if (files.length === 0) errors.push("content/blog: no .mdx posts found");
 
 const slugs = new Map();
+const posts = [];
 for (const f of files) {
-  const slug = validatePost(f);
-  if (slug) {
-    if (slugs.has(slug)) err(path.relative(ROOT, f), `duplicate slug "${slug}" (also in ${slugs.get(slug)})`);
-    else slugs.set(slug, path.basename(f));
+  const post = validatePost(f);
+  posts.push(post);
+  if (post.slug) {
+    if (slugs.has(post.slug)) err(path.relative(ROOT, f), `duplicate slug "${post.slug}" (also in ${slugs.get(post.slug)})`);
+    else slugs.set(post.slug, path.basename(f));
   }
 }
+
+// Second pass: verify every internal link resolves to a known route or slug.
+const staticRoutes = loadStaticRoutes();
+const knownSlugs = new Set(slugs.keys());
+for (const post of posts) checkInternalLinks(post.file, post.body, knownSlugs, staticRoutes);
 
 validateSiteDefaults();
 
