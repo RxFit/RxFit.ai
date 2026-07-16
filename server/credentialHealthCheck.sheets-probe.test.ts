@@ -7,12 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const getStripeSecretKey = vi.fn();
+const getUncachableStripeClient = vi.fn();
 const getUncachableGmailClient = vi.fn();
 const getUncachableGoogleSheetClient = vi.fn();
 const sendCredentialAlertEmail = vi.fn();
 const appendCredentialAlertToSheet = vi.fn();
 
-vi.mock("./stripeClient", () => ({ getStripeSecretKey }));
+vi.mock("./stripeClient", () => ({ getStripeSecretKey, getUncachableStripeClient }));
 vi.mock("./gmailClient", () => ({ getUncachableGmailClient }));
 vi.mock("./sheetsClient", () => ({ getUncachableGoogleSheetClient }));
 vi.mock("./emailService", () => ({ sendCredentialAlertEmail }));
@@ -33,6 +34,7 @@ describe("sheets health check API-access probe", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
+    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance" }) } });
     getUncachableGmailClient.mockResolvedValue({});
     sendCredentialAlertEmail.mockResolvedValue(true);
     appendCredentialAlertToSheet.mockResolvedValue(undefined);

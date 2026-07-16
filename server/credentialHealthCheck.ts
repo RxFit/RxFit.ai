@@ -20,7 +20,7 @@
  * Enabled in production automatically; in development set
  * CREDENTIAL_HEALTHCHECK=true to run it.
  */
-import { getStripeSecretKey } from "./stripeClient";
+import { getStripeSecretKey, getUncachableStripeClient } from "./stripeClient";
 import { getUncachableGmailClient } from "./gmailClient";
 import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
@@ -67,8 +67,17 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function checkStripe(): Promise<void> {
+  // Resolve the secret key (throws if neither the STRIPE_SECRET_KEY secret nor
+  // the connector can provide one)…
   const key = await getStripeSecretKey();
   if (!key) throw new Error("Stripe secret key resolved empty");
+
+  // …then verify REAL API access: a resolved key can be revoked or rotated to
+  // an invalid value, leaving checkout broken while the key still "resolves".
+  // balance.retrieve is the cheapest authenticated read (no list, no params)
+  // and works for every account/mode.
+  const stripe = await getUncachableStripeClient();
+  await stripe.balance.retrieve();
 }
 
 async function checkGmail(): Promise<void> {

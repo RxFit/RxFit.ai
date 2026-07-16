@@ -6,12 +6,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const getStripeSecretKey = vi.fn();
+const getUncachableStripeClient = vi.fn();
 const getUncachableGmailClient = vi.fn();
 const getUncachableGoogleSheetClient = vi.fn();
 const sendCredentialAlertEmail = vi.fn();
 const appendCredentialAlertToSheet = vi.fn();
 
-vi.mock("./stripeClient", () => ({ getStripeSecretKey }));
+vi.mock("./stripeClient", () => ({ getStripeSecretKey, getUncachableStripeClient }));
 vi.mock("./gmailClient", () => ({ getUncachableGmailClient }));
 vi.mock("./sheetsClient", () => ({ getUncachableGoogleSheetClient }));
 vi.mock("./emailService", () => ({ sendCredentialAlertEmail }));
@@ -32,6 +33,7 @@ describe("credential health check alert fallback", () => {
     vi.useFakeTimers();
     // Default: both services healthy.
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
+    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance" }) } });
     getUncachableGmailClient.mockResolvedValue({});
     // Healthy sheets client: token resolves AND the metadata probe succeeds.
     getUncachableGoogleSheetClient.mockResolvedValue({

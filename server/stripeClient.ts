@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { dbSslConfig } from '@shared/db-ssl.mjs';
 
 let connectionSettings: any;
 
@@ -70,7 +71,7 @@ export async function getStripeSync() {
       poolConfig: {
         connectionString: process.env.DATABASE_URL!,
         max: 2,
-        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+        ssl: dbSslConfig(),
       },
       stripeSecretKey: secretKey,
     });
