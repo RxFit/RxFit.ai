@@ -25,12 +25,13 @@ import { getUncachableGmailClient } from "./gmailClient";
 import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
+import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
 const RETRY_DELAY_MS = 15 * 1000;
 
-export type ServiceName = "stripe" | "gmail" | "sheets";
+export type ServiceName = "stripe" | "gmail" | "sheets" | "products";
 
 type ServiceState = { healthy: boolean; alerted: boolean };
 
@@ -38,6 +39,7 @@ const state: Record<ServiceName, ServiceState> = {
   stripe: { healthy: true, alerted: false },
   gmail: { healthy: true, alerted: false },
   sheets: { healthy: true, alerted: false },
+  products: { healthy: true, alerted: false },
 };
 
 /** On-demand status metadata (per service), surfaced by the internal
@@ -52,6 +54,7 @@ const status: Record<ServiceName, ServiceStatus> = {
   stripe: { healthy: null, lastCheckedAt: null, lastError: null },
   gmail: { healthy: null, lastCheckedAt: null, lastError: null },
   sheets: { healthy: null, lastCheckedAt: null, lastError: null },
+  products: { healthy: null, lastCheckedAt: null, lastError: null },
 };
 
 export interface CredentialHealthStatus {
@@ -66,6 +69,7 @@ export function getCredentialHealthStatus(): CredentialHealthStatus {
       stripe: { ...status.stripe },
       gmail: { ...status.gmail },
       sheets: { ...status.sheets },
+      products: { ...status.products },
     },
     checkedAt: new Date().toISOString(),
   };
@@ -134,6 +138,74 @@ async function checkSheets(): Promise<void> {
     return;
   }
   await sheets.spreadsheets.get({ spreadsheetId, fields: "spreadsheetId" });
+}
+
+/** Minimal shape of a Stripe price (with expanded product) for tier matching. */
+export type TierPriceCandidate = {
+  active?: boolean | null;
+  recurring?: unknown | null;
+  unit_amount?: number | null;
+  product?: { active?: boolean | null; metadata?: Record<string, string> | null } | null;
+};
+
+/**
+ * Pure tier→price verification (unit-tested): given the live active prices
+ * (product expanded), return a human-readable problem per PLAN_PRICING tier
+ * that no longer resolves to an active recurring price on an active product
+ * with the expected amount. Empty array = everything matches.
+ *
+ * This mirrors what SignupModalProvider does with /api/stripe/products
+ * (metadata.tier → price id, silent hardcoded fallback) — but loudly.
+ */
+export function findTierPriceProblems(prices: TierPriceCandidate[]): string[] {
+  const problems: string[] = [];
+  for (const tier of Object.keys(PLAN_PRICING) as PlanTier[]) {
+    const candidates = prices.filter(
+      (p) => p.product?.metadata?.tier === tier && p.product?.active !== false,
+    );
+    if (candidates.length === 0) {
+      const archivedOnly = prices.some((p) => p.product?.metadata?.tier === tier);
+      problems.push(
+        archivedOnly
+          ? `${tier}: product with metadata.tier="${tier}" is archived (buyers silently get the hardcoded fallback price)`
+          : `${tier}: no active Stripe product has metadata.tier="${tier}" (buyers silently get the hardcoded fallback price)`,
+      );
+      continue;
+    }
+    const usable = candidates.filter((p) => p.active !== false && p.recurring);
+    if (usable.length === 0) {
+      problems.push(
+        `${tier}: product resolves but has no active recurring price (found ${candidates.length} price(s), none usable)`,
+      );
+      continue;
+    }
+    const expectedAmount = PLAN_PRICING[tier].amount * 100;
+    if (!usable.some((p) => p.unit_amount === expectedAmount)) {
+      const seen = usable.map((p) => p.unit_amount).join(", ");
+      problems.push(
+        `${tier}: no active recurring price matches the site's ${PLAN_PRICING[tier].display} (expected unit_amount ${expectedAmount}, found: ${seen})`,
+      );
+    }
+  }
+  return problems;
+}
+
+async function checkProducts(): Promise<void> {
+  // Verify the live Stripe catalog still matches the site's plan tiers:
+  // each PLAN_PRICING tier must resolve (via product metadata.tier) to an
+  // active recurring price with the advertised amount. If a product is
+  // renamed/archived or loses its tier metadata, SignupModalProvider silently
+  // falls back to hardcoded LIVE_PRICE_IDS — this check makes that loud.
+  const stripe = await getUncachableStripeClient();
+  const prices = await stripe.prices.list({
+    active: true,
+    limit: 100,
+    expand: ["data.product"],
+  });
+  const problems = findTierPriceProblems((prices.data ?? []) as TierPriceCandidate[]);
+  if (problems.length > 0) {
+    throw new Error(`Stripe plan-tier mismatch — ${problems.join("; ")}`);
+  }
 }
 
 async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; error?: unknown }> {
@@ -217,6 +289,7 @@ export async function runCredentialHealthCheck(): Promise<void> {
     await checkService("stripe", checkStripe);
     await checkService("gmail", checkGmail);
     await checkService("sheets", checkSheets);
+    await checkService("products", checkProducts);
   } catch (error) {
     console.error("[credential-check] Unexpected error during health check:", error);
   } finally {
@@ -233,7 +306,7 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe, Gmail & Sheets credentials at boot and hourly");
+  console.log("[credential-check] Enabled — verifying Stripe, Gmail & Sheets credentials plus Stripe plan-tier prices at boot and hourly");
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }

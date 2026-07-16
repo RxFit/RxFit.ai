@@ -357,12 +357,14 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     const gmail = await getUncachableGmailClient();
     const to = await getOwnerEmail();
     const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
-    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service;
+    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service === 'products' ? 'Stripe plan tiers' : service;
     const impact =
       service === 'stripe'
         ? 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.'
         : service === 'sheets'
         ? 'Lead rows will silently stop syncing to the spreadsheet AND the backup alert channel is dead until this is fixed.'
+        : service === 'products'
+        ? 'The live Stripe catalog no longer matches the site\'s plan tiers — buyers are silently getting the hardcoded fallback price, which may be stale. Fix the product metadata.tier / prices in Stripe.'
         : 'Welcome/lead emails and blog notifications will fail until this is fixed.';
     const html = `
 <!DOCTYPE html>

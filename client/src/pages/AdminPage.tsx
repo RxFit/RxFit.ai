@@ -11,7 +11,7 @@ type ServiceStatus = {
 };
 
 type HealthResponse = {
-  services: Record<"stripe" | "gmail" | "sheets", ServiceStatus>;
+  services: Record<"stripe" | "gmail" | "sheets" | "products", ServiceStatus>;
   checkedAt: string;
 };
 
@@ -27,6 +27,7 @@ const SERVICE_LABELS: Record<string, string> = {
   stripe: "Stripe (checkout & billing)",
   gmail: "Gmail (customer emails)",
   sheets: "Google Sheets (lead sync & alerts)",
+  products: "Stripe plan tiers (catalog matches site pricing)",
 };
 
 async function adminFetch<T>(path: string, key: string, init?: RequestInit): Promise<T> {
@@ -213,6 +214,7 @@ export default function AdminPage() {
                 {health ? (
                   (Object.keys(SERVICE_LABELS) as Array<keyof HealthResponse["services"]>).map((name) => {
                     const s = health.services[name];
+                    if (!s) return null;
                     return (
                       <div
                         key={name}

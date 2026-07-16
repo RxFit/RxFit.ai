@@ -24,6 +24,7 @@ const HEALTH_BODY = {
     stripe: { healthy: true, lastCheckedAt: "2026-07-16T10:00:00.000Z", lastError: null },
     gmail: { healthy: false, lastCheckedAt: "2026-07-16T10:00:00.000Z", lastError: "token refresh failed" },
     sheets: { healthy: null, lastCheckedAt: null, lastError: null },
+    products: { healthy: true, lastCheckedAt: "2026-07-16T10:00:00.000Z", lastError: null },
   },
   checkedAt: "2026-07-16T10:00:00.000Z",
 };

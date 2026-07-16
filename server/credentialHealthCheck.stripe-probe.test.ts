@@ -6,6 +6,7 @@
  * key resolution. Mirrors credentialHealthCheck.sheets-probe.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { healthyTierPrices } from "./credentialHealthCheck.fixtures";
 
 const getStripeSecretKey = vi.fn();
 const getUncachableStripeClient = vi.fn();
@@ -47,7 +48,7 @@ describe("stripe health check API-access probe", () => {
 
   it("performs a real balance.retrieve read when the key resolves", async () => {
     const retrieve = vi.fn().mockResolvedValue({ object: "balance" });
-    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve } });
+    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve }, prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) } });
 
     await freshRun();
 
@@ -59,7 +60,7 @@ describe("stripe health check API-access probe", () => {
     const retrieve = vi.fn().mockRejectedValue(
       Object.assign(new Error("Invalid API Key provided"), { statusCode: 401 }),
     );
-    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve } });
+    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve }, prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) } });
 
     await freshRun();
 
@@ -72,7 +73,7 @@ describe("stripe health check API-access probe", () => {
   it("still alerts when the key itself resolves empty (probe never reached)", async () => {
     getStripeSecretKey.mockResolvedValue("");
     const retrieve = vi.fn();
-    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve } });
+    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve }, prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) } });
 
     await freshRun();
 
