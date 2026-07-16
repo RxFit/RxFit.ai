@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Mail } from "lucide-react";
 import { track } from "@/lib/analytics";
-import { EXIT_SHOWN_KEY as SHOWN_KEY, CTA_ENGAGED_KEY, shouldShowExitModal } from "@shared/cta-frequency";
+import {
+  EXIT_SHOWN_KEY as SHOWN_KEY,
+  CTA_ENGAGED_KEY,
+  EXIT_SUPPRESSED_TRACKED_KEY,
+  exitModalDecision,
+} from "@shared/cta-frequency";
 
 export default function ExitIntentModal({ slug }: { slug?: string }) {
   const [open, setOpen] = useState(false);
@@ -13,13 +18,32 @@ export default function ExitIntentModal({ slug }: { slug?: string }) {
     // Desktop only (fine pointer), once per session.
     if (typeof window === "undefined") return;
     if (!window.matchMedia("(pointer: fine)").matches) return;
-    if (!shouldShowExitModal(sessionStorage.getItem(SHOWN_KEY), sessionStorage.getItem(CTA_ENGAGED_KEY))) return;
+    // Once shown this session the modal never returns — nothing to observe.
+    // When only the engagement cap applies we still attach the listener so
+    // the actual suppression moment (an exit attempt) can be tracked.
+    if (sessionStorage.getItem(SHOWN_KEY) === "1") return;
 
     const onLeave = (e: MouseEvent) => {
       if (e.clientY <= 0) {
-        // Re-check at trigger time: the user may have clicked the sticky CTA
+        // Decide at trigger time: the user may have clicked the sticky CTA
         // after this listener was attached.
-        if (sessionStorage.getItem(CTA_ENGAGED_KEY) === "1") return;
+        const decision = exitModalDecision(
+          sessionStorage.getItem(SHOWN_KEY),
+          sessionStorage.getItem(CTA_ENGAGED_KEY),
+        );
+        if (decision !== "show") {
+          // Engagement cap fired: the modal would have appeared on this exit
+          // attempt but was skipped. Track once per session so Plausible can
+          // show how often the cap suppresses the modal.
+          if (
+            decision === "suppressed_engaged" &&
+            sessionStorage.getItem(EXIT_SUPPRESSED_TRACKED_KEY) !== "1"
+          ) {
+            sessionStorage.setItem(EXIT_SUPPRESSED_TRACKED_KEY, "1");
+            track("cta_exit_suppressed", { slug, reason: "engaged" });
+          }
+          return;
+        }
         sessionStorage.setItem(SHOWN_KEY, "1");
         setOpen(true);
         track("cta_exit_modal_show", { slug });

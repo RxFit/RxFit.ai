@@ -8,6 +8,7 @@ import {
   STICKY_DISMISS_KEY,
   CTA_ENGAGED_KEY,
   isStickyDismissed,
+  daysSinceDismissal,
 } from "@shared/cta-frequency";
 
 export default function StickyFooterCta({ slug }: { slug?: string }) {
@@ -16,10 +17,18 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isStickyDismissed(localStorage.getItem(STICKY_DISMISS_KEY), Date.now())) return;
+    const stored = localStorage.getItem(STICKY_DISMISS_KEY);
+    const now = Date.now();
+    if (isStickyDismissed(stored, now)) {
+      // The STICKY_DISMISS_DAYS dismissal cap is hiding the bar on this
+      // pageview — track it so Plausible can show how often the cap fires
+      // and at what age.
+      track("cta_sticky_suppressed", { slug, days_since_dismiss: daysSinceDismissal(stored, now) });
+      return;
+    }
     const t = setTimeout(() => setVisible(true), 1200);
     return () => clearTimeout(t);
-  }, []);
+  }, [slug]);
 
   if (!visible || location === "/success") return null;
 

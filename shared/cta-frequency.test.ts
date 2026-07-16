@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   isStickyDismissed,
   shouldShowExitModal,
+  exitModalDecision,
+  daysSinceDismissal,
   STICKY_DISMISS_DAYS,
 } from "./cta-frequency";
 
@@ -54,5 +56,48 @@ describe("shouldShowExitModal", () => {
   it("suppresses for the session once the sticky CTA was clicked", () => {
     expect(shouldShowExitModal(null, "1")).toBe(false);
     expect(shouldShowExitModal("1", "1")).toBe(false);
+  });
+});
+
+describe("exitModalDecision", () => {
+  it("shows when neither flag is set", () => {
+    expect(exitModalDecision(null, null)).toBe("show");
+  });
+
+  it("already_shown wins over the engagement cap (not a tracked suppression)", () => {
+    expect(exitModalDecision("1", null)).toBe("already_shown");
+    expect(exitModalDecision("1", "1")).toBe("already_shown");
+  });
+
+  it("reports the engagement cap as the tracked suppression reason", () => {
+    expect(exitModalDecision(null, "1")).toBe("suppressed_engaged");
+  });
+
+  it("stays consistent with shouldShowExitModal", () => {
+    for (const shown of [null, "1"]) {
+      for (const engaged of [null, "1"]) {
+        expect(shouldShowExitModal(shown, engaged)).toBe(
+          exitModalDecision(shown, engaged) === "show",
+        );
+      }
+    }
+  });
+});
+
+describe("daysSinceDismissal", () => {
+  it("is null when nothing valid is stored", () => {
+    expect(daysSinceDismissal(null, NOW)).toBe(null);
+    expect(daysSinceDismissal("", NOW)).toBe(null);
+    expect(daysSinceDismissal("not-a-number", NOW)).toBe(null);
+  });
+
+  it("reports whole days since dismissal", () => {
+    expect(daysSinceDismissal(String(NOW - 1000), NOW)).toBe(0);
+    expect(daysSinceDismissal(String(NOW - 2 * DAY_MS), NOW)).toBe(2);
+    expect(daysSinceDismissal(String(NOW - (6 * DAY_MS + DAY_MS / 2)), NOW)).toBe(6);
+  });
+
+  it("reports 0 for a clock-skewed future timestamp (matches isStickyDismissed staying dismissed)", () => {
+    expect(daysSinceDismissal(String(NOW + DAY_MS), NOW)).toBe(0);
   });
 });
