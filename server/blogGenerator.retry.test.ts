@@ -223,9 +223,35 @@ describe("generateAndPublishPost retry feedback", () => {
     expect(storage.createGeneratedPost).toHaveBeenCalledTimes(1);
     expect(storage.markKeywordThemeUsed).toHaveBeenCalledTimes(1);
 
-    // No false alarm on either channel.
+    // No FAILURE alarm — but a low-severity "post live, email failed" alert
+    // row IS appended so a broken Gmail connector doesn't go unnoticed.
     expect(sendPostFailureEmail).not.toHaveBeenCalled();
-    expect(appendAlertToSheet).not.toHaveBeenCalled();
+    expect(appendAlertToSheet).toHaveBeenCalledTimes(1);
+    const [alert] = vi.mocked(appendAlertToSheet).mock.calls[0];
+    expect(alert.title).toContain("notification email FAILED");
+    expect(alert.title).toContain("/blog/hrv-training-guide-test");
+    expect(alert.message).toContain("LIVE");
+    expect(alert.message).toContain("gmail exploded");
+  });
+
+  it("still returns the live post when the notification email AND the sheet alert both fail", async () => {
+    createMock.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify(makeDraft()) } }],
+    });
+
+    const { sendPostPublishedEmail, sendPostFailureEmail } = await import("./emailService");
+    const { appendAlertToSheet } = await import("./sheetsService");
+    vi.mocked(sendPostPublishedEmail).mockRejectedValueOnce(new Error("gmail exploded"));
+    vi.mocked(appendAlertToSheet).mockRejectedValueOnce(new Error("sheets exploded too"));
+
+    const { generateAndPublishPost } = await import("./blogGenerator");
+    const { storage } = await import("./storage");
+
+    const post = await generateAndPublishPost();
+
+    expect(post.slug).toBe("hrv-training-guide-test");
+    expect(storage.createGeneratedPost).toHaveBeenCalledTimes(1);
+    expect(sendPostFailureEmail).not.toHaveBeenCalled();
   });
 
   it("still publishes (without an image) when hero image generation fails", async () => {

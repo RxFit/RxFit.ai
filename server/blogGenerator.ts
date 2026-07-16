@@ -340,6 +340,25 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
     } catch (emailError) {
       // The post is live; a notification failure should not roll it back.
       console.error("[blog-publisher] Post published but notification email failed:", emailError);
+      // Low-severity fallback alert: append a row to the "RxFit Alerts" sheet
+      // tab (separate google-sheet connector) so a broken Gmail connector
+      // becomes visible instead of posts silently appearing. Best-effort —
+      // a sheet failure must not turn a notification hiccup into a pipeline
+      // failure either.
+      try {
+        const message =
+          emailError instanceof Error ? emailError.message : String(emailError);
+        await appendAlertToSheet({
+          title: `Blog post published but the notification email FAILED — /blog/${post.slug}`,
+          message: `The post is LIVE at /blog/${post.slug}. Only the "post published" email could not be sent (check the Gmail connector). Error: ${message}`,
+        });
+        console.log("[blog-publisher] Notification-failure alert row appended to Google Sheet");
+      } catch (sheetError) {
+        console.error(
+          "[blog-publisher] Notification email failed AND the sheet alert also failed — publish notifications are silently broken:",
+          sheetError,
+        );
+      }
     }
 
     return post;
