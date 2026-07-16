@@ -4,6 +4,7 @@ import path from "path";
 import { parse as parseYaml } from "yaml";
 import { STATIC_ROUTES } from "../shared/site";
 import { verifyPrerenderedRoute } from "./prerenderVerify";
+import { verifySsrTemplateMarkers } from "../server/blogSsr";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -58,7 +59,16 @@ export async function prerender() {
   // Preserve the raw SPA shell (with the seo:start block + <!--app-html-->
   // placeholder intact) so the server can render DB-backed blog posts at
   // runtime (see server/blogSsr.ts). Must happen before index.html is
-  // overwritten by the "/" prerender below.
+  // overwritten by the "/" prerender below. Verify the markers blogSsr.ts
+  // relies on are present — a drifted shell must fail the build, not silently
+  // serve broken crawler HTML for DB posts in production.
+  const markerProblems = verifySsrTemplateMarkers(template);
+  if (markerProblems.length > 0) {
+    throw new Error(
+      `SSR template verification failed — client/index.html no longer matches what server/blogSsr.ts expects:\n` +
+        markerProblems.map((p) => `  - ${p}`).join("\n"),
+    );
+  }
   fs.writeFileSync(path.join(PUBLIC_DIR, "template.html"), template);
 
   const renderToFile = (route: string, file: string, status: string) => {

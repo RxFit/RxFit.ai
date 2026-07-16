@@ -19,6 +19,30 @@ import { extractToc } from "@shared/generated-blog";
 import { SITE_URL, APP_URL } from "@shared/site";
 
 const SEO_BLOCK = /<!-- seo:start[\s\S]*?seo:end -->/;
+const ROOT_MARKER = '<div id="root">';
+const APP_HTML_MARKER = "<!--app-html-->";
+
+/**
+ * Build-time guard: verify a shell template contains every marker this module
+ * relies on to inject crawler HTML (seo:start/seo:end block, the #root div
+ * used for the data-runtime-ssr injection, and the <!--app-html-->
+ * placeholder). Returns a list of human-readable problems (empty = OK).
+ * script/prerender.ts calls this before saving dist/public/template.html so a
+ * template drift fails the build instead of silently degrading runtime SSR.
+ */
+export function verifySsrTemplateMarkers(template: string): string[] {
+  const problems: string[] = [];
+  if (!SEO_BLOCK.test(template)) {
+    problems.push("missing '<!-- seo:start ... seo:end -->' block (head tags cannot be injected)");
+  }
+  if (!template.includes(ROOT_MARKER)) {
+    problems.push(`missing '${ROOT_MARKER}' (data-runtime-ssr marker cannot be injected)`);
+  }
+  if (!template.includes(APP_HTML_MARKER)) {
+    problems.push(`missing '${APP_HTML_MARKER}' placeholder (article body cannot be injected)`);
+  }
+  return problems;
+}
 
 function templatePath(): string {
   // In production the bundle runs from dist/, alongside dist/public.
@@ -309,7 +333,7 @@ export function renderGeneratedPostPage(post: GeneratedPost): string | null {
   let page = template.replace(SEO_BLOCK, buildHead(post));
   // Mark the root so main.tsx renders fresh (createRoot) instead of hydrating
   // — this server HTML is intentionally not React-generated markup.
-  page = page.replace('<div id="root">', '<div id="root" data-runtime-ssr="true">');
-  page = page.replace("<!--app-html-->", buildArticleHtml(post));
+  page = page.replace(ROOT_MARKER, '<div id="root" data-runtime-ssr="true">');
+  page = page.replace(APP_HTML_MARKER, buildArticleHtml(post));
   return page;
 }
