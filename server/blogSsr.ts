@@ -327,8 +327,11 @@ function buildArticleHtml(post: GeneratedPost): string {
  * Render the full page HTML for a generated post, or null when the template
  * is unavailable (dev mode) — caller should fall through to the SPA shell.
  */
-export function renderGeneratedPostPage(post: GeneratedPost): string | null {
-  const template = loadTemplate();
+export function renderGeneratedPostPage(
+  post: GeneratedPost,
+  templateOverride?: string,
+): string | null {
+  const template = templateOverride ?? loadTemplate();
   if (!template) return null;
   let page = template.replace(SEO_BLOCK, buildHead(post));
   // Mark the root so main.tsx renders fresh (createRoot) instead of hydrating
