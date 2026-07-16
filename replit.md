@@ -77,7 +77,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **SEO / AEO / GEO:** `client/src/lib/seo.tsx` manages per-page `<title>`/meta (without clobbering default `og:image`/`twitter:image`) and injects `Article` + `BreadcrumbList` + `Organization` JSON-LD. `FAQ` emits `FAQPage` JSON-LD. `server/routes.ts` serves dynamic `/sitemap.xml` (fs + gray-matter, 5-min cache) and `/robots.txt` (allows GPTBot/PerplexityBot/ClaudeBot/Google-Extended/CCBot); `client/public/llms.txt` summarizes the site for AI assistants.
 - **CRO:** Tier-aware inline `<CTACard>`, dismissable `StickyFooterCta`, desktop `ExitIntentModal` (→ `/api/leads`). All open the shared signup modal via `useSignupModal()`.
 - **Attribution:** `client/src/lib/utm.ts` captures/persists UTMs and builds a `client_reference_id` (`slug|source|medium|campaign`) passed through `/api/stripe/checkout`.
-- **Analytics:** Plausible (`data-domain=rxfit.ai` in `client/index.html`); `client/src/lib/analytics.ts` tracks `pageview`, `scroll_50`, `scroll_90`, `cta_*` events.
+- **Analytics:** Plausible (`data-domain=rxfit.ai` in `client/index.html`); `client/src/lib/analytics.ts` tracks `pageview`, `scroll_50`, `scroll_90`, `cta_*` events. `/compare` tracks `pageview`/`scroll_50`/`scroll_90` (slug `compare`), `cta_compare_trial_click` on the trial CTA, and `faq_open` on FAQ accordion opens.
 - **Cross-domain authority:** Crawlable `<a href="https://app.rxfit.ai">` links in header/footer/landing/post + Organization `sameAs`. Reciprocal links FROM app.rxfit.ai are a manual step — see `CROSS-DOMAIN-SEO.md`.
 
 ## Automated AI Blog Publisher

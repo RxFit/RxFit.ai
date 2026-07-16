@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Check, ChevronRight, Minus, X } from "lucide-react";
 
 import { useSignupModal } from "@/components/SignupModalProvider";
+import { track } from "@/lib/analytics";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { Seo } from "@/lib/seo";
@@ -146,6 +148,32 @@ function ToneIcon({ tone }: { tone: CellValue["tone"] }) {
 
 export default function ComparePage() {
   const { open: openSignup } = useSignupModal();
+
+  useEffect(() => {
+    track("pageview", { slug: "compare" });
+    let fired50 = false;
+    let fired90 = false;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const scrolled = window.scrollY + window.innerHeight;
+        const pct = scrolled / document.documentElement.scrollHeight;
+        if (!fired50 && pct >= 0.5) {
+          fired50 = true;
+          track("scroll_50", { slug: "compare" });
+        }
+        if (!fired90 && pct >= 0.9) {
+          fired90 = true;
+          track("scroll_90", { slug: "compare" });
+        }
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground">
@@ -302,7 +330,10 @@ export default function ComparePage() {
               for $49/month after your trial.
             </p>
             <button
-              onClick={() => openSignup("kickstart")}
+              onClick={() => {
+                track("cta_compare_trial_click", { plan: "kickstart", slug: "compare" });
+                openSignup("kickstart");
+              }}
               className="btn-primary px-8 py-4 rounded-full text-lg shadow-xl shadow-primary/20 inline-flex items-center justify-center gap-2 group"
               data-testid="button-compare-trial"
             >
@@ -319,7 +350,17 @@ export default function ComparePage() {
               <div className="hud-label text-primary mb-3">Common Questions</div>
               <h2 className="text-3xl md:text-4xl font-bold text-foreground">Comparison FAQs</h2>
             </div>
-            <Accordion type="single" collapsible className="space-y-3" data-testid="compare-faq">
+            <Accordion
+              type="single"
+              collapsible
+              className="space-y-3"
+              data-testid="compare-faq"
+              onValueChange={(value) => {
+                if (!value) return;
+                const idx = Number(value.replace("faq-", ""));
+                track("faq_open", { slug: "compare", question: COMPARE_FAQ[idx]?.q ?? value });
+              }}
+            >
               {COMPARE_FAQ.map((it, i) => (
                 <AccordionItem
                   key={i}
