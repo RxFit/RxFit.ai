@@ -505,7 +505,13 @@ function loadPlanPricing() {
 
 function scanForHardcodedPrices(pricing) {
   if (!pricing) return;
-  const codeDirs = ["client/src/pages", "client/src/components"];
+  // Server surfaces carry price/trial copy too: email HTML, the AI blog
+  // generator prompt (which tells the model what RxFit costs), crawler HTML,
+  // and the Stripe seed script. Scan them with the same rules so a price
+  // change can't leave a server-side surface stale. (*.test.* files are
+  // excluded below; shared/stripe-constants.ts itself is not scanned — it is
+  // the source of truth.)
+  const codeDirs = ["client/src/pages", "client/src/components", "server"];
   const codeFiles = [];
   for (const dir of codeDirs) {
     const stack = [path.join(ROOT, dir)];

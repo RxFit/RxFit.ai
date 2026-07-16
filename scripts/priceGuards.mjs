@@ -39,6 +39,19 @@ export function scanCodeForHardcodedPrices(pricing, relPath, content) {
     new RegExp(`\\b${trialDays}[-\\s][Dd]ay\\b`, "g"),
     new RegExp(`free for ${trialDays} days`, "gi"),
   ];
+  // Stripe API literals: a numeric unit_amount / trial_period_days in code is
+  // always drift-prone — it must be computed from PLAN_PRICING instead
+  // (e.g. `unit_amount: PLAN_PRICING.kickstart.amount * 100`).
+  const stripeLiteralRes = [
+    {
+      re: /\bunit_amount\s*:\s*\d+/g,
+      msg: "hardcoded Stripe unit_amount — derive it from PLAN_PRICING (amount * 100) in shared/stripe-constants.ts",
+    },
+    {
+      re: /\btrial_period_days\s*:\s*\d+/g,
+      msg: "hardcoded Stripe trial_period_days — derive it from PLAN_PRICING.kickstart.trialDays in shared/stripe-constants.ts",
+    },
+  ];
   const lines = content.split(/\r?\n/);
   lines.forEach((line, i) => {
     for (const { amount, re } of amountRes) {
@@ -49,6 +62,10 @@ export function scanCodeForHardcodedPrices(pricing, relPath, content) {
     for (const re of trialRes) {
       if (re.test(line))
         out.push(`${relPath}: line ${i + 1}: hardcoded trial copy ("${line.trim().slice(0, 80)}") — derive it from PLAN_PRICING.kickstart.trialDays / TRIAL_COPY`);
+      re.lastIndex = 0;
+    }
+    for (const { re, msg } of stripeLiteralRes) {
+      if (re.test(line)) out.push(`${relPath}: line ${i + 1}: ${msg}`);
       re.lastIndex = 0;
     }
   });

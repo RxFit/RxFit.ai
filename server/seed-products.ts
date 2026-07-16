@@ -1,4 +1,5 @@
 import { getUncachableStripeClient } from './stripeClient';
+import { PLAN_PRICING } from '@shared/stripe-constants';
 
 async function createProducts() {
   const stripe = await getUncachableStripeClient();
@@ -18,9 +19,9 @@ async function createProducts() {
     });
     await stripe.prices.create({
       product: kickstart.id,
-      unit_amount: 4900,
+      unit_amount: PLAN_PRICING.kickstart.amount * 100,
       currency: 'usd',
-      recurring: { interval: 'month', trial_period_days: 7 },
+      recurring: { interval: 'month', trial_period_days: PLAN_PRICING.kickstart.trialDays },
       metadata: { tier: 'kickstart', billing: 'monthly' },
     });
     console.log(`Created Kickstart: ${kickstart.id}`);
@@ -41,7 +42,7 @@ async function createProducts() {
     });
     await stripe.prices.create({
       product: committed.id,
-      unit_amount: 49000,
+      unit_amount: PLAN_PRICING.committed.amount * 100,
       currency: 'usd',
       recurring: { interval: 'year' },
       metadata: { tier: 'committed', billing: 'yearly' },
@@ -63,7 +64,7 @@ async function createProducts() {
     });
     await stripe.prices.create({
       product: transformation.id,
-      unit_amount: 99700,
+      unit_amount: PLAN_PRICING.transformation.amount * 100,
       currency: 'usd',
       recurring: { interval: 'year' },
       metadata: { tier: 'transformation', billing: 'one-time-equivalent' },

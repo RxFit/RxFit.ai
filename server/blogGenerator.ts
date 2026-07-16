@@ -24,6 +24,7 @@ import {
 } from "@shared/generated-blog";
 import type { GeneratedPost, FaqItem } from "@shared/schema";
 import { STATIC_ROUTES } from "@shared/site";
+import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 
 const AUTHOR = "RxFit.ai Research Team";
 const AUTHOR_BIO =
@@ -95,6 +96,8 @@ function buildPrompt(
   return `You are the senior content writer for RxFit.ai, a HealthTech SaaS that pairs an AI health dashboard (syncs wearables like Apple Watch, Oura, Whoop, Garmin) with a real human accountability coach. Brand voice: authoritative but warm, evidence-driven, practical, zero fluff. Audience: busy professionals 30-55 who own wearables but struggle with consistency.
 
 TASK: Write one complete, publication-ready blog post on the keyword theme: "${theme}" (content pillar: ${pillar}).
+
+RXFIT PRICING FACTS (if you mention RxFit pricing anywhere, use these EXACT current numbers — never invent or round prices): ${PLAN_PRICING.kickstart.name} is ${PLAN_PRICING.kickstart.perMonth} with a ${TRIAL_COPY}; ${PLAN_PRICING.committed.name} is ${PLAN_PRICING.committed.perYear} (saves ${PLAN_PRICING.committed.savings} vs monthly); ${PLAN_PRICING.transformation.name} is ${PLAN_PRICING.transformation.oneTime}.
 
 RESEARCH SOURCES (use these for facts and statistics; cite claims inline as markdown links to the source URL):
 ${sources}

@@ -66,6 +66,26 @@ describe("scanCodeForHardcodedPrices", () => {
     );
     expect(errs).toEqual([]);
   });
+
+  it("flags literal Stripe unit_amount and trial_period_days in server code", () => {
+    const errs = scanCodeForHardcodedPrices(
+      PRICING,
+      "server/seed-products.ts",
+      `await stripe.prices.create({\n  unit_amount: 4900,\n  recurring: { interval: 'month', trial_period_days: 7 },\n});`,
+    );
+    expect(errs).toHaveLength(2);
+    expect(errs[0]).toContain("hardcoded Stripe unit_amount");
+    expect(errs[1]).toContain("hardcoded Stripe trial_period_days");
+  });
+
+  it("accepts unit_amount/trial_period_days derived from PLAN_PRICING", () => {
+    const errs = scanCodeForHardcodedPrices(
+      PRICING,
+      "server/seed-products.ts",
+      `unit_amount: PLAN_PRICING.kickstart.amount * 100,\nrecurring: { interval: 'month', trial_period_days: PLAN_PRICING.kickstart.trialDays },`,
+    );
+    expect(errs).toEqual([]);
+  });
 });
 
 describe("scanMdxPriceClaims", () => {
@@ -114,5 +134,12 @@ describe("validate-seo.mjs wiring", () => {
     expect(src).toContain("parsePlanPricing(");
     expect(src).toContain("scanCodeForHardcodedPrices(");
     expect(src).toContain("scanMdxPriceClaims(");
+  });
+
+  it("scans server code (email copy, generator prompt, seed script) too", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "validate-seo.mjs"), "utf8");
+    const dirs = src.match(/const codeDirs = \[([^\]]*)\]/);
+    expect(dirs).not.toBeNull();
+    expect(dirs![1]).toContain('"server"');
   });
 });
