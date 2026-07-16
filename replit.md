@@ -10,7 +10,7 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - **Typography:** Inter (body, self-hosted), Space Grotesk (display/headings), JetBrains Mono (HUD command labels).
 
 ## Project Architecture
-- `client/src/pages/LandingPage.tsx` — Main landing page (pricing buttons open the shared signup modal via `useSignupModal`)
+- `client/src/pages/LandingPage.tsx` — Main landing page (pricing buttons open the shared signup modal via `useSignupModal`); AEO surfaces: citable hero definition sentence, FAQ accordion section (`#faq`), and FAQPage + Product/Offer JSON-LD emitted via the `Seo` `jsonLd` prop (prerendered into the head)
 - `client/src/pages/SuccessPage.tsx` — Post-payment success page with link to app.rxfit.ai
 - `client/src/pages/BlogIndex.tsx` — Blog index: pillar filter chips + responsive post-card grid
 - `client/src/pages/BlogPost.tsx` — Blog post template: breadcrumb, byline, hero, MDX content, sticky TOC, author bio, related posts, CRO surfaces

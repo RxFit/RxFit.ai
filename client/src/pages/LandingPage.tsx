@@ -20,7 +20,96 @@ import heroDashboardImg from "../assets/hero-dashboard.webp";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import SiteFooter from "@/components/SiteFooter";
 import ThemeToggle from "@/components/theme-toggle";
-import { Seo } from "@/lib/seo";
+import { Seo, SITE_URL } from "@/lib/seo";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+const FAQ_ITEMS = [
+  {
+    q: "What is RxFit.ai?",
+    a: "RxFit.ai is an AI-powered health coaching service that combines wearable data from devices like Oura, Garmin, and Apple Health with a dedicated human accountability coach. The AI dashboard analyzes your biometrics daily, and your coach turns that data into a specific plan and keeps you consistent.",
+  },
+  {
+    q: "How is RxFit different from a fitness app or an AI chatbot?",
+    a: "Apps and chatbots give generic advice and are easy to ignore. RxFit assigns you a real human coach who sees your actual sleep, recovery, and training data and adjusts your workouts and nutrition daily. The AI does the analysis; the human provides the judgment and accountability.",
+  },
+  {
+    q: "Which wearables and apps does RxFit work with?",
+    a: "RxFit syncs with all major wearables and health apps, including Oura, Garmin, Apple Health, Strava, and SnapCalorie. Your data is combined into a single dashboard with a daily readiness score.",
+  },
+  {
+    q: "How much does RxFit.ai cost?",
+    a: "RxFit has three plans: The Kickstart at $49/month with a 7-day free trial (AI dashboard, device sync, weekly coach check-in), The Committed at $490/year paid upfront (saves $98 and adds priority coach access), and The Transformation at $997 one-time (1-on-1 deep-dive coaching and an executive wellness audit).",
+  },
+  {
+    q: "Is there a free trial, and can I cancel anytime?",
+    a: "Yes. The Kickstart plan includes a 7-day free trial, and you can cancel your subscription at any time from the billing portal — no long-term contract or cancellation fee.",
+  },
+  {
+    q: "Who is RxFit.ai for?",
+    a: "RxFit is built for busy professionals and high-performers who already track their health data but struggle to turn it into consistent daily action. If you own a wearable and want expert direction plus real accountability without hiring a $500/month personal trainer, RxFit is designed for you.",
+  },
+];
+
+const PRICING_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  name: "RxFit.ai Health Coaching",
+  description:
+    "AI health dashboard plus a dedicated human accountability coach. Syncs with Oura, Garmin, Apple Health, Strava, and more.",
+  brand: { "@type": "Brand", name: "RxFit.ai" },
+  url: `${SITE_URL}/#pricing`,
+  image: `${SITE_URL}/opengraph.jpg`,
+  offers: [
+    {
+      "@type": "Offer",
+      name: "The Kickstart",
+      description: "AI dashboard access, device sync for all brands, and a weekly coach check-in. Includes a 7-day free trial.",
+      price: "49.00",
+      priceCurrency: "USD",
+      url: `${SITE_URL}/#pricing`,
+      availability: "https://schema.org/InStock",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: "49.00",
+        priceCurrency: "USD",
+        billingDuration: 1,
+        billingIncrement: 1,
+        unitCode: "MON",
+      },
+    },
+    {
+      "@type": "Offer",
+      name: "The Committed",
+      description: "Everything in Kickstart plus priority coach access, paid annually upfront — saves $98 per year.",
+      price: "490.00",
+      priceCurrency: "USD",
+      url: `${SITE_URL}/#pricing`,
+      availability: "https://schema.org/InStock",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: "490.00",
+        priceCurrency: "USD",
+        billingDuration: 1,
+        billingIncrement: 1,
+        unitCode: "ANN",
+      },
+    },
+    {
+      "@type": "Offer",
+      name: "The Transformation",
+      description: "One-time VIP program: 1-on-1 deep-dive strategy, executive wellness audit, daily live coaching, lifetime community access.",
+      price: "997.00",
+      priceCurrency: "USD",
+      url: `${SITE_URL}/#pricing`,
+      availability: "https://schema.org/InStock",
+    },
+  ],
+};
 
 const bottomLeftNotifications = [
   {
@@ -144,6 +233,18 @@ export default function LandingPage() {
         description="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach."
         canonicalPath="/"
         image="/opengraph.jpg"
+        jsonLd={[
+          PRICING_JSONLD,
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: FAQ_ITEMS.map((it) => ({
+              "@type": "Question",
+              name: it.q,
+              acceptedAnswer: { "@type": "Answer", text: it.a },
+            })),
+          },
+        ]}
       />
 
       {/* Sticky Navbar */}
@@ -207,6 +308,10 @@ export default function LandingPage() {
             
             <motion.p variants={fadeIn} className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Stop guessing. <span className="text-foreground font-medium">RxFit.ai</span> syncs with your devices and connects you to a real human coach to turn your data into daily, consistent action.
+            </motion.p>
+
+            <motion.p variants={fadeIn} className="text-sm text-muted-foreground/80 max-w-2xl mx-auto leading-relaxed" data-testid="text-hero-definition">
+              RxFit.ai is an AI-powered health coaching service that combines wearable data from Oura, Garmin, and Apple Health with a dedicated human coach — from $49/month with a 7-day free trial.
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -561,6 +666,31 @@ export default function LandingPage() {
                  </div>
               </div>
            </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 relative">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[300px] bg-primary/5 blur-[100px] rounded-full -z-10" />
+        <div className="container mx-auto px-6 max-w-3xl">
+          <div className="text-center mb-12">
+            <div className="hud-label text-primary mb-3">Common Questions</div>
+            <h2 className="text-3xl md:text-5xl font-bold text-foreground">Frequently Asked Questions</h2>
+          </div>
+          <Accordion type="single" collapsible className="space-y-3" data-testid="landing-faq">
+            {FAQ_ITEMS.map((it, i) => (
+              <AccordionItem
+                key={i}
+                value={`faq-${i}`}
+                className="hud-corner glass-card rounded-xl border-none px-5"
+              >
+                <AccordionTrigger className="text-left text-foreground hover:no-underline" data-testid={`landing-faq-question-${i}`}>
+                  {it.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-foreground/80 leading-relaxed">{it.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </section>
 
