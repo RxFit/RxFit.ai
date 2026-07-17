@@ -2,6 +2,7 @@
 - [LLM content safety](llm-generated-content-safety.md) — AI-written markdown is untrusted input: sanitize URL schemes at render time AND reject them at publish time.
 - [Object storage at runtime](object-storage-runtime.md) — pass bucketId explicitly to the SDK; runtime-generated assets must live in object storage (deploy FS is ephemeral) behind a serving route.
 - [Replit connector credentials](replit-connector-credentials.md) — the v2 connection API returns nothing when filtered by connector_names; fetch all + filter client-side. Gmail token is send-only (no getProfile).
+- [OpenGraph auto-regen](opengraph-auto-regen.md) — client/public/opengraph.jpg is platform-regenerated from preview screenshots; unrelated binary diffs in commits are benign, don't revert.
 - [Source-scan guards](source-scan-guards.md) — tests that count literal markers in source files break if a comment quotes the marker; describe it, don't quote it.
 - [pg SSL config precedence](pg-ssl-precedence.md) — pg merges the parsed URL OVER the pool config: the URL's sslmode always wins; sslmode=require means verify-full in pg ≥ 8.16.
 - [Google Search Console integration](gsc-integration.md) — no Replit connector exists; use a service-account JSON secret + JWT auth; GSC data lags ~2 days.
