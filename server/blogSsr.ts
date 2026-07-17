@@ -16,7 +16,7 @@ import path from "path";
 import { marked } from "marked";
 import type { GeneratedPost } from "@shared/schema";
 import { extractToc } from "@shared/generated-blog";
-import { SITE_URL, APP_URL } from "@shared/site";
+import { SITE_URL, APP_URL, SITE_DESCRIPTION } from "@shared/site";
 import {
   BLOG_INDEX_TITLE,
   BLOG_INDEX_DESCRIPTION,
@@ -118,8 +118,7 @@ function buildHead(post: GeneratedPost): string {
     name: "RxFit.ai",
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
-    description:
-      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    description: SITE_DESCRIPTION,
     sameAs: [
       APP_URL,
       "https://twitter.com/rxfitai",
@@ -132,8 +131,7 @@ function buildHead(post: GeneratedPost): string {
     "@type": "WebSite",
     name: "RxFit.ai",
     url: SITE_URL,
-    description:
-      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    description: SITE_DESCRIPTION,
     publisher: { "@type": "Organization", name: "RxFit.ai", url: SITE_URL },
   };
   const breadcrumbs = {
@@ -375,8 +373,7 @@ function buildIndexHead(posts: BlogIndexCard[]): string {
     name: "RxFit.ai",
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
-    description:
-      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    description: SITE_DESCRIPTION,
     sameAs: [
       APP_URL,
       "https://twitter.com/rxfitai",
@@ -389,8 +386,7 @@ function buildIndexHead(posts: BlogIndexCard[]): string {
     "@type": "WebSite",
     name: "RxFit.ai",
     url: SITE_URL,
-    description:
-      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    description: SITE_DESCRIPTION,
     publisher: { "@type": "Organization", name: "RxFit.ai", url: SITE_URL },
   };
   const breadcrumbs = {

@@ -1,5 +1,5 @@
 import { useEffect, useContext, createContext } from "react";
-import { SITE_URL, APP_URL } from "@shared/site";
+import { SITE_URL, APP_URL, SITE_DESCRIPTION } from "@shared/site";
 
 export { SITE_URL, APP_URL };
 
@@ -14,8 +14,7 @@ export const ORGANIZATION_JSONLD = {
   name: "RxFit.ai",
   url: SITE_URL,
   logo: `${SITE_URL}/logo.png`,
-  description:
-    "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+  description: SITE_DESCRIPTION,
   sameAs: [
     APP_URL,
     "https://twitter.com/rxfitai",
@@ -29,8 +28,7 @@ export const WEBSITE_JSONLD = {
   "@type": "WebSite",
   name: "RxFit.ai",
   url: SITE_URL,
-  description:
-    "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+  description: SITE_DESCRIPTION,
   publisher: {
     "@type": "Organization",
     name: "RxFit.ai",
