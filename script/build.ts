@@ -47,6 +47,19 @@ function runTests() {
   }
 }
 
+function runTypecheck() {
+  console.log("type-checking (tsc --noEmit)...");
+  const result = spawnSync("npx", ["tsc", "--noEmit"], {
+    stdio: "inherit",
+    env: { ...process.env, CI: "true" },
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `Type check failed (exit code ${result.status ?? "unknown"}). Aborting build.`,
+    );
+  }
+}
+
 function runSeoValidation() {
   console.log("validating SEO / structured data / internal links...");
   const result = spawnSync("node", ["scripts/validate-seo.mjs"], {
@@ -61,6 +74,7 @@ function runSeoValidation() {
 }
 
 async function buildAll() {
+  runTypecheck();
   runTests();
   runSeoValidation();
 
