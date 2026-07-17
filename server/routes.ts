@@ -23,6 +23,7 @@ import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServi
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
 import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
+import { createStripeSessionRateLimit, createStripeReadRateLimit } from "./stripeRateLimits";
 import { createEmailPreviewsHandler } from "./emailPreviewRoute";
 
 function parseFrontmatter(raw: string): Record<string, any> {
@@ -43,6 +44,17 @@ const leadsRateLimit = rateLimit({
 // + two Stripe API calls), so it gets its own per-IP limiter (defined in
 // checkoutRoute.ts so the route-level test covers the 429 behavior).
 const checkoutRateLimit = createCheckoutRateLimit();
+
+// The remaining public Stripe-touching routes each get their OWN limiter
+// instance (factories in stripeRateLimits.ts, tested in
+// stripeRateLimits.test.ts) so abuse of one route can't consume another's
+// budget. Strict tier for routes buyers hit once or twice; generous tier
+// for the read routes every landing-page visitor loads.
+const sessionRateLimit = createStripeSessionRateLimit();
+const customerPortalRateLimit = createStripeSessionRateLimit();
+const stripeDiagRateLimit = createStripeSessionRateLimit();
+const productsRateLimit = createStripeReadRateLimit();
+const publishableKeyRateLimit = createStripeReadRateLimit();
 
 export async function registerRoutes(
   httpServer: Server,
@@ -93,7 +105,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stripe/publishable-key", async (_req, res) => {
+  app.get("/api/stripe/publishable-key", publishableKeyRateLimit, async (_req, res) => {
     try {
       const key = await getStripePublishableKey();
       return res.json({ publishableKey: key });
@@ -118,6 +130,7 @@ export async function registerRoutes(
   // covered by a route-level test (server/productsRoute.test.ts).
   app.get(
     "/api/stripe/products",
+    productsRateLimit,
     createProductsHandler({
       db,
       getStripeClient: getUncachableStripeClient,
@@ -141,10 +154,11 @@ export async function registerRoutes(
   // repeated sends when the success page URL is replayed.
   const processedSessions = new Set<string>();
 
-  app.get("/api/stripe/session/:sessionId", async (req, res) => {
+  app.get("/api/stripe/session/:sessionId", sessionRateLimit, async (req, res) => {
     try {
       const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId, {
+      const sessionId = String(req.params.sessionId);
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
         expand: ['line_items', 'line_items.data.price.product'],
       });
 
@@ -154,8 +168,6 @@ export async function registerRoutes(
       const lineItem = session.line_items?.data?.[0];
       const product = lineItem?.price?.product as any;
       const planName = product?.name || 'RxFit.ai';
-
-      const sessionId = req.params.sessionId;
       if ((session.payment_status === 'paid' || session.status === 'complete') && email) {
         if (!processedSessions.has(sessionId)) {
           processedSessions.add(sessionId);
@@ -180,7 +192,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/stripe/customer-portal", async (req, res) => {
+  app.post("/api/stripe/customer-portal", customerPortalRateLimit, async (req, res) => {
     try {
       const { sessionId } = req.body;
 
@@ -225,7 +237,7 @@ export async function registerRoutes(
 
 
   // Diagnostic: check Stripe prices and connection mode
-  app.get("/api/diag/stripe-prices", async (_req, res) => {
+  app.get("/api/diag/stripe-prices", stripeDiagRateLimit, async (_req, res) => {
     try {
       const stripe = await getUncachableStripeClient();
       const prices = await stripe.prices.list({ active: true, limit: 100 });
