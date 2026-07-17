@@ -14,6 +14,21 @@ import {
   BLOG_INDEX_HERO_SUBTITLE,
   buildBlogCollectionJsonLd,
 } from "@shared/blog-index-seo";
+import {
+  BLOG_CARD_TAG_LIMIT,
+  BLOG_INDEX_GRID_CLASS,
+  BLOG_CARD_ARTICLE_CLASS,
+  BLOG_CARD_HERO_FRAME_CLASS,
+  BLOG_CARD_HERO_IMG_CLASS,
+  BLOG_CARD_BODY_CLASS,
+  BLOG_CARD_TAG_ROW_CLASS,
+  BLOG_CARD_TAG_CHIP_CLASS,
+  BLOG_CARD_TITLE_CLASS,
+  BLOG_CARD_DESCRIPTION_CLASS,
+  BLOG_CARD_FOOTER_CLASS,
+  formatBlogCardDate,
+  blogCardReadingTime,
+} from "@shared/blog-index-card";
 import { getAllPosts, PILLARS, type PostFrontmatter } from "@/lib/blogLoader";
 import { useGeneratedPosts, toFrontmatter } from "@/lib/generatedPosts";
 
@@ -21,14 +36,6 @@ import { useGeneratedPosts, toFrontmatter } from "@/lib/generatedPosts";
 interface PostCard {
   frontmatter: PostFrontmatter;
   readingMinutes: number;
-}
-
-function formatDate(date: string) {
-  try {
-    return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  } catch {
-    return date;
-  }
 }
 
 export default function BlogIndex() {
@@ -124,46 +131,46 @@ export default function BlogIndex() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div className={BLOG_INDEX_GRID_CLASS}>
             {filtered.map((post, i) => (
               <motion.article
                 key={post.frontmatter.slug}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="hud-corner glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col"
+                className={BLOG_CARD_ARTICLE_CLASS}
                 data-testid={`card-post-${post.frontmatter.slug}`}
               >
                 <Link href={`/blog/${post.frontmatter.slug}`} className="block">
-                  <div className="aspect-[1200/630] bg-muted overflow-hidden">
+                  <div className={BLOG_CARD_HERO_FRAME_CLASS}>
                     {post.frontmatter.heroImage && (
                       <img
                         src={post.frontmatter.heroImage}
                         alt={post.frontmatter.title}
                         loading="lazy"
-                        className="w-full h-full object-cover"
+                        className={BLOG_CARD_HERO_IMG_CLASS}
                       />
                     )}
                   </div>
                 </Link>
-                <div className="p-6 flex flex-col flex-1">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {(post.frontmatter.tags || []).slice(0, 2).map((t) => (
-                      <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
+                <div className={BLOG_CARD_BODY_CLASS}>
+                  <div className={BLOG_CARD_TAG_ROW_CLASS}>
+                    {(post.frontmatter.tags || []).slice(0, BLOG_CARD_TAG_LIMIT).map((t) => (
+                      <span key={t} className={BLOG_CARD_TAG_CHIP_CLASS}>
                         {t}
                       </span>
                     ))}
                   </div>
                   <Link href={`/blog/${post.frontmatter.slug}`}>
-                    <h2 className="text-xl font-bold text-foreground mb-2 hover:text-primary transition-colors">
+                    <h2 className={BLOG_CARD_TITLE_CLASS}>
                       {post.frontmatter.title}
                     </h2>
                   </Link>
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-4 flex-1">{post.frontmatter.description}</p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground/70 pt-4 border-t border-border">
-                    <span>{formatDate(post.frontmatter.date)}</span>
+                  <p className={BLOG_CARD_DESCRIPTION_CLASS}>{post.frontmatter.description}</p>
+                  <div className={BLOG_CARD_FOOTER_CLASS}>
+                    <span>{formatBlogCardDate(post.frontmatter.date)}</span>
                     <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {post.readingMinutes} min read
+                      <Clock className="w-3 h-3" /> {blogCardReadingTime(post.readingMinutes)}
                     </span>
                   </div>
                 </div>

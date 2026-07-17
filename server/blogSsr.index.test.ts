@@ -17,7 +17,37 @@ import {
   BLOG_INDEX_HERO_HEADING_ACCENT,
   BLOG_INDEX_HERO_SUBTITLE,
 } from "@shared/blog-index-seo";
+import {
+  BLOG_CARD_TAG_LIMIT,
+  BLOG_INDEX_GRID_CLASS,
+  BLOG_CARD_ARTICLE_CLASS,
+  BLOG_CARD_HERO_FRAME_CLASS,
+  BLOG_CARD_HERO_IMG_CLASS,
+  BLOG_CARD_BODY_CLASS,
+  BLOG_CARD_TAG_ROW_CLASS,
+  BLOG_CARD_TAG_CHIP_CLASS,
+  BLOG_CARD_TITLE_CLASS,
+  BLOG_CARD_DESCRIPTION_CLASS,
+  BLOG_CARD_FOOTER_CLASS,
+  formatBlogCardDate,
+  blogCardReadingTime,
+} from "@shared/blog-index-card";
 import { SITE_URL } from "@shared/site";
+
+/** Every shared card/grid class constant, keyed by export name (used by both
+ *  the SSR-output assertions and the source drift guards below). */
+const CARD_CLASS_CONSTANTS: Record<string, string> = {
+  BLOG_INDEX_GRID_CLASS,
+  BLOG_CARD_ARTICLE_CLASS,
+  BLOG_CARD_HERO_FRAME_CLASS,
+  BLOG_CARD_HERO_IMG_CLASS,
+  BLOG_CARD_BODY_CLASS,
+  BLOG_CARD_TAG_ROW_CLASS,
+  BLOG_CARD_TAG_CHIP_CLASS,
+  BLOG_CARD_TITLE_CLASS,
+  BLOG_CARD_DESCRIPTION_CLASS,
+  BLOG_CARD_FOOTER_CLASS,
+};
 
 const TEMPLATE = `<!DOCTYPE html>
 <html>
@@ -165,5 +195,84 @@ describe("BlogIndex.tsx hero copy wiring (drift guard)", () => {
     ]) {
       expect(src, `hero copy "${literal.slice(0, 40)}…" must not be duplicated inline`).not.toContain(literal);
     }
+  });
+});
+
+/**
+ * Card markup drift guards: the post cards on /blog are rendered twice — as
+ * JSX for visitors (BlogIndex.tsx) and as raw HTML for crawlers
+ * (buildIndexCardHtml in blogSsr.ts). Both must source their class lists, the
+ * visible-tag cap, and the footer strings from shared/blog-index-card.ts, so
+ * a client redesign can't silently leave crawlers a stale card.
+ */
+describe("crawler card markup uses the shared card contract", () => {
+  const page = renderBlogIndexPage(POSTS, TEMPLATE)!;
+
+  it("renders every shared card/grid class constant in the crawler HTML", () => {
+    for (const [name, cls] of Object.entries(CARD_CLASS_CONSTANTS)) {
+      expect(page, `${name} must appear as a class attribute in the SSR card grid`).toContain(
+        `class="${cls}"`,
+      );
+    }
+  });
+
+  it("caps visible tags at BLOG_CARD_TAG_LIMIT", () => {
+    // The fixture's first post carries MORE tags than the cap so this test
+    // actually exercises the slice.
+    expect(POSTS[0].tags.length).toBeGreaterThan(BLOG_CARD_TAG_LIMIT);
+    expect(page).toContain(">HRV</span>");
+    expect(page).toContain(">Recovery</span>");
+    expect(page).not.toContain(">Extra</span>");
+  });
+
+  it("renders the shared footer strings (formatted date + reading time)", () => {
+    expect(page).toContain(formatBlogCardDate("2026-07-10"));
+    expect(page).toContain(blogCardReadingTime(6));
+  });
+});
+
+describe("BlogIndex.tsx card markup wiring (drift guard)", () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, "../client/src/pages/BlogIndex.tsx"),
+    "utf-8",
+  );
+
+  it("imports and uses every shared card constant/helper", () => {
+    expect(src).toMatch(/from "@shared\/blog-index-card"/);
+    for (const name of [
+      ...Object.keys(CARD_CLASS_CONSTANTS),
+      "BLOG_CARD_TAG_LIMIT",
+      "formatBlogCardDate",
+      "blogCardReadingTime",
+    ]) {
+      // Imported once, then used in JSX — 2+ occurrences.
+      const uses = src.split(name).length - 1;
+      expect(uses, `${name} must be imported AND used in BlogIndex.tsx`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("does not hardcode the card class strings, tag cap, or footer label inline", () => {
+    for (const [name, cls] of Object.entries(CARD_CLASS_CONSTANTS)) {
+      expect(src, `class list of ${name} must not be duplicated inline`).not.toContain(cls);
+    }
+    expect(src, "tag cap must come from BLOG_CARD_TAG_LIMIT").not.toMatch(/\.slice\(0,\s*\d/);
+    expect(src, '"min read" must come from blogCardReadingTime()').not.toContain("min read");
+  });
+});
+
+describe("blogSsr.ts card markup wiring (drift guard)", () => {
+  const src = fs.readFileSync(path.resolve(__dirname, "./blogSsr.ts"), "utf-8");
+
+  it("interpolates the shared constants instead of inlining the class strings", () => {
+    expect(src).toMatch(/from "@shared\/blog-index-card"/);
+    for (const name of Object.keys(CARD_CLASS_CONSTANTS)) {
+      expect(src, `${name} must be interpolated into the card/grid HTML`).toContain(`\${${name}}`);
+    }
+    for (const [name, cls] of Object.entries(CARD_CLASS_CONSTANTS)) {
+      expect(src, `class list of ${name} must not be duplicated inline`).not.toContain(cls);
+    }
+    expect(src, "tag cap must come from BLOG_CARD_TAG_LIMIT").toContain(
+      ".slice(0, BLOG_CARD_TAG_LIMIT)",
+    );
   });
 });

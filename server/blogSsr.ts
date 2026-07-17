@@ -27,6 +27,21 @@ import {
   buildBlogCollectionJsonLd,
   type BlogIndexPostInput,
 } from "@shared/blog-index-seo";
+import {
+  BLOG_CARD_TAG_LIMIT,
+  BLOG_INDEX_GRID_CLASS,
+  BLOG_CARD_ARTICLE_CLASS,
+  BLOG_CARD_HERO_FRAME_CLASS,
+  BLOG_CARD_HERO_IMG_CLASS,
+  BLOG_CARD_BODY_CLASS,
+  BLOG_CARD_TAG_ROW_CLASS,
+  BLOG_CARD_TAG_CHIP_CLASS,
+  BLOG_CARD_TITLE_CLASS,
+  BLOG_CARD_DESCRIPTION_CLASS,
+  BLOG_CARD_FOOTER_CLASS,
+  formatBlogCardDate,
+  blogCardReadingTime,
+} from "@shared/blog-index-card";
 
 const SEO_BLOCK = /<!-- seo:start[\s\S]*?seo:end -->/;
 const ROOT_MARKER = '<div id="root">';
@@ -244,15 +259,7 @@ export function markdownToHtml(markdown: string): string {
 }
 
 function formatDate(date: string): string {
-  try {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return date;
-  }
+  return formatBlogCardDate(date);
 }
 
 function buildArticleHtml(post: GeneratedPost): string {
@@ -263,10 +270,7 @@ function buildArticleHtml(post: GeneratedPost): string {
       ? `<div class="rounded-2xl overflow-hidden border border-border mb-12 max-w-4xl"><img src="${escapeHtml(heroSrc)}" alt="${escapeHtml(post.title)}" fetchpriority="high" decoding="sync" width="1200" height="675" class="w-full h-auto object-cover" /></div>`
       : "";
   const tags = post.tags
-    .map(
-      (t) =>
-        `<span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">${escapeHtml(t)}</span>`,
-    )
+    .map((t) => `<span class="${BLOG_CARD_TAG_CHIP_CLASS}">${escapeHtml(t)}</span>`)
     .join("");
   const takeaways = post.keyTakeaways
     .map(
@@ -423,25 +427,22 @@ function buildIndexCardHtml(post: BlogIndexCard): string {
   const heroSrc = post.heroImage ? sanitizeUrl(post.heroImage) : "";
   const hero =
     heroSrc && heroSrc !== "#"
-      ? `<img src="${escapeHtml(heroSrc)}" alt="${escapeHtml(post.title)}" loading="lazy" class="w-full h-full object-cover" />`
+      ? `<img src="${escapeHtml(heroSrc)}" alt="${escapeHtml(post.title)}" loading="lazy" class="${BLOG_CARD_HERO_IMG_CLASS}" />`
       : "";
   const tags = post.tags
-    .slice(0, 2)
-    .map(
-      (t) =>
-        `<span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">${escapeHtml(t)}</span>`,
-    )
+    .slice(0, BLOG_CARD_TAG_LIMIT)
+    .map((t) => `<span class="${BLOG_CARD_TAG_CHIP_CLASS}">${escapeHtml(t)}</span>`)
     .join("");
   return `
-<article class="hud-corner glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col">
-  <a href="${escapeHtml(href)}" class="block"><div class="aspect-[1200/630] bg-muted overflow-hidden">${hero}</div></a>
-  <div class="p-6 flex flex-col flex-1">
-    <div class="flex flex-wrap gap-2 mb-3">${tags}</div>
-    <a href="${escapeHtml(href)}"><h2 class="text-xl font-bold text-foreground mb-2 hover:text-primary transition-colors">${escapeHtml(post.title)}</h2></a>
-    <p class="text-muted-foreground text-sm leading-relaxed mb-4 flex-1">${escapeHtml(post.description)}</p>
-    <div class="flex items-center justify-between text-xs text-muted-foreground/70 pt-4 border-t border-border">
-      <span>${escapeHtml(formatDate(post.date))}</span>
-      <span>${post.readingMinutes} min read</span>
+<article class="${BLOG_CARD_ARTICLE_CLASS}">
+  <a href="${escapeHtml(href)}" class="block"><div class="${BLOG_CARD_HERO_FRAME_CLASS}">${hero}</div></a>
+  <div class="${BLOG_CARD_BODY_CLASS}">
+    <div class="${BLOG_CARD_TAG_ROW_CLASS}">${tags}</div>
+    <a href="${escapeHtml(href)}"><h2 class="${BLOG_CARD_TITLE_CLASS}">${escapeHtml(post.title)}</h2></a>
+    <p class="${BLOG_CARD_DESCRIPTION_CLASS}">${escapeHtml(post.description)}</p>
+    <div class="${BLOG_CARD_FOOTER_CLASS}">
+      <span>${escapeHtml(formatBlogCardDate(post.date))}</span>
+      <span>${blogCardReadingTime(post.readingMinutes)}</span>
     </div>
   </div>
 </article>`;
@@ -459,7 +460,7 @@ function buildIndexPageHtml(posts: BlogIndexCard[]): string {
     </div>
   </header>
   <main class="container mx-auto px-6 pb-24 max-w-6xl">
-    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">${cards}</div>
+    <div class="${BLOG_INDEX_GRID_CLASS}">${cards}</div>
     <p class="mt-10"><a href="/" class="text-primary underline underline-offset-2">← Back to RxFit.ai</a></p>
   </main>
 </div>`;
