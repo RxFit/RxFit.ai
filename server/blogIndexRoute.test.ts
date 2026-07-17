@@ -245,4 +245,15 @@ describe("routes.ts wiring", () => {
     expect(registration![0]).toContain("getPublishedGeneratedPosts");
     expect(registration![0]).toContain("renderBlogIndexPage");
   });
+
+  it("passes the real, unit-tested MDX reader (not a re-inlined copy) into the handler", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "routes.ts"), "utf-8");
+    // The reader must come from the extracted, unit-tested module...
+    expect(source).toContain('from "./mdxIndexCards"');
+    // ...and routes.ts must not grow its own frontmatter parser or card
+    // mapper again (the exact regression this extraction closed: an inline
+    // copy would be invisible to mdxIndexCards.test.ts).
+    expect(source).not.toContain("function parseFrontmatter");
+    expect(source).not.toMatch(/readingMinutes:\s*Math\.max/);
+  });
 });

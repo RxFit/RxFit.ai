@@ -11,11 +11,10 @@ import { sendWelcomeEmail, sendLeadEmail } from "./emailService";
 import { appendLeadToSheet } from "./sheetsService";
 import fs from "fs";
 import path from "path";
-import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
 import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { buildRobotsTxt } from "./robots";
-import { renderGeneratedPostPage, renderBlogIndexPage, type BlogIndexCard } from "./blogSsr";
+import { renderGeneratedPostPage, renderBlogIndexPage } from "./blogSsr";
 import { createBlogSlugHandler } from "./blogSlugRoute";
 import { createBlogIndexHandler } from "./blogIndexRoute";
 import { getHeroImageBytes } from "./heroImage";
@@ -30,12 +29,7 @@ import {
   createPricingThrottleReporter,
 } from "./stripeRateLimits";
 import { createEmailPreviewsHandler } from "./emailPreviewRoute";
-
-function parseFrontmatter(raw: string): Record<string, any> {
-  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return {};
-  return parseYaml(m[1]) ?? {};
-}
+import { parseFrontmatter, readMdxIndexCards } from "./mdxIndexCards";
 
 const leadsRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -387,38 +381,16 @@ export async function registerRoutes(
   // without this, crawlers that don't run JS never see them in the index's
   // card grid or Blog/ItemList JSON-LD. Renders the merged (MDX + DB) post
   // list on request; falls through (next()) to the prerendered static file
-  // when the DB or the SSR template is unavailable.
-  const readMdxIndexCards = (): BlogIndexCard[] => {
-    const dir = path.resolve(process.cwd(), "content", "blog");
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".mdx"));
-    return files
-      .map((file) => {
-        const raw = fs.readFileSync(path.join(dir, file), "utf-8");
-        const fm = parseFrontmatter(raw);
-        const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---/, "");
-        const words = body.split(/\s+/).filter(Boolean).length;
-        return {
-          slug: (fm.slug as string) || file.replace(/\.mdx$/, ""),
-          title: (fm.title as string) || "",
-          description: (fm.description as string) || "",
-          date: (fm.date as string) || "",
-          updatedDate: (fm.updatedDate as string) || undefined,
-          heroImage: (fm.heroImage as string) || undefined,
-          author: (fm.author as string) || "",
-          tags: Array.isArray(fm.tags) ? (fm.tags as string[]) : [],
-          readingMinutes: Math.max(1, Math.round(words / 200)),
-        };
-      })
-      .filter((p) => p.title && !p.slug.startsWith("_"));
-  };
-
+  // when the DB or the SSR template is unavailable. The MDX reader lives in
+  // server/mdxIndexCards.ts (unit-tested in mdxIndexCards.test.ts) so a
+  // frontmatter/filter regression can't silently drop hand-written posts.
   // Merge/sort/fall-through logic lives in createBlogIndexHandler
   // (server/blogIndexRoute.ts) so the contract is route-level tested in
   // server/blogIndexRoute.test.ts.
   app.get(
     "/blog",
     createBlogIndexHandler({
-      readMdxCards: readMdxIndexCards,
+      readMdxCards: () => readMdxIndexCards(),
       getPublishedPosts: () => storage.getPublishedGeneratedPosts(),
       renderPage: (posts) => renderBlogIndexPage(posts),
     }),
