@@ -23,6 +23,7 @@ import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServi
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
 import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
+import { createEmailPreviewsHandler } from "./emailPreviewRoute";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -273,6 +274,8 @@ export async function registerRoutes(
       return res.status(500).json({ message: "Health check run failed." });
     }
   });
+
+  app.get("/api/internal/email-previews", createEmailPreviewsHandler());
 
   // ---- AI-generated blog posts (DB-backed, live without redeploy) ----
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Seo } from "@/lib/seo";
-import { ShieldCheck, ShieldAlert, ShieldQuestion, RefreshCw, LogOut, Loader2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldQuestion, RefreshCw, LogOut, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
 const KEY_STORAGE = "rxfit_admin_key";
 
@@ -13,6 +13,26 @@ type ServiceStatus = {
 type HealthResponse = {
   services: Record<"stripe" | "gmail" | "sheets" | "products" | "pricing", ServiceStatus>;
   checkedAt: string;
+};
+
+type EmailPreview = {
+  name: string;
+  brand: "gold" | "alert";
+  html: string;
+};
+
+type EmailPreviewsResponse = {
+  templates: EmailPreview[];
+};
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  welcome: "Welcome (new customer)",
+  leadWelcome: "Lead nurture",
+  postPublished: "Blog post published",
+  postRefreshed: "Blog post refreshed",
+  alertsDigest: "Weekly alerts digest",
+  postFailure: "Blog publish failure",
+  credentialAlert: "Credential alert",
 };
 
 type Lead = {
@@ -75,6 +95,8 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [previews, setPreviews] = useState<EmailPreview[] | null>(null);
+  const [openPreview, setOpenPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,6 +106,7 @@ export default function AdminPage() {
     setKey(null);
     setHealth(null);
     setLeads(null);
+    setPreviews(null);
     setAuthError(null);
   }, []);
 
@@ -92,12 +115,14 @@ export default function AdminPage() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [h, l] = await Promise.all([
+        const [h, l, p] = await Promise.all([
           adminFetch<HealthResponse>("/api/internal/credential-health", k),
           adminFetch<Lead[]>("/api/leads", k),
+          adminFetch<EmailPreviewsResponse>("/api/internal/email-previews", k),
         ]);
         setHealth(h);
         setLeads(l);
+        setPreviews(p.templates);
       } catch (e) {
         if (e instanceof Error && e.message === "unauthorized") {
           logout();
@@ -241,6 +266,65 @@ export default function AdminPage() {
                   <p className="text-sm text-muted-foreground">{loading ? "Loading…" : "No data."}</p>
                 )}
               </div>
+            </section>
+
+            <section>
+              <h2 className="font-display text-lg font-semibold mb-1">Email previews</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                How each customer email looks, rendered with sample data. Preview only — nothing is sent.
+              </p>
+              {previews && previews.length > 0 ? (
+                <div className="space-y-3">
+                  {previews.map((tpl) => {
+                    const isOpen = openPreview === tpl.name;
+                    return (
+                      <div
+                        key={tpl.name}
+                        className="glass rounded-lg border border-border"
+                        data-testid={`card-email-${tpl.name}`}
+                      >
+                        <button
+                          onClick={() => setOpenPreview(isOpen ? null : tpl.name)}
+                          className="w-full flex items-center justify-between gap-2 p-4 text-left"
+                          data-testid={`button-preview-${tpl.name}`}
+                        >
+                          <span className="text-sm font-medium">
+                            {TEMPLATE_LABELS[tpl.name] ?? tpl.name}
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span
+                              className={`text-xs font-mono uppercase tracking-wide ${tpl.brand === "alert" ? "text-red-500" : "text-primary"}`}
+                              data-testid={`text-brand-${tpl.name}`}
+                            >
+                              {tpl.brand === "alert" ? "Alert" : "Gold"}
+                            </span>
+                            {isOpen ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </span>
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-border p-2 bg-white rounded-b-lg">
+                            <iframe
+                              title={`Preview: ${TEMPLATE_LABELS[tpl.name] ?? tpl.name}`}
+                              srcDoc={tpl.html}
+                              sandbox=""
+                              className="w-full h-[480px] border-0"
+                              data-testid={`iframe-preview-${tpl.name}`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {loading ? "Loading…" : "No data."}
+                </p>
+              )}
             </section>
 
             <section>

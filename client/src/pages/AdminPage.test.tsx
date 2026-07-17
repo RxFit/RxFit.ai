@@ -34,6 +34,13 @@ const LEADS_BODY = [
   { id: "lead-2", email: "grace@example.com", name: null, plan: null, createdAt: "2026-07-14T09:00:00.000Z" },
 ];
 
+const PREVIEWS_BODY = {
+  templates: [
+    { name: "welcome", brand: "gold", html: "<html><body>Sample welcome</body></html>" },
+    { name: "credentialAlert", brand: "alert", html: "<html><body>Sample alert</body></html>" },
+  ],
+};
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
@@ -76,6 +83,7 @@ describe("AdminPage auth handling", () => {
     fetchMock.mockImplementation(async (path: string) => {
       if (path === "/api/internal/credential-health") return jsonResponse(200, HEALTH_BODY);
       if (path === "/api/leads") return jsonResponse(200, LEADS_BODY);
+      if (path === "/api/internal/email-previews") return jsonResponse(200, PREVIEWS_BODY);
       throw new Error(`unexpected fetch: ${path}`);
     });
 
@@ -105,6 +113,15 @@ describe("AdminPage auth handling", () => {
     expect(screen.getByTestId("row-lead-lead-1").textContent).toContain("ada@example.com");
     expect(screen.getByTestId("row-lead-lead-2").textContent).toContain("grace@example.com");
     expect(screen.getByText(/Recent leads \(2\)/)).toBeTruthy();
+
+    // Email previews: one card per template, iframe only after expanding.
+    expect(screen.getByTestId("card-email-welcome")).toBeTruthy();
+    expect(screen.getByTestId("card-email-credentialAlert")).toBeTruthy();
+    expect(screen.queryByTestId("iframe-preview-welcome")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-preview-welcome"));
+    const frame = screen.getByTestId("iframe-preview-welcome") as HTMLIFrameElement;
+    expect(frame.getAttribute("srcdoc")).toContain("Sample welcome");
+    expect(frame.getAttribute("sandbox")).toBe("");
 
     // No auth error and the key form is gone.
     expect(screen.queryByTestId("text-auth-error")).toBeNull();
