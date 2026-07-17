@@ -22,6 +22,7 @@ import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
+import { createCheckoutHandler } from "./checkoutRoute";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -119,52 +120,13 @@ export async function registerRoutes(
     }),
   );
 
-  app.post("/api/stripe/checkout", async (req, res) => {
-    try {
-      const { priceId, email, name, plan, clientReferenceId } = req.body;
-
-      if (!priceId) {
-        return res.status(400).json({ message: "Price ID is required." });
-      }
-
-      const existing = await storage.getLeadByEmail(email);
-      if (!existing && email) {
-        try {
-          await storage.createLead({ email, name: name || undefined, plan: plan || 'kickstart' });
-        } catch (e) {
-        }
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const priceObj = await stripe.prices.retrieve(priceId);
-
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-      const sessionParams: any = {
-        payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/#pricing`,
-        allow_promotion_codes: true,
-      };
-      sessionParams.mode = priceObj.recurring ? 'subscription' : 'payment';
-
-      if (email) {
-        sessionParams.customer_email = email;
-      }
-
-      if (clientReferenceId && typeof clientReferenceId === 'string') {
-        sessionParams.client_reference_id = clientReferenceId.slice(0, 200);
-      }
-
-      const session = await stripe.checkout.sessions.create(sessionParams);
-
-      return res.json({ url: session.url });
-    } catch (error: any) {
-      console.error("Error creating checkout session:", { priceId: req.body.priceId, error: error.message, code: error.code, type: error.type });
-      return res.status(500).json({ message: "Failed to create checkout session." });
-    }
-  });
+  app.post(
+    "/api/stripe/checkout",
+    createCheckoutHandler({
+      getStripeClient: getUncachableStripeClient,
+      leadStore: storage,
+    })
+  );
 
   // Track sessions whose post-purchase side effects have already been fired.
   // An in-memory Set is sufficient: side effects are idempotent at the business
