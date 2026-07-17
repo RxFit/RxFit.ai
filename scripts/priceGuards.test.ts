@@ -11,6 +11,7 @@ import {
   scanCodeForHardcodedPrices,
   scanMdxPriceClaims,
   scanFaqPriceClaims,
+  scanSummaryPriceClaims,
 } from "./priceGuards.mjs";
 
 const PRICING = { amounts: [49, 490, 997], savings: [98], trialDays: 7 };
@@ -131,6 +132,52 @@ describe("scanMdxPriceClaims", () => {
   });
 });
 
+describe("scanSummaryPriceClaims", () => {
+  it("flags a wrong RxFit price in each summary field with a per-field label", () => {
+    const errs = scanSummaryPriceClaims(PRICING, "generated_posts/x", {
+      tldr: "RxFit costs just $59 per month.",
+      description: "RxFit plans start at $59 with coaching included.",
+      keyTakeaways: ["Sleep matters.", "RxFit is $59 a month."],
+    });
+    expect(errs).toHaveLength(3);
+    expect(errs[0]).toContain("generated_posts/x: tldr");
+    expect(errs[1]).toContain("generated_posts/x: description");
+    expect(errs[2]).toContain("generated_posts/x: keyTakeaways[1]");
+    expect(errs.every((e: string) => e.includes('"$59"'))).toBe(true);
+  });
+
+  it("flags stale trial-length claims in any field, RxFit mention or not", () => {
+    const errs = scanSummaryPriceClaims(PRICING, "x", {
+      tldr: "Start with the 14-day free trial.",
+      description: "You can train free for 30 days.",
+      keyTakeaways: ["A 21-day free trial beats none."],
+    });
+    expect(errs).toHaveLength(3);
+    expect(errs.every((e: string) => e.includes("trialDays"))).toBe(true);
+  });
+
+  it("accepts current prices in RxFit sentences and competitor prices in non-RxFit sentences", () => {
+    const errs = scanSummaryPriceClaims(PRICING, "x", {
+      tldr: "RxFit starts at $49 a month with a 7-day free trial.",
+      description: "A personal trainer costs $400 per month. RxFit is $490 a year (save $98).",
+      keyTakeaways: ["Trainers charge $500+ monthly.", "RxFit is $997 one-time for Transformation."],
+    });
+    expect(errs).toEqual([]);
+  });
+
+  it("handles missing or malformed fields without throwing", () => {
+    expect(scanSummaryPriceClaims(PRICING, "x", {})).toEqual([]);
+    expect(scanSummaryPriceClaims(PRICING, "x", null as never)).toEqual([]);
+    expect(
+      scanSummaryPriceClaims(PRICING, "x", {
+        tldr: null,
+        description: undefined,
+        keyTakeaways: [null, 42, "RxFit costs $49."] as never,
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("scanFaqPriceClaims", () => {
   it("flags a wrong price in the answer when only the question names RxFit", () => {
     const errs = scanFaqPriceClaims(PRICING, "generated_posts/x", [
@@ -174,11 +221,14 @@ describe("validate-seo.mjs wiring", () => {
     expect(src).toContain("scanMdxPriceClaims(");
   });
 
-  it("re-validates DB-published posts' price claims (body + faq) in the DB gate", () => {
+  it("re-validates DB-published posts' price claims (body + faq + summary fields) in the DB gate", () => {
     const src = fs.readFileSync(path.resolve(__dirname, "validate-seo.mjs"), "utf8");
     expect(src).toContain("scanFaqPriceClaims(");
-    // The DB gate must fetch the faq column and receive the parsed pricing.
-    expect(src).toMatch(/SELECT slug, body_markdown, faq FROM generated_posts/);
+    expect(src).toContain("scanSummaryPriceClaims(");
+    // The DB gate must fetch every scanned column and receive the parsed pricing.
+    expect(src).toMatch(
+      /SELECT slug, body_markdown, faq, tldr, description, key_takeaways FROM generated_posts/,
+    );
     expect(src).toMatch(/validateDbPostLinks\(planPricing,/);
   });
 

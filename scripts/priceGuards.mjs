@@ -109,6 +109,35 @@ export function scanMdxPriceClaims(pricing, file, body) {
 }
 
 /**
+ * Summary-surface price claims: a draft's tldr, description, and
+ * keyTakeaways render on the live post (and description in meta tags), so a
+ * wrong RxFit price or trial length there would ship just as silently as in
+ * the body. Runs the SAME body scanner per field with a per-field label so
+ * retry feedback (and build-gate errors) name exactly which surface to fix.
+ * Same policy as the body scan: trial claims are checked everywhere, dollar
+ * amounts only in sentences that mention RxFit (competitor prices in
+ * non-RxFit sentences stay legal). Used by validateDraft at publish time AND
+ * by the validate-seo DB gate after price changes.
+ * Returns error strings (empty = clean); tolerates missing/malformed fields.
+ */
+export function scanSummaryPriceClaims(pricing, file, fields) {
+  const out = [];
+  const { tldr, description, keyTakeaways } = fields ?? {};
+  if (typeof tldr === "string" && tldr) {
+    out.push(...scanMdxPriceClaims(pricing, `${file}: tldr`, tldr));
+  }
+  if (typeof description === "string" && description) {
+    out.push(...scanMdxPriceClaims(pricing, `${file}: description`, description));
+  }
+  (Array.isArray(keyTakeaways) ? keyTakeaways : []).forEach((takeaway, i) => {
+    if (typeof takeaway === "string" && takeaway) {
+      out.push(...scanMdxPriceClaims(pricing, `${file}: keyTakeaways[${i}]`, takeaway));
+    }
+  });
+  return out;
+}
+
+/**
  * FAQ price claims: each q/a pair is checked as ONE unit (the question
  * usually names RxFit while the answer carries the price, so sentence-level
  * scanning would miss it). Trial-length claims are checked in every pair;

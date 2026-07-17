@@ -4,8 +4,9 @@
  * - findStalePricePosts reuses the SAME priceGuards scanners as the
  *   validate-seo build gate, so "stale" here is exactly what fails a build
  *   after a PLAN_PRICING change: wrong RxFit dollar amounts in the body,
- *   wrong trial-length claims in body or FAQ. Non-RxFit (competitor)
- *   sentences are never flagged.
+ *   wrong trial-length claims in body or FAQ, and stale claims on the
+ *   summary surfaces (tldr/description/keyTakeaways). Non-RxFit
+ *   (competitor) sentences are never flagged.
  * - refreshStalePricePosts refreshes each stale post through the injected
  *   refresh pipeline, never touches clean posts, continues past a single
  *   failure, and throws an aggregate error at the end so scheduler/CLI runs
@@ -77,6 +78,28 @@ describe("findStalePricePosts", () => {
     expect(result).toHaveLength(1);
     expect(result[0].slug).toBe("old-trial-faq");
     expect(result[0].errors.join("\n")).toContain("14-day free trial");
+  });
+
+  it("flags a post whose ONLY stale claims live in the summary surfaces (tldr/description/keyTakeaways)", () => {
+    const stale = post({
+      slug: "old-price-summary",
+      tldr: "RxFit is $777 per month.",
+      description: "RxFit membership now runs $888 monthly for everyone.",
+      keyTakeaways: ["RxFit includes a 21-day free trial."],
+      // Body and FAQ are clean — detection must come from the summary scan.
+      bodyMarkdown: "## Heading\n\nNeutral body with no price claims.",
+      faq: [],
+    });
+    const result = findStalePricePosts([stale], PRICING);
+    expect(result).toHaveLength(1);
+    expect(result[0].slug).toBe("old-price-summary");
+    const joined = result[0].errors.join("\n");
+    expect(joined).toContain("/blog/old-price-summary: tldr");
+    expect(joined).toContain("/blog/old-price-summary: description");
+    expect(joined).toContain("/blog/old-price-summary: keyTakeaways[0]");
+    expect(joined).toContain("$777");
+    expect(joined).toContain("$888");
+    expect(joined).toContain("21-day free trial");
   });
 
   it("does not flag current prices or competitor prices in non-RxFit sentences", () => {

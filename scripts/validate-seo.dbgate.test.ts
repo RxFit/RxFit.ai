@@ -72,10 +72,14 @@ describe("validate-seo DB broken-link gate", () => {
       pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
       // $53 is not a PLAN_PRICING amount/savings and 14 days is not the
       // current trial length — both must fail the build until refreshed.
+      // Stale claims are planted in EVERY scanned surface (body, faq, tldr,
+      // description, keyTakeaways) so the gate must name each one.
       await pool.query(
         `INSERT INTO generated_posts
-           (slug, title, description, keyword_theme, pillar, author, tldr, body_markdown, faq, status, date)
-         VALUES ($1, 'Test post', 'test', 'test', 'test', 'Test', 'test',
+           (slug, title, description, keyword_theme, pillar, author, tldr, key_takeaways, body_markdown, faq, status, date)
+         VALUES ($1, 'Test post', 'RxFit plans start at $53 monthly.', 'test', 'test', 'Test',
+                 'RxFit is $53 per month.',
+                 ARRAY['RxFit now costs $53 monthly.'],
                  'RxFit costs just $53 per month. See [pricing](/#pricing) for details.',
                  '[{"q": "Does RxFit have a free trial?", "a": "Yes — a 14-day free trial."}]'::jsonb,
                  'published', '2026-01-01')`,
@@ -88,12 +92,16 @@ describe("validate-seo DB broken-link gate", () => {
       await pool.end();
     });
 
-    it("fails the build naming the stale price and trial claims", async () => {
+    it("fails the build naming the stale price and trial claims on every surface", async () => {
       const { code, out } = await runScript({});
       expect(code).toBe(1);
       expect(out).toContain(`generated_posts/${slug}`);
       expect(out).toContain('"$53"');
       expect(out).toContain("14-day free trial");
+      // Per-field labels from the summary-surface scan.
+      expect(out).toContain(`generated_posts/${slug}: tldr`);
+      expect(out).toContain(`generated_posts/${slug}: description`);
+      expect(out).toContain(`generated_posts/${slug}: keyTakeaways[0]`);
     }, 120_000);
   });
 

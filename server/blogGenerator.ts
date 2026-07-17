@@ -28,6 +28,7 @@ import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 import {
   scanMdxPriceClaims,
   scanFaqPriceClaims,
+  scanSummaryPriceClaims,
   type GuardPricing,
 } from "../scripts/priceGuards.mjs";
 
@@ -331,6 +332,16 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
   if (Array.isArray(draft.faq)) {
     errors.push(...scanFaqPriceClaims(guardPricing, "draft", draft.faq));
   }
+  // tldr/description/keyTakeaways render on the live post too (description
+  // also in meta tags) — a wrong price there ships just as silently as in
+  // the body, so they get the same scanners with per-field error labels.
+  errors.push(
+    ...scanSummaryPriceClaims(guardPricing, "draft", {
+      tldr: draft.tldr,
+      description: draft.description,
+      keyTakeaways: draft.keyTakeaways,
+    }),
+  );
   if (draft.description && (draft.description.length < 100 || draft.description.length > 180)) {
     errors.push(`description is ${draft.description.length} chars (want 100-180)`);
   }

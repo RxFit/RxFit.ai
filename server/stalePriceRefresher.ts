@@ -1,13 +1,15 @@
 /**
  * Stale-price auto-refresh: after a PLAN_PRICING change deploys, any live
- * AI-published post whose body/FAQ still quotes the OLD prices is detected
- * and refreshed through the existing blogRefresher pipeline (slug/URL never
- * changes, same validation gates — which re-run these very scanners, so the
- * refreshed post is guaranteed price-correct or the refresh fails loudly).
+ * AI-published post whose body/FAQ/summary surfaces still quote the OLD
+ * prices is detected and refreshed through the existing blogRefresher
+ * pipeline (slug/URL never changes, same validation gates — which re-run
+ * these very scanners, so the refreshed post is guaranteed price-correct
+ * or the refresh fails loudly).
  *
  * Detection reuses the SAME scanners as the validate-seo build gate and
- * publish-time validateDraft (scanMdxPriceClaims / scanFaqPriceClaims from
- * scripts/priceGuards.mjs with live pricing from currentGuardPricing), so
+ * publish-time validateDraft (scanMdxPriceClaims / scanFaqPriceClaims /
+ * scanSummaryPriceClaims from scripts/priceGuards.mjs with live pricing
+ * from currentGuardPricing), so
  * "stale" here is exactly the condition that fails `npm run build` — once
  * the refreshes complete, `node scripts/validate-seo.mjs` passes again
  * without manual work.
@@ -23,6 +25,7 @@ import { currentGuardPricing } from "./blogGenerator";
 import {
   scanMdxPriceClaims,
   scanFaqPriceClaims,
+  scanSummaryPriceClaims,
   type GuardPricing,
 } from "../scripts/priceGuards.mjs";
 import type { GeneratedPost } from "@shared/schema";
@@ -33,8 +36,12 @@ export interface StalePricePost {
 }
 
 /**
- * Pure detection: returns the published posts whose body or FAQ price/trial
- * claims no longer match the given pricing, with the exact scanner errors.
+ * Pure detection: returns the published posts whose body, FAQ, or summary
+ * surfaces (tldr/description/keyTakeaways — they render on the live post
+ * too) carry price/trial claims that no longer match the given pricing,
+ * with the exact scanner errors. Must scan the SAME surfaces as the
+ * validate-seo DB gate, or a stale post could block builds without ever
+ * being auto-refreshed.
  */
 export function findStalePricePosts(
   posts: GeneratedPost[],
@@ -45,6 +52,11 @@ export function findStalePricePosts(
     const errors = [
       ...scanMdxPriceClaims(pricing, label, post.bodyMarkdown ?? ""),
       ...scanFaqPriceClaims(pricing, label, Array.isArray(post.faq) ? post.faq : []),
+      ...scanSummaryPriceClaims(pricing, label, {
+        tldr: post.tldr,
+        description: post.description,
+        keyTakeaways: post.keyTakeaways,
+      }),
     ];
     return errors.length > 0 ? [{ slug: post.slug, errors }] : [];
   });

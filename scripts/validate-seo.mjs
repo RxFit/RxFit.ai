@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims, scanFaqPriceClaims } from "./priceGuards.mjs";
+import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims, scanFaqPriceClaims, scanSummaryPriceClaims } from "./priceGuards.mjs";
 import { loadSiteOrigins } from "./siteConfig.mjs";
 import { dbSslConfig } from "../shared/db-ssl.mjs";
 
@@ -637,7 +637,7 @@ async function validateDbPostLinks(pricing, mdxSlugs, staticRoutes) {
   });
   try {
     const { rows } = await pool.query(
-      `SELECT slug, body_markdown, faq FROM generated_posts WHERE status = 'published'`,
+      `SELECT slug, body_markdown, faq, tldr, description, key_takeaways FROM generated_posts WHERE status = 'published'`,
     );
     const allSlugs = new Set([...mdxSlugs, ...rows.map((r) => r.slug)]);
     for (const row of rows) {
@@ -646,6 +646,13 @@ async function validateDbPostLinks(pricing, mdxSlugs, staticRoutes) {
       if (pricing) {
         for (const e of scanMdxPriceClaims(pricing, label, row.body_markdown ?? "")) errors.push(e);
         for (const e of scanFaqPriceClaims(pricing, label, Array.isArray(row.faq) ? row.faq : [])) errors.push(e);
+        // tldr/description/keyTakeaways render on the live post (description
+        // in meta tags too) — same drift risk as body/FAQ after a price change.
+        for (const e of scanSummaryPriceClaims(pricing, label, {
+          tldr: row.tldr,
+          description: row.description,
+          keyTakeaways: row.key_takeaways,
+        })) errors.push(e);
       }
     }
     console.log(`Checked internal links and price claims in ${rows.length} DB-published post(s).`);

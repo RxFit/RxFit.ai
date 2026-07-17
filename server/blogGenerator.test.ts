@@ -245,6 +245,50 @@ describe("validateDraft price-claim enforcement", () => {
     ];
     expect(validateDraft(makeDraft({ faq }), noSlugs)).toEqual([]);
   });
+
+  it("rejects a wrong RxFit price in the tldr with a per-field label", () => {
+    const errors = validateDraft(
+      makeDraft({ tldr: `RxFit costs just $${wrongPrice} per month for full coaching.` }),
+      noSlugs,
+    );
+    expect(errors.some((e) => e.includes("draft: tldr") && e.includes(`"$${wrongPrice}"`))).toBe(true);
+  });
+
+  it("rejects a wrong RxFit price in the description with a per-field label", () => {
+    const description = `RxFit pairs wearable data with a real human coach for $${wrongPrice} per month — see why members stay consistent far longer than app-only users.`;
+    const errors = validateDraft(makeDraft({ description }), noSlugs);
+    expect(
+      errors.some((e) => e.includes("draft: description") && e.includes(`"$${wrongPrice}"`)),
+    ).toBe(true);
+  });
+
+  it("rejects a stale trial claim in a keyTakeaway with an indexed label", () => {
+    const errors = validateDraft(
+      makeDraft({
+        keyTakeaways: [
+          "Takeaway one.",
+          `Start with the ${wrongTrial}-day free trial.`,
+          "Takeaway three.",
+        ],
+      }),
+      noSlugs,
+    );
+    expect(
+      errors.some((e) => e.includes("draft: keyTakeaways[1]") && e.includes("trialDays")),
+    ).toBe(true);
+  });
+
+  it("accepts current prices in summary fields and competitor prices in non-RxFit sentences", () => {
+    const draft = makeDraft({
+      tldr: `RxFit costs $${price} per month with a ${trial}-day free trial included.`,
+      keyTakeaways: [
+        "A personal trainer charges $400+ monthly.",
+        `RxFit is $${price} per month.`,
+        "Consistency beats intensity.",
+      ],
+    });
+    expect(validateDraft(draft, noSlugs)).toEqual([]);
+  });
 });
 
 describe("buildRetryFeedback", () => {

@@ -19,6 +19,16 @@ export function scanCodeForHardcodedPrices(
 
 export function scanMdxPriceClaims(pricing: GuardPricing, file: string, body: string): string[];
 
+export function scanSummaryPriceClaims(
+  pricing: GuardPricing,
+  file: string,
+  fields: {
+    tldr?: string | null;
+    description?: string | null;
+    keyTakeaways?: ReadonlyArray<string | null | undefined> | null;
+  },
+): string[];
+
 export function scanFaqPriceClaims(
   pricing: GuardPricing,
   file: string,
