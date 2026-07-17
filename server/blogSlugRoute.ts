@@ -4,6 +4,15 @@ import type { GeneratedPost } from "@shared/schema";
 export interface BlogSlugRouteDeps {
   getPostBySlug: (slug: string) => Promise<GeneratedPost | undefined>;
   renderPage: (post: GeneratedPost) => string | null;
+  /**
+   * Optional event-driven health reporter (reportBlogSsrServing in
+   * server/credentialHealthCheck.ts): called with `true` after a published
+   * DB post is served as crawler HTML, `false` when storage/render throws
+   * and the route degrades to the SPA shell (crawlers silently get thin
+   * client-side HTML for every AI post while the outage lasts). Called
+   * fire-and-forget so monitoring can never break the route.
+   */
+  reportServing?: (ok: boolean, error?: unknown) => Promise<void>;
 }
 
 /**
@@ -22,7 +31,16 @@ export interface BlogSlugRouteDeps {
  *   SPA shell instead of a 500 for crawlers)
  */
 export function createBlogSlugHandler(deps: BlogSlugRouteDeps) {
-  const { getPostBySlug, renderPage } = deps;
+  const { getPostBySlug, renderPage, reportServing } = deps;
+
+  // Fire-and-forget: monitoring must never break (or delay) the route.
+  const report = (ok: boolean, error?: unknown) => {
+    try {
+      void reportServing?.(ok, error)?.catch(() => {});
+    } catch {
+      // ignore — reporter must never affect the response
+    }
+  };
 
   return async function blogSlugHandler(
     req: Request<{ slug: string }>,
@@ -34,9 +52,11 @@ export function createBlogSlugHandler(deps: BlogSlugRouteDeps) {
       if (!post || post.status !== "published") return next();
       const page = renderPage(post);
       if (!page) return next();
+      report(true);
       return res.status(200).type("html").send(page);
     } catch (error) {
       console.error("Error rendering generated post page:", error);
+      report(false, error);
       return next();
     }
   };

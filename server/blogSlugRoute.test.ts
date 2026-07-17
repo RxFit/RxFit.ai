@@ -164,6 +164,78 @@ describe("GET /blog/:slug dispatch", () => {
   });
 });
 
+describe("blog SSR health reporting (reportServing)", () => {
+  it("reports ok=true after serving a published DB post as crawler HTML", async () => {
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    const { res } = await run({
+      getPostBySlug: vi.fn().mockResolvedValue(POST),
+      renderPage: (post) => renderGeneratedPostPage(post, TEMPLATE),
+      reportServing,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(reportServing).toHaveBeenCalledTimes(1);
+    expect(reportServing).toHaveBeenCalledWith(true, undefined);
+  });
+
+  it("reports ok=false with the error on the storage-throw path", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    const boom = new Error("db down");
+    const { next } = await run({
+      getPostBySlug: vi.fn().mockRejectedValue(boom),
+      renderPage: vi.fn(),
+      reportServing,
+    });
+    errorSpy.mockRestore();
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(reportServing).toHaveBeenCalledTimes(1);
+    expect(reportServing).toHaveBeenCalledWith(false, boom);
+  });
+
+  it("does NOT report on DB-miss, draft, or render-null fall-throughs (not outages)", async () => {
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+
+    await run(
+      { getPostBySlug: vi.fn().mockResolvedValue(undefined), renderPage: vi.fn(), reportServing },
+      "unknown-slug",
+    );
+    await run({
+      getPostBySlug: vi.fn().mockResolvedValue({ ...POST, status: "draft" }),
+      renderPage: vi.fn(),
+      reportServing,
+    });
+    await run({
+      getPostBySlug: vi.fn().mockResolvedValue(POST),
+      renderPage: () => null,
+      reportServing,
+    });
+
+    expect(reportServing).not.toHaveBeenCalled();
+  });
+
+  it("never breaks the route when the reporter rejects or throws (fire-and-forget)", async () => {
+    const rejecting = vi.fn().mockRejectedValue(new Error("monitoring down"));
+    const { res } = await run({
+      getPostBySlug: vi.fn().mockResolvedValue(POST),
+      renderPage: (post) => renderGeneratedPostPage(post, TEMPLATE),
+      reportServing: rejecting,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const throwing = vi.fn().mockImplementation(() => {
+      throw new Error("sync throw");
+    });
+    const second = await run({
+      getPostBySlug: vi.fn().mockResolvedValue(POST),
+      renderPage: (post) => renderGeneratedPostPage(post, TEMPLATE),
+      reportServing: throwing,
+    });
+    expect(second.res.statusCode).toBe(200);
+  });
+});
+
 describe("routes.ts wiring", () => {
   it("registers /blog/:slug with createBlogSlugHandler (dispatch can't silently revert to an untested inline handler)", () => {
     const source = fs.readFileSync(path.resolve(__dirname, "routes.ts"), "utf-8");
@@ -173,5 +245,8 @@ describe("routes.ts wiring", () => {
     expect(registration![0]).toContain("createBlogSlugHandler");
     expect(registration![0]).toContain("getGeneratedPostBySlug");
     expect(registration![0]).toContain("renderGeneratedPostPage");
+    // The blog-SSR health monitor must stay wired: without it a DB outage
+    // silently serves crawlers the SPA shell with no owner alert.
+    expect(registration![0]).toContain("reportBlogSsrServing");
   });
 });

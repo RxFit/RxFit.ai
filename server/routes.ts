@@ -20,7 +20,7 @@ import { createBlogSlugHandler } from "./blogSlugRoute";
 import { createBlogIndexHandler } from "./blogIndexRoute";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
-import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
+import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing, reportBlogSsrServing } from "./credentialHealthCheck";
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
 import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
@@ -436,6 +436,7 @@ export async function registerRoutes(
     createBlogSlugHandler({
       getPostBySlug: (slug) => storage.getGeneratedPostBySlug(slug),
       renderPage: renderGeneratedPostPage,
+      reportServing: reportBlogSsrServing,
     }),
   );
 

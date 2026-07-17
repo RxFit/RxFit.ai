@@ -31,7 +31,7 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
 const RETRY_DELAY_MS = 15 * 1000;
 
-export type ServiceName = "stripe" | "gmail" | "sheets" | "products" | "pricing";
+export type ServiceName = "stripe" | "gmail" | "sheets" | "products" | "pricing" | "blogSsr";
 
 type ServiceState = { healthy: boolean; alerted: boolean };
 
@@ -41,6 +41,7 @@ const state: Record<ServiceName, ServiceState> = {
   sheets: { healthy: true, alerted: false },
   products: { healthy: true, alerted: false },
   pricing: { healthy: true, alerted: false },
+  blogSsr: { healthy: true, alerted: false },
 };
 
 /** On-demand status metadata (per service), surfaced by the internal
@@ -57,6 +58,7 @@ const status: Record<ServiceName, ServiceStatus> = {
   sheets: { healthy: null, lastCheckedAt: null, lastError: null },
   products: { healthy: null, lastCheckedAt: null, lastError: null },
   pricing: { healthy: null, lastCheckedAt: null, lastError: null },
+  blogSsr: { healthy: null, lastCheckedAt: null, lastError: null },
 };
 
 export interface CredentialHealthStatus {
@@ -73,6 +75,7 @@ export function getCredentialHealthStatus(): CredentialHealthStatus {
       sheets: { ...status.sheets },
       products: { ...status.products },
       pricing: { ...status.pricing },
+      blogSsr: { ...status.blogSsr },
     },
     checkedAt: new Date().toISOString(),
   };
@@ -334,6 +337,30 @@ export async function reportPricingServing(ok: boolean, error?: unknown): Promis
   } catch (e) {
     // Never let monitoring break the products endpoint itself.
     console.error("[credential-check] Failed to record pricing serving outcome:", e);
+  }
+}
+
+/**
+ * Event-driven blog-SSR monitor, reported from the GET /blog/:slug handler
+ * (server/blogSlugRoute.ts): `ok=false` when storage threw and the route
+ * degraded to the SPA shell — visitors still get a page, but crawlers are
+ * silently served thin client-side HTML for every AI-published post while
+ * the outage lasts; `ok=true` when a published DB post was served as full
+ * crawler HTML. Uses the same healthy→broken transition + alert chain
+ * (email → sheet fallback) as the periodic checks, so the owner is alerted
+ * once per outage and recovery resets the state.
+ */
+export async function reportBlogSsrServing(ok: boolean, error?: unknown): Promise<void> {
+  try {
+    await recordOutcome(
+      "blogSsr",
+      ok,
+      error ?? new Error("Blog SSR serving failure"),
+      "crawlers are getting the SPA shell instead of crawler HTML for AI blog posts",
+    );
+  } catch (e) {
+    // Never let monitoring break the blog route itself.
+    console.error("[credential-check] Failed to record blog SSR serving outcome:", e);
   }
 }
 
