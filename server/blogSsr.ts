@@ -17,6 +17,12 @@ import { marked } from "marked";
 import type { GeneratedPost } from "@shared/schema";
 import { extractToc } from "@shared/generated-blog";
 import { SITE_URL, APP_URL } from "@shared/site";
+import {
+  BLOG_INDEX_TITLE,
+  BLOG_INDEX_DESCRIPTION,
+  buildBlogCollectionJsonLd,
+  type BlogIndexPostInput,
+} from "@shared/blog-index-seo";
 
 const SEO_BLOCK = /<!-- seo:start[\s\S]*?seo:end -->/;
 const ROOT_MARKER = '<div id="root">';
@@ -338,5 +344,137 @@ export function renderGeneratedPostPage(
   // — this server HTML is intentionally not React-generated markup.
   page = page.replace(ROOT_MARKER, '<div id="root" data-runtime-ssr="true">');
   page = page.replace(APP_HTML_MARKER, buildArticleHtml(post));
+  return page;
+}
+
+/* ------------------------------------------------------------------ */
+/* Blog index (/blog) — crawler HTML with ALL published posts (MDX+DB)  */
+/* ------------------------------------------------------------------ */
+
+/** Card data the crawler-facing /blog grid needs (superset of the JSON-LD input). */
+export interface BlogIndexCard extends BlogIndexPostInput {
+  tags: string[];
+  readingMinutes: number;
+}
+
+function buildIndexHead(posts: BlogIndexCard[]): string {
+  const canonical = `${SITE_URL}/blog`;
+  const image = `${SITE_URL}/opengraph.jpg`;
+
+  const organization = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "RxFit.ai",
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.png`,
+    description:
+      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    sameAs: [
+      APP_URL,
+      "https://twitter.com/rxfitai",
+      "https://www.instagram.com/rxfitai",
+      "https://www.linkedin.com/company/rxfitai",
+    ],
+  };
+  const website = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "RxFit.ai",
+    url: SITE_URL,
+    description:
+      "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+    publisher: { "@type": "Organization", name: "RxFit.ai", url: SITE_URL },
+  };
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE_URL}/` },
+      { "@type": "ListItem", position: 2, name: "Blog", item: canonical },
+    ],
+  };
+  const collection = buildBlogCollectionJsonLd(posts);
+
+  const out: string[] = [
+    `<title>${escapeHtml(BLOG_INDEX_TITLE)}</title>`,
+    `<link rel="canonical" href="${escapeHtml(canonical)}" data-seo="true" />`,
+    `<meta name="description" content="${escapeHtml(BLOG_INDEX_DESCRIPTION)}" data-seo="true" />`,
+    `<meta property="og:title" content="${escapeHtml(BLOG_INDEX_TITLE)}" data-seo="true" />`,
+    `<meta property="og:description" content="${escapeHtml(BLOG_INDEX_DESCRIPTION)}" data-seo="true" />`,
+    `<meta property="og:url" content="${escapeHtml(canonical)}" data-seo="true" />`,
+    `<meta property="og:type" content="website" data-seo="true" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" data-seo="true" />`,
+    `<meta name="twitter:title" content="${escapeHtml(BLOG_INDEX_TITLE)}" data-seo="true" />`,
+    `<meta name="twitter:description" content="${escapeHtml(BLOG_INDEX_DESCRIPTION)}" data-seo="true" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}" data-seo="true" />`,
+  ];
+  for (const j of [organization, website, breadcrumbs, collection]) {
+    out.push(`<script type="application/ld+json" data-seo-jsonld="true">${jsonLdSafe(j)}</script>`);
+  }
+  return out.join("\n    ");
+}
+
+function buildIndexCardHtml(post: BlogIndexCard): string {
+  const href = `/blog/${post.slug}`;
+  const heroSrc = post.heroImage ? sanitizeUrl(post.heroImage) : "";
+  const hero =
+    heroSrc && heroSrc !== "#"
+      ? `<img src="${escapeHtml(heroSrc)}" alt="${escapeHtml(post.title)}" loading="lazy" class="w-full h-full object-cover" />`
+      : "";
+  const tags = post.tags
+    .slice(0, 2)
+    .map(
+      (t) =>
+        `<span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">${escapeHtml(t)}</span>`,
+    )
+    .join("");
+  return `
+<article class="hud-corner glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col">
+  <a href="${escapeHtml(href)}" class="block"><div class="aspect-[1200/630] bg-muted overflow-hidden">${hero}</div></a>
+  <div class="p-6 flex flex-col flex-1">
+    <div class="flex flex-wrap gap-2 mb-3">${tags}</div>
+    <a href="${escapeHtml(href)}"><h2 class="text-xl font-bold text-foreground mb-2 hover:text-primary transition-colors">${escapeHtml(post.title)}</h2></a>
+    <p class="text-muted-foreground text-sm leading-relaxed mb-4 flex-1">${escapeHtml(post.description)}</p>
+    <div class="flex items-center justify-between text-xs text-muted-foreground/70 pt-4 border-t border-border">
+      <span>${escapeHtml(formatDate(post.date))}</span>
+      <span>${post.readingMinutes} min read</span>
+    </div>
+  </div>
+</article>`;
+}
+
+function buildIndexPageHtml(posts: BlogIndexCard[]): string {
+  const cards = posts.map(buildIndexCardHtml).join("\n");
+  return `
+<div class="min-h-screen bg-background text-foreground overflow-x-hidden">
+  <header class="relative pt-32 pb-16 px-6 overflow-hidden">
+    <div class="container mx-auto max-w-4xl text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">The RxFit Journal</div>
+      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">Turn your data into <span class="text-gradient-teal">consistent action.</span></h1>
+      <p class="text-xl text-muted-foreground max-w-2xl mx-auto">Evidence-based guides on AI coaching, wearables, and the accountability that actually makes change stick.</p>
+    </div>
+  </header>
+  <main class="container mx-auto px-6 pb-24 max-w-6xl">
+    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">${cards}</div>
+    <p class="mt-10"><a href="/" class="text-primary underline underline-offset-2">← Back to RxFit.ai</a></p>
+  </main>
+</div>`;
+}
+
+/**
+ * Render the crawler-facing /blog index page with ALL published posts (MDX +
+ * DB) in both the visible card grid and the Blog/ItemList JSON-LD. Posts must
+ * already be merged, deduped, and sorted newest-first. Returns null when the
+ * template is unavailable (dev mode) — caller should fall through.
+ */
+export function renderBlogIndexPage(
+  posts: BlogIndexCard[],
+  templateOverride?: string,
+): string | null {
+  const template = templateOverride ?? loadTemplate();
+  if (!template) return null;
+  let page = template.replace(SEO_BLOCK, buildIndexHead(posts));
+  page = page.replace(ROOT_MARKER, '<div id="root" data-runtime-ssr="true">');
+  page = page.replace(APP_HTML_MARKER, buildIndexPageHtml(posts));
   return page;
 }

@@ -15,7 +15,7 @@ import { parse as parseYaml } from "yaml";
 import { SITE_URL } from "@shared/site";
 import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { buildRobotsTxt } from "./robots";
-import { renderGeneratedPostPage } from "./blogSsr";
+import { renderGeneratedPostPage, renderBlogIndexPage, type BlogIndexCard } from "./blogSsr";
 import { createBlogSlugHandler } from "./blogSlugRoute";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
@@ -346,6 +346,65 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error serving hero image:", error);
       return res.status(500).json({ message: "Failed to load image." });
+    }
+  });
+
+  // Runtime SSR for the blog index: the prerendered /blog HTML only contains
+  // build-time MDX posts, but DB posts publish every few days after deploy —
+  // without this, crawlers that don't run JS never see them in the index's
+  // card grid or Blog/ItemList JSON-LD. Renders the merged (MDX + DB) post
+  // list on request; falls through (next()) to the prerendered static file
+  // when the DB or the SSR template is unavailable.
+  const readMdxIndexCards = (): BlogIndexCard[] => {
+    const dir = path.resolve(process.cwd(), "content", "blog");
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".mdx"));
+    return files
+      .map((file) => {
+        const raw = fs.readFileSync(path.join(dir, file), "utf-8");
+        const fm = parseFrontmatter(raw);
+        const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---/, "");
+        const words = body.split(/\s+/).filter(Boolean).length;
+        return {
+          slug: (fm.slug as string) || file.replace(/\.mdx$/, ""),
+          title: (fm.title as string) || "",
+          description: (fm.description as string) || "",
+          date: (fm.date as string) || "",
+          updatedDate: (fm.updatedDate as string) || undefined,
+          heroImage: (fm.heroImage as string) || undefined,
+          author: (fm.author as string) || "",
+          tags: Array.isArray(fm.tags) ? (fm.tags as string[]) : [],
+          readingMinutes: Math.max(1, Math.round(words / 200)),
+        };
+      })
+      .filter((p) => p.title && !p.slug.startsWith("_"));
+  };
+
+  app.get("/blog", async (_req, res, next) => {
+    try {
+      const mdxCards = readMdxIndexCards();
+      const mdxSlugs = new Set(mdxCards.map((p) => p.slug));
+      const dbCards: BlogIndexCard[] = (await storage.getPublishedGeneratedPosts())
+        .filter((p) => !mdxSlugs.has(p.slug))
+        .map((p) => ({
+          slug: p.slug,
+          title: p.title,
+          description: p.description,
+          date: p.date,
+          updatedDate: p.updatedDate ?? undefined,
+          heroImage: p.heroImage ?? undefined,
+          author: p.author,
+          tags: p.tags,
+          readingMinutes: p.readingMinutes,
+        }));
+      const posts = [...mdxCards, ...dbCards].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      const page = renderBlogIndexPage(posts);
+      if (!page) return next();
+      return res.status(200).type("html").send(page);
+    } catch (error) {
+      console.error("Error rendering blog index page:", error);
+      return next();
     }
   });
 
