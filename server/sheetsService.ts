@@ -184,30 +184,61 @@ async function ensureMetaSheet(sheets: any, spreadsheetId: string): Promise<void
 }
 
 /**
- * Read the last-digest-sent timestamp from the hidden "RxFit Meta" tab.
- * Returns null when never sent (missing tab/cell or unparseable value).
+ * Alerts-digest state in the hidden "RxFit Meta" tab. Two separate values:
+ * - `lastSentAt` (row keyed `alertsDigestLastSentAt`) — wall-clock send time,
+ *   drives the weekly due-check only.
+ * - `watermark` (row keyed `alertsDigestWatermark`) — the max alert-row date
+ *   actually INCLUDED in the last digest, drives row filtering. Kept separate
+ *   from lastSentAt so a row appended in the seconds between reading the
+ *   sheet and persisting state (dated before "now" but after the read) can
+ *   never fall between digests.
  */
-export async function getAlertsDigestLastSentAt(): Promise<Date | null> {
+export interface AlertsDigestState {
+  lastSentAt: Date | null;
+  watermark: Date | null;
+}
+
+/**
+ * Pure parser for the meta-tab key/value rows (column A = key, column B =
+ * ISO date). Order-independent and tolerant of missing/extra rows so older
+ * sheets that only have `alertsDigestLastSentAt` (pre-watermark) still load.
+ */
+export function parseAlertsDigestMeta(values: unknown[][] | null | undefined): AlertsDigestState {
+  const state: AlertsDigestState = { lastSentAt: null, watermark: null };
+  for (const row of values ?? []) {
+    if (!Array.isArray(row)) continue;
+    const [key, raw] = row;
+    if (typeof raw !== 'string' || !raw) continue;
+    const parsed = new Date(raw);
+    if (isNaN(parsed.getTime())) continue;
+    if (key === 'alertsDigestLastSentAt') state.lastSentAt = parsed;
+    else if (key === 'alertsDigestWatermark') state.watermark = parsed;
+  }
+  return state;
+}
+
+/**
+ * Read the digest state from the hidden "RxFit Meta" tab.
+ * Both fields null when never sent (missing tab/cells or unparseable values).
+ */
+export async function getAlertsDigestState(): Promise<AlertsDigestState> {
   if (!SPREADSHEET_ID) {
     throw new Error('LEADS_SPREADSHEET_ID not set — cannot read digest state');
   }
   const sheets = await getUncachableGoogleSheetClient();
   const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
   const sheetNames = meta.data.sheets?.map((s: any) => s.properties?.title) || [];
-  if (!sheetNames.includes(META_SHEET_NAME)) return null;
+  if (!sheetNames.includes(META_SHEET_NAME)) return { lastSentAt: null, watermark: null };
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `'${META_SHEET_NAME}'!B1`,
+    range: `'${META_SHEET_NAME}'!A1:B2`,
   });
-  const raw = res.data.values?.[0]?.[0];
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  return isNaN(parsed.getTime()) ? null : parsed;
+  return parseAlertsDigestMeta(res.data.values);
 }
 
-/** Persist the last-digest-sent timestamp to the hidden "RxFit Meta" tab. */
-export async function setAlertsDigestLastSentAt(sentAt: Date): Promise<void> {
+/** Persist the digest state (both rows, one write) to the hidden "RxFit Meta" tab. */
+export async function setAlertsDigestState(state: { lastSentAt: Date; watermark: Date | null }): Promise<void> {
   if (!SPREADSHEET_ID) {
     throw new Error('LEADS_SPREADSHEET_ID not set — cannot write digest state');
   }
@@ -215,10 +246,13 @@ export async function setAlertsDigestLastSentAt(sentAt: Date): Promise<void> {
   await ensureMetaSheet(sheets, SPREADSHEET_ID);
   await sheets.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
-    range: `'${META_SHEET_NAME}'!A1:B1`,
+    range: `'${META_SHEET_NAME}'!A1:B2`,
     valueInputOption: 'RAW',
     requestBody: {
-      values: [['alertsDigestLastSentAt', sentAt.toISOString()]],
+      values: [
+        ['alertsDigestLastSentAt', state.lastSentAt.toISOString()],
+        ['alertsDigestWatermark', state.watermark ? state.watermark.toISOString() : ''],
+      ],
     },
   });
 }
