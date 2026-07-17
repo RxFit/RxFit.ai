@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims, scanFaqPriceClaims } from "./priceGuards.mjs";
+import { loadSiteOrigins } from "./siteConfig.mjs";
 import { dbSslConfig } from "../shared/db-ssl.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,7 +23,11 @@ const BLOG_DIR = path.join(ROOT, "content", "blog");
 const PUBLIC_DIR = path.join(ROOT, "client", "public");
 const INDEX_HTML = path.join(ROOT, "client", "index.html");
 
-const SITE_URL = "https://rxfit.ai";
+// Derived from shared/site.ts (the single source of truth the app itself
+// uses) instead of duplicate literals, so the validator can never drift
+// from the real canonical origins. Throws loudly (failing the build) if a
+// constant can't be parsed. See scripts/siteConfig.mjs.
+const { siteUrl: SITE_URL, appUrl: APP_URL } = loadSiteOrigins(ROOT);
 
 const errors = [];
 const warnings = [];
@@ -176,7 +181,7 @@ const ORGANIZATION_JSONLD = {
   name: "RxFit.ai",
   url: SITE_URL,
   logo: `${SITE_URL}/logo.png`,
-  sameAs: ["https://app.rxfit.ai"],
+  sameAs: [APP_URL],
 };
 
 /* ---------------- shape validators -------------------------------------- */
