@@ -99,7 +99,10 @@ export function CTACard({
     let fired = false;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (fired || !entries.some((e) => e.isIntersecting)) return;
+        // Gate on the actual ratio, not just isIntersecting — isIntersecting
+        // is true at ANY non-zero visibility, which would inflate the
+        // impression denominator with barely-visible cards.
+        if (fired || !entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.5)) return;
         fired = true;
         track("cta_card_shown", { slug, tier: plan });
         observer.disconnect();

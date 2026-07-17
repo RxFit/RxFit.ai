@@ -96,6 +96,21 @@ describe("CTACard impression tracking", () => {
     ]);
   });
 
+  it("does NOT fire while the card is only barely visible (isIntersecting but ratio < 0.5)", () => {
+    render(<CTACard plan="kickstart" slug="test-post" />);
+    const observer = lastObserver();
+
+    // Browsers report isIntersecting=true at ANY non-zero visibility; the
+    // impression must still wait for the 50% ratio.
+    observer.intersect(true, 0.3);
+    expect(eventsNamed("cta_card_shown")).toHaveLength(0);
+
+    observer.intersect(true, 0.6);
+    expect(eventsNamed("cta_card_shown")).toEqual([
+      ["cta_card_shown", { slug: "test-post", tier: "kickstart" }],
+    ]);
+  });
+
   it("never fires for a card that never scrolls into view", () => {
     render(<CTACard plan="committed" slug="test-post" />);
 
