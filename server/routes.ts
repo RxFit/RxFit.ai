@@ -16,6 +16,7 @@ import { SITE_URL } from "@shared/site";
 import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { buildRobotsTxt } from "./robots";
 import { renderGeneratedPostPage } from "./blogSsr";
+import { createBlogSlugHandler } from "./blogSlugRoute";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
@@ -390,19 +391,16 @@ export async function registerRoutes(
   // but DB posts appear after the deploy, so their crawlable HTML is rendered
   // on request. Falls through (next()) for non-DB slugs so the static
   // prerendered file — or the 404 shell — is served instead. In dev the
-  // template doesn't exist and the Vite SPA shell takes over.
-  app.get("/blog/:slug", async (req, res, next) => {
-    try {
-      const post = await storage.getGeneratedPostBySlug(req.params.slug);
-      if (!post || post.status !== "published") return next();
-      const page = renderGeneratedPostPage(post);
-      if (!page) return next();
-      return res.status(200).type("html").send(page);
-    } catch (error) {
-      console.error("Error rendering generated post page:", error);
-      return next();
-    }
-  });
+  // template doesn't exist and the Vite SPA shell takes over. Dispatch logic
+  // lives in createBlogSlugHandler (server/blogSlugRoute.ts) so the contract
+  // is route-level tested in server/blogSlugRoute.test.ts.
+  app.get(
+    "/blog/:slug",
+    createBlogSlugHandler({
+      getPostBySlug: (slug) => storage.getGeneratedPostBySlug(slug),
+      renderPage: renderGeneratedPostPage,
+    }),
+  );
 
   // ---- SEO / AEO crawlable endpoints ----
 
