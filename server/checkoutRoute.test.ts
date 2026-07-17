@@ -14,7 +14,9 @@
 import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { createCheckoutHandler } from "./checkoutRoute";
+import express from "express";
+import type { Server } from "node:http";
+import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
 import { PLAN_PRICING } from "@shared/stripe-constants";
 
 function mockRes() {
@@ -210,10 +212,12 @@ describe("wiring + source guards", () => {
   const routesSrc = fs.readFileSync(path.join(__dirname, "routes.ts"), "utf8");
   const handlerSrc = fs.readFileSync(path.join(__dirname, "checkoutRoute.ts"), "utf8");
 
-  it("routes.ts registers /api/stripe/checkout via the tested factory", () => {
+  it("routes.ts registers /api/stripe/checkout via the tested factory, behind the rate limiter", () => {
     expect(routesSrc).toMatch(
-      /app\.post\(\s*["']\/api\/stripe\/checkout["']\s*,\s*createCheckoutHandler\(\s*\{[^}]*getStripeClient:\s*getUncachableStripeClient[^}]*leadStore:\s*storage[^}]*\}\s*\)/s,
+      /app\.post\(\s*["']\/api\/stripe\/checkout["']\s*,\s*checkoutRateLimit\s*,\s*createCheckoutHandler\(\s*\{[^}]*getStripeClient:\s*getUncachableStripeClient[^}]*leadStore:\s*storage[^}]*\}\s*\)/s,
     );
+    // The limiter must be built from the tested factory in checkoutRoute.ts.
+    expect(routesSrc).toMatch(/const\s+checkoutRateLimit\s*=\s*createCheckoutRateLimit\(\)/);
   });
 
   it("no inline /api/stripe/checkout handler remains in routes.ts", () => {
@@ -227,5 +231,45 @@ describe("wiring + source guards", () => {
     // nor a trial override may appear as code in the checkout path.
     expect(handlerSrc).not.toMatch(/subscription_data\s*[:=[]/);
     expect(handlerSrc).not.toMatch(/trial_period_days\s*[:=]/);
+  });
+});
+
+describe("checkout rate limiting", () => {
+  it("rejects the 11th rapid request from one IP with 429, while the first 10 pass", async () => {
+    // Real express app + the REAL limiter from createCheckoutRateLimit(),
+    // fronting a stub handler — proves the limiter itself returns 429 after
+    // max requests, not just that it's mentioned in routes.ts.
+    const app = express();
+    app.use(express.json());
+    app.post("/api/stripe/checkout", createCheckoutRateLimit(), (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+
+    const server: Server = await new Promise((resolve) => {
+      const s = app.listen(0, "127.0.0.1", () => resolve(s));
+    });
+    try {
+      const { port } = server.address() as { port: number };
+      const url = `http://127.0.0.1:${port}/api/stripe/checkout`;
+      const post = () =>
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priceId: "price_x" }),
+        });
+
+      for (let i = 1; i <= 10; i++) {
+        const res = await post();
+        expect(res.status, `request #${i} should not be rate limited`).toBe(200);
+      }
+
+      const eleventh = await post();
+      expect(eleventh.status).toBe(429);
+      expect(await eleventh.json()).toEqual({
+        message: "Too many requests. Please try again later.",
+      });
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

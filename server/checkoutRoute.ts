@@ -1,5 +1,28 @@
 import type { Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { insertLeadSchema, type InsertLead } from "@shared/schema";
+
+/**
+ * Per-IP rate limiter for POST /api/stripe/checkout. Checkout is the most
+ * expensive public route (DB read + possible lead write + two Stripe API
+ * calls), so bots hammering it could exhaust Stripe quota and pollute the
+ * leads table (threat model: Denial of Service). Legitimate buyers retry a
+ * handful of times at most, so 10 requests per 15 minutes (same window as
+ * leadsRateLimit) is generous for humans and hostile to bots.
+ *
+ * Exposed as a factory so the route-level test can build a fresh limiter
+ * (no shared hit-counting state between tests) and prove the max+1th rapid
+ * request gets a 429.
+ */
+export function createCheckoutRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests. Please try again later." },
+  });
+}
 
 export interface CheckoutRouteDeps {
   getStripeClient: () => Promise<any>;

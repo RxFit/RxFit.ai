@@ -22,7 +22,7 @@ import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
-import { createCheckoutHandler } from "./checkoutRoute";
+import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -37,6 +37,11 @@ const leadsRateLimit = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many requests. Please try again later." },
 });
+
+// Checkout is the most expensive public route (DB read + possible lead write
+// + two Stripe API calls), so it gets its own per-IP limiter (defined in
+// checkoutRoute.ts so the route-level test covers the 429 behavior).
+const checkoutRateLimit = createCheckoutRateLimit();
 
 export async function registerRoutes(
   httpServer: Server,
@@ -122,6 +127,7 @@ export async function registerRoutes(
 
   app.post(
     "/api/stripe/checkout",
+    checkoutRateLimit,
     createCheckoutHandler({
       getStripeClient: getUncachableStripeClient,
       leadStore: storage,
