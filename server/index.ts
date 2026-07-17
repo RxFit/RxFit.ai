@@ -8,8 +8,12 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { applyTrustProxy } from "./trustProxy";
 
 const app = express();
+// One trusted proxy hop (Replit's reverse proxy) so req.ip is the real
+// client address for the per-IP rate limiters — see server/trustProxy.ts.
+applyTrustProxy(app);
 const httpServer = createServer(app);
 
 declare module "http" {
