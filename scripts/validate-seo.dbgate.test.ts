@@ -63,6 +63,40 @@ describe("validate-seo DB broken-link gate", () => {
     expect(out).toMatch(/ERROR generated_posts/);
   }, 120_000);
 
+  describe("with a published post containing stale price claims", () => {
+    const slug = `test-stale-price-gate-${Date.now()}`;
+    let pool: pg.Pool;
+
+    beforeAll(async () => {
+      if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required for this test");
+      pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      // $53 is not a PLAN_PRICING amount/savings and 14 days is not the
+      // current trial length — both must fail the build until refreshed.
+      await pool.query(
+        `INSERT INTO generated_posts
+           (slug, title, description, keyword_theme, pillar, author, tldr, body_markdown, faq, status, date)
+         VALUES ($1, 'Test post', 'test', 'test', 'test', 'Test', 'test',
+                 'RxFit costs just $53 per month. See [pricing](/#pricing) for details.',
+                 '[{"q": "Does RxFit have a free trial?", "a": "Yes — a 14-day free trial."}]'::jsonb,
+                 'published', '2026-01-01')`,
+        [slug],
+      );
+    });
+
+    afterAll(async () => {
+      await pool.query(`DELETE FROM generated_posts WHERE slug = $1`, [slug]);
+      await pool.end();
+    });
+
+    it("fails the build naming the stale price and trial claims", async () => {
+      const { code, out } = await runScript({});
+      expect(code).toBe(1);
+      expect(out).toContain(`generated_posts/${slug}`);
+      expect(out).toContain('"$53"');
+      expect(out).toContain("14-day free trial");
+    }, 120_000);
+  });
+
   describe("with a published post containing a broken internal link", () => {
     const slug = `test-broken-link-gate-${Date.now()}`;
     let pool: pg.Pool;

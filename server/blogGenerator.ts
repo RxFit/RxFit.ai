@@ -25,6 +25,11 @@ import {
 import type { GeneratedPost, FaqItem } from "@shared/schema";
 import { STATIC_ROUTES } from "@shared/site";
 import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
+import {
+  scanMdxPriceClaims,
+  scanFaqPriceClaims,
+  type GuardPricing,
+} from "../scripts/priceGuards.mjs";
 
 const AUTHOR = "RxFit.ai Research Team";
 const AUTHOR_BIO =
@@ -234,6 +239,22 @@ export function extractInternalLinks(body: string): string[] {
   return Array.from(body.matchAll(/\]\(\s*(\/[^)\s]*)\s*(?:"[^"]*"\s*)?\)/g), (m) => m[1]);
 }
 
+/**
+ * Live pricing in the shape the priceGuards scanners expect — derived from
+ * the imported PLAN_PRICING constants directly (no source-text parsing), so
+ * publish-time enforcement can never drift from the real prices.
+ */
+export function currentGuardPricing(): GuardPricing {
+  const plans = Object.values(PLAN_PRICING);
+  return {
+    amounts: plans.map((p) => p.amount),
+    savings: plans.flatMap((p) =>
+      "savings" in p ? [Number(p.savings.replace(/[^0-9]/g, ""))] : [],
+    ),
+    trialDays: PLAN_PRICING.kickstart.trialDays,
+  };
+}
+
 export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): string[] {
   const errors: string[] = [];
   const required: (keyof LlmPostDraft)[] = [
@@ -297,6 +318,18 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
         errors.push(`body links to unknown route: ${raw} (not a static route or /blog/:slug)`);
       }
     }
+  }
+  // Price-claim enforcement: the prompt tells the model the current prices,
+  // but nothing else guarantees it listened. Run the SAME scanners the
+  // validate-seo build gate uses, so a wrong/stale RxFit price or trial
+  // length in the body or FAQ rejects the draft (and triggers a retry with
+  // the exact errors) instead of going live silently.
+  const guardPricing = currentGuardPricing();
+  if (draft.bodyMarkdown) {
+    errors.push(...scanMdxPriceClaims(guardPricing, "body", draft.bodyMarkdown));
+  }
+  if (Array.isArray(draft.faq)) {
+    errors.push(...scanFaqPriceClaims(guardPricing, "draft", draft.faq));
   }
   if (draft.description && (draft.description.length < 100 || draft.description.length > 180)) {
     errors.push(`description is ${draft.description.length} chars (want 100-180)`);

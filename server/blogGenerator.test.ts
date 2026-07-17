@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { validateDraft, buildRetryFeedback, type LlmPostDraft } from "./blogGenerator";
+import {
+  validateDraft,
+  buildRetryFeedback,
+  currentGuardPricing,
+  type LlmPostDraft,
+} from "./blogGenerator";
+import { PLAN_PRICING } from "@shared/stripe-constants";
 
 function goodBody(): string {
   const para = "This is a sentence about wearable data and coaching consistency. ".repeat(6);
@@ -168,6 +174,76 @@ describe("validateDraft", () => {
       noSlugs,
     );
     expect(errors.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("currentGuardPricing", () => {
+  it("mirrors the live PLAN_PRICING constants (no source parsing to drift)", () => {
+    const pricing = currentGuardPricing();
+    expect(pricing.amounts).toEqual(Object.values(PLAN_PRICING).map((p) => p.amount));
+    expect(pricing.trialDays).toBe(PLAN_PRICING.kickstart.trialDays);
+    expect(pricing.savings).toContain(Number(PLAN_PRICING.committed.savings.replace(/[^0-9]/g, "")));
+  });
+});
+
+describe("validateDraft price-claim enforcement", () => {
+  const price = PLAN_PRICING.kickstart.amount;
+  const wrongPrice = price + 4;
+  const trial = PLAN_PRICING.kickstart.trialDays;
+  const wrongTrial = trial + 7;
+
+  it("rejects a body sentence quoting a wrong RxFit price", () => {
+    const body = `${goodBody()}\n\nRxFit costs just $${wrongPrice} per month for full coaching.`;
+    const errors = validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs);
+    expect(errors.some((e) => e.includes(`"$${wrongPrice}"`) && e.includes("PLAN_PRICING"))).toBe(true);
+  });
+
+  it("accepts a body quoting the current RxFit price", () => {
+    const body = `${goodBody()}\n\nRxFit costs $${price} per month with human coaching included.`;
+    expect(validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs)).toEqual([]);
+  });
+
+  it("ignores competitor prices in sentences that do not mention RxFit", () => {
+    const body = `${goodBody()}\n\nA personal trainer typically charges $300 per month for two sessions a week.`;
+    expect(validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs)).toEqual([]);
+  });
+
+  it("rejects a stale trial-length claim anywhere in the body", () => {
+    const body = `${goodBody()}\n\nStart your ${wrongTrial}-day free trial today.`;
+    const errors = validateDraft(makeDraft({ bodyMarkdown: body }), noSlugs);
+    expect(errors.some((e) => e.includes(`${wrongTrial}-day free trial`) && e.includes("trialDays"))).toBe(true);
+  });
+
+  it("catches a wrong price in the answer when only the question names RxFit", () => {
+    const faq = [
+      { q: "How much does RxFit cost?", a: `Plans start at $${wrongPrice} per month.` },
+      { q: "Q2?", a: "Answer two." },
+      { q: "Q3?", a: "Answer three." },
+      { q: "Q4?", a: "Answer four." },
+    ];
+    const errors = validateDraft(makeDraft({ faq }), noSlugs);
+    expect(errors.some((e) => e.includes("faq[0]") && e.includes(`"$${wrongPrice}"`))).toBe(true);
+  });
+
+  it("rejects a wrong trial length in any FAQ pair (no RxFit mention needed)", () => {
+    const faq = [
+      { q: "Q1?", a: "Answer one." },
+      { q: "Is there a trial?", a: `Yes — you train free for ${wrongTrial} days.` },
+      { q: "Q3?", a: "Answer three." },
+      { q: "Q4?", a: "Answer four." },
+    ];
+    const errors = validateDraft(makeDraft({ faq }), noSlugs);
+    expect(errors.some((e) => e.includes("faq[1]") && e.includes("trialDays"))).toBe(true);
+  });
+
+  it("accepts FAQ pairs quoting current prices and competitor prices in non-RxFit pairs", () => {
+    const faq = [
+      { q: "How much does RxFit cost?", a: `Plans start at $${price} per month with a ${trial}-day free trial.` },
+      { q: "What does a personal trainer cost?", a: "Usually $200 to $600 per month." },
+      { q: "Q3?", a: "Answer three." },
+      { q: "Q4?", a: "Answer four." },
+    ];
+    expect(validateDraft(makeDraft({ faq }), noSlugs)).toEqual([]);
   });
 });
 

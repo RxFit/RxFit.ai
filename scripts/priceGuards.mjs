@@ -107,3 +107,39 @@ export function scanMdxPriceClaims(pricing, file, body) {
   }
   return out;
 }
+
+/**
+ * FAQ price claims: each q/a pair is checked as ONE unit (the question
+ * usually names RxFit while the answer carries the price, so sentence-level
+ * scanning would miss it). Trial-length claims are checked in every pair;
+ * dollar amounts are checked when the pair mentions RxFit — any $N in an
+ * RxFit pair must be a current plan amount or documented savings, so
+ * competitor prices must live in non-RxFit pairs (same policy as the body
+ * scan). Used by validateDraft at publish time AND by the validate-seo DB
+ * gate after price changes.
+ * Returns error strings (empty = clean).
+ */
+export function scanFaqPriceClaims(pricing, file, faq) {
+  const out = [];
+  const { amounts, savings, trialDays } = pricing;
+  const allowedDollars = new Set([...amounts, ...savings]);
+  (Array.isArray(faq) ? faq : []).forEach((item, i) => {
+    const text = `${item?.q ?? ""} ${item?.a ?? ""}`;
+    const label = `${file}: faq[${i}]`;
+    for (const m of text.matchAll(/(\d+)[-\s]day free trial/gi)) {
+      if (Number(m[1]) !== trialDays)
+        out.push(`${label}: trial claim "${m[0]}" no longer matches PLAN_PRICING trialDays (${trialDays})`);
+    }
+    for (const m of text.matchAll(/free for (\d+) days/gi)) {
+      if (Number(m[1]) !== trialDays)
+        out.push(`${label}: trial claim "${m[0]}" no longer matches PLAN_PRICING trialDays (${trialDays})`);
+    }
+    if (!/rxfit/i.test(text)) return;
+    for (const m of text.matchAll(/\$(\d+)(?![\d.])/g)) {
+      const val = Number(m[1]);
+      if (!allowedDollars.has(val))
+        out.push(`${label}: RxFit price mention "$${m[1]}" does not match any PLAN_PRICING amount/savings (${[...allowedDollars].join(", ")}) — fix this Q/A: "${text.trim().slice(0, 100)}"`);
+    }
+  });
+  return out;
+}

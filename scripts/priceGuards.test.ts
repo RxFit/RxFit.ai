@@ -6,8 +6,12 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-// @ts-expect-error — plain .mjs module without type declarations
-import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims } from "./priceGuards.mjs";
+import {
+  parsePlanPricing,
+  scanCodeForHardcodedPrices,
+  scanMdxPriceClaims,
+  scanFaqPriceClaims,
+} from "./priceGuards.mjs";
 
 const PRICING = { amounts: [49, 490, 997], savings: [98], trialDays: 7 };
 
@@ -127,6 +131,40 @@ describe("scanMdxPriceClaims", () => {
   });
 });
 
+describe("scanFaqPriceClaims", () => {
+  it("flags a wrong price in the answer when only the question names RxFit", () => {
+    const errs = scanFaqPriceClaims(PRICING, "generated_posts/x", [
+      { q: "How much does RxFit cost?", a: "Plans start at $59 per month." },
+    ]);
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toContain("faq[0]");
+    expect(errs[0]).toContain('"$59"');
+  });
+
+  it("flags stale trial-length claims in any pair, RxFit mention or not", () => {
+    const errs = scanFaqPriceClaims(PRICING, "generated_posts/x", [
+      { q: "Is there a trial?", a: "Yes, a 14-day free trial." },
+      { q: "Anything else?", a: "You train free for 30 days." },
+    ]);
+    expect(errs).toHaveLength(2);
+    expect(errs[0]).toContain("faq[0]");
+    expect(errs[1]).toContain("faq[1]");
+  });
+
+  it("accepts current prices in RxFit pairs and competitor prices in non-RxFit pairs", () => {
+    const errs = scanFaqPriceClaims(PRICING, "generated_posts/x", [
+      { q: "How much does RxFit cost?", a: "Plans start at $49/month or $490 a year (save $98), with a 7-day free trial." },
+      { q: "What does a personal trainer cost?", a: "Typically $200 to $600 per month." },
+    ]);
+    expect(errs).toEqual([]);
+  });
+
+  it("handles malformed input (non-array faq, missing q/a) without throwing", () => {
+    expect(scanFaqPriceClaims(PRICING, "x", null as never)).toEqual([]);
+    expect(scanFaqPriceClaims(PRICING, "x", [null, { q: "RxFit?" }, {}] as never)).toEqual([]);
+  });
+});
+
 describe("validate-seo.mjs wiring", () => {
   it("still imports and calls the shared guard helpers", () => {
     const src = fs.readFileSync(path.resolve(__dirname, "validate-seo.mjs"), "utf8");
@@ -134,6 +172,14 @@ describe("validate-seo.mjs wiring", () => {
     expect(src).toContain("parsePlanPricing(");
     expect(src).toContain("scanCodeForHardcodedPrices(");
     expect(src).toContain("scanMdxPriceClaims(");
+  });
+
+  it("re-validates DB-published posts' price claims (body + faq) in the DB gate", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "validate-seo.mjs"), "utf8");
+    expect(src).toContain("scanFaqPriceClaims(");
+    // The DB gate must fetch the faq column and receive the parsed pricing.
+    expect(src).toMatch(/SELECT slug, body_markdown, faq FROM generated_posts/);
+    expect(src).toMatch(/validateDbPostLinks\(planPricing,/);
   });
 
   it("scans server code (email copy, generator prompt, seed script) too", () => {

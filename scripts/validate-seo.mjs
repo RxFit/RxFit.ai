@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims } from "./priceGuards.mjs";
+import { parsePlanPricing, scanCodeForHardcodedPrices, scanMdxPriceClaims, scanFaqPriceClaims } from "./priceGuards.mjs";
 import { dbSslConfig } from "../shared/db-ssl.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -597,15 +597,22 @@ function scanMdxPricing(pricing, file, body) {
 }
 
 /**
- * DB-published post link check: AI-generated posts in generated_posts are
- * link-validated once at publish time, but if a static route is later removed
- * or renamed (STATIC_ROUTES changes) the links inside already-published posts
- * silently break. Re-validate every live DB post's internal links against the
- * CURRENT routes + slugs so a route change fails the build loudly instead.
+ * DB-published post checks: AI-generated posts in generated_posts are
+ * validated once at publish time, but the world can change afterwards:
+ *   - links: if a static route is later removed or renamed (STATIC_ROUTES
+ *     changes) the links inside already-published posts silently break;
+ *   - price claims: if PLAN_PRICING changes, live posts keep quoting the old
+ *     RxFit prices/trial length (MDX posts already fail the build for this —
+ *     DB posts must too).
+ * Re-validate every live DB post's internal links AND price claims (body via
+ * scanMdxPriceClaims, FAQ via scanFaqPriceClaims — the same scanners
+ * validateDraft enforces at publish time) against the CURRENT routes, slugs,
+ * and PLAN_PRICING so either kind of drift fails the build loudly until the
+ * stale posts are refreshed.
  * Skips (with a warning) only when DATABASE_URL is not set; any DB error is a
  * hard failure so this gate can't be silently bypassed.
  */
-async function validateDbPostLinks(mdxSlugs, staticRoutes) {
+async function validateDbPostLinks(pricing, mdxSlugs, staticRoutes) {
   const label = "generated_posts";
   if (!process.env.DATABASE_URL) {
     warn(label, "DATABASE_URL not set — skipping link validation for DB-published posts");
@@ -625,13 +632,18 @@ async function validateDbPostLinks(mdxSlugs, staticRoutes) {
   });
   try {
     const { rows } = await pool.query(
-      `SELECT slug, body_markdown FROM generated_posts WHERE status = 'published'`,
+      `SELECT slug, body_markdown, faq FROM generated_posts WHERE status = 'published'`,
     );
     const allSlugs = new Set([...mdxSlugs, ...rows.map((r) => r.slug)]);
     for (const row of rows) {
-      checkInternalLinks(`generated_posts/${row.slug}`, row.body_markdown ?? "", allSlugs, staticRoutes);
+      const label = `generated_posts/${row.slug}`;
+      checkInternalLinks(label, row.body_markdown ?? "", allSlugs, staticRoutes);
+      if (pricing) {
+        for (const e of scanMdxPriceClaims(pricing, label, row.body_markdown ?? "")) errors.push(e);
+        for (const e of scanFaqPriceClaims(pricing, label, Array.isArray(row.faq) ? row.faq : [])) errors.push(e);
+      }
     }
-    console.log(`Checked internal links in ${rows.length} DB-published post(s).`);
+    console.log(`Checked internal links and price claims in ${rows.length} DB-published post(s).`);
   } catch (e) {
     err(label, `failed to validate DB-published post links: ${e.message}`);
   } finally {
@@ -674,7 +686,7 @@ const planPricing = loadPlanPricing();
 scanForHardcodedPrices(planPricing);
 for (const post of posts) scanMdxPricing(planPricing, post.file, post.body);
 
-await validateDbPostLinks(knownSlugs, staticRoutes);
+await validateDbPostLinks(planPricing, knownSlugs, staticRoutes);
 
 for (const w of warnings) console.warn(`WARN  ${w}`);
 if (errors.length > 0) {
