@@ -11,6 +11,18 @@ export const BLOG_INDEX_TITLE = "The RxFit.ai Blog — AI Coaching, Wearables & 
 export const BLOG_INDEX_DESCRIPTION =
   "Evidence-based guides on AI fitness coaching, reading your wearable data, and closing the accountability gap that makes most fitness apps fail.";
 
+/**
+ * On-page hero copy for /blog, shared by the client page (BlogIndex.tsx) and
+ * the crawler-facing runtime SSR (server/blogSsr.ts buildIndexPageHtml) so the
+ * two renderings can never drift apart. The heading is split into a lead and
+ * an accent segment because the client wraps the accent in a gradient span.
+ */
+export const BLOG_INDEX_HERO_BADGE = "The RxFit Journal";
+export const BLOG_INDEX_HERO_HEADING_LEAD = "Turn your data into";
+export const BLOG_INDEX_HERO_HEADING_ACCENT = "consistent action.";
+export const BLOG_INDEX_HERO_SUBTITLE =
+  "Evidence-based guides on AI coaching, wearables, and the accountability that actually makes change stick.";
+
 /** Minimal post-card data the blog index JSON-LD needs (MDX and DB posts both map to this). */
 export interface BlogIndexPostInput {
   slug: string;

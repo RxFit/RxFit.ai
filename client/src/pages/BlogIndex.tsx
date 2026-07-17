@@ -8,6 +8,10 @@ import { Seo } from "@/lib/seo";
 import {
   BLOG_INDEX_TITLE,
   BLOG_INDEX_DESCRIPTION,
+  BLOG_INDEX_HERO_BADGE,
+  BLOG_INDEX_HERO_HEADING_LEAD,
+  BLOG_INDEX_HERO_HEADING_ACCENT,
+  BLOG_INDEX_HERO_SUBTITLE,
   buildBlogCollectionJsonLd,
 } from "@shared/blog-index-seo";
 import { getAllPosts, PILLARS, type PostFrontmatter } from "@/lib/blogLoader";
@@ -73,14 +77,13 @@ export default function BlogIndex() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-primary/10 blur-[120px] rounded-full -z-10" />
         <div className="container mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">
-            The RxFit Journal
+            {BLOG_INDEX_HERO_BADGE}
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">
-            Turn your data into <span className="text-gradient-teal">consistent action.</span>
+            {BLOG_INDEX_HERO_HEADING_LEAD}{" "}
+            <span className="text-gradient-teal">{BLOG_INDEX_HERO_HEADING_ACCENT}</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Evidence-based guides on AI coaching, wearables, and the accountability that actually makes change stick.
-          </p>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">{BLOG_INDEX_HERO_SUBTITLE}</p>
 
           <div className="flex flex-wrap justify-center gap-3 mt-10">
             <button

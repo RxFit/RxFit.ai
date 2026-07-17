@@ -6,8 +6,17 @@
  * the index. Mirrors the fixture-template approach of blogSsr.render.test.ts.
  */
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import { renderBlogIndexPage, verifySsrTemplateMarkers, type BlogIndexCard } from "./blogSsr";
-import { BLOG_INDEX_TITLE, BLOG_INDEX_DESCRIPTION } from "@shared/blog-index-seo";
+import {
+  BLOG_INDEX_TITLE,
+  BLOG_INDEX_DESCRIPTION,
+  BLOG_INDEX_HERO_BADGE,
+  BLOG_INDEX_HERO_HEADING_LEAD,
+  BLOG_INDEX_HERO_HEADING_ACCENT,
+  BLOG_INDEX_HERO_SUBTITLE,
+} from "@shared/blog-index-seo";
 import { SITE_URL } from "@shared/site";
 
 const TEMPLATE = `<!DOCTYPE html>
@@ -102,5 +111,59 @@ describe("renderBlogIndexPage output", () => {
     const empty = renderBlogIndexPage([], TEMPLATE)!;
     const blog = extractJsonLd(empty).find((j: any) => j["@type"] === "Blog") as any;
     expect(blog.mainEntity.numberOfItems).toBe(0);
+  });
+
+  it("renders the shared hero copy (badge, heading, subtitle) in the crawler HTML", () => {
+    // Mirror the renderer's escaping so the test stays correct if the copy
+    // ever gains &, <, or quote characters.
+    const esc = (s: string) =>
+      s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    expect(page).toContain(`>${esc(BLOG_INDEX_HERO_BADGE)}</div>`);
+    expect(page).toContain(
+      `${esc(BLOG_INDEX_HERO_HEADING_LEAD)} <span class="text-gradient-teal">${esc(BLOG_INDEX_HERO_HEADING_ACCENT)}</span>`,
+    );
+    expect(page).toContain(`>${esc(BLOG_INDEX_HERO_SUBTITLE)}</p>`);
+  });
+});
+
+/**
+ * Drift guard: the client page must render the SAME shared hero constants the
+ * SSR uses. If someone edits the copy inline in BlogIndex.tsx instead of in
+ * shared/blog-index-seo.ts, crawlers would see stale copy — fail loudly here.
+ */
+describe("BlogIndex.tsx hero copy wiring (drift guard)", () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, "../client/src/pages/BlogIndex.tsx"),
+    "utf-8",
+  );
+
+  it("imports every shared hero constant from @shared/blog-index-seo", () => {
+    for (const name of [
+      "BLOG_INDEX_HERO_BADGE",
+      "BLOG_INDEX_HERO_HEADING_LEAD",
+      "BLOG_INDEX_HERO_HEADING_ACCENT",
+      "BLOG_INDEX_HERO_SUBTITLE",
+    ]) {
+      // Imported once, then rendered in JSX ({CONSTANT}) — 2+ occurrences.
+      const uses = src.split(name).length - 1;
+      expect(uses, `${name} must be imported AND rendered in BlogIndex.tsx`).toBeGreaterThanOrEqual(2);
+    }
+    expect(src).toMatch(/from "@shared\/blog-index-seo"/);
+  });
+
+  it("does not hardcode the hero copy inline (must come from the shared constants)", () => {
+    for (const literal of [
+      BLOG_INDEX_HERO_BADGE,
+      BLOG_INDEX_HERO_HEADING_LEAD,
+      BLOG_INDEX_HERO_HEADING_ACCENT,
+      BLOG_INDEX_HERO_SUBTITLE,
+    ]) {
+      expect(src, `hero copy "${literal.slice(0, 40)}…" must not be duplicated inline`).not.toContain(literal);
+    }
   });
 });

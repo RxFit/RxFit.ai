@@ -20,6 +20,10 @@ import { SITE_URL, APP_URL } from "@shared/site";
 import {
   BLOG_INDEX_TITLE,
   BLOG_INDEX_DESCRIPTION,
+  BLOG_INDEX_HERO_BADGE,
+  BLOG_INDEX_HERO_HEADING_LEAD,
+  BLOG_INDEX_HERO_HEADING_ACCENT,
+  BLOG_INDEX_HERO_SUBTITLE,
   buildBlogCollectionJsonLd,
   type BlogIndexPostInput,
 } from "@shared/blog-index-seo";
@@ -449,9 +453,9 @@ function buildIndexPageHtml(posts: BlogIndexCard[]): string {
 <div class="min-h-screen bg-background text-foreground overflow-x-hidden">
   <header class="relative pt-32 pb-16 px-6 overflow-hidden">
     <div class="container mx-auto max-w-4xl text-center">
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">The RxFit Journal</div>
-      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">Turn your data into <span class="text-gradient-teal">consistent action.</span></h1>
-      <p class="text-xl text-muted-foreground max-w-2xl mx-auto">Evidence-based guides on AI coaching, wearables, and the accountability that actually makes change stick.</p>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">${escapeHtml(BLOG_INDEX_HERO_BADGE)}</div>
+      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">${escapeHtml(BLOG_INDEX_HERO_HEADING_LEAD)} <span class="text-gradient-teal">${escapeHtml(BLOG_INDEX_HERO_HEADING_ACCENT)}</span></h1>
+      <p class="text-xl text-muted-foreground max-w-2xl mx-auto">${escapeHtml(BLOG_INDEX_HERO_SUBTITLE)}</p>
     </div>
   </header>
   <main class="container mx-auto px-6 pb-24 max-w-6xl">
