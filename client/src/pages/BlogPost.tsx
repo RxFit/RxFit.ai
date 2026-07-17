@@ -44,6 +44,19 @@ export default function BlogPost() {
     [slug, fm !== undefined, pillar],
   );
 
+  // MDX bodies embed <CTACard plan="..."/> without a slug (authors shouldn't
+  // repeat it) — bind the current post's slug in so inline-card impressions
+  // and clicks are attributable per post. Author-provided props still win.
+  const mdxPostComponents = useMemo(
+    () => ({
+      ...mdxComponents,
+      CTACard: (props: React.ComponentProps<typeof CTACard>) => (
+        <CTACard slug={slug} {...props} />
+      ),
+    }),
+    [slug],
+  );
+
   const hasPost = !!fm;
   useEffect(() => {
     if (!hasPost) return;
@@ -199,7 +212,7 @@ export default function BlogPost() {
             {/* Content */}
             <div className="max-w-3xl min-w-0" data-testid="blog-post-content">
               {staticPost ? (
-                <MDXProvider components={mdxComponents}>
+                <MDXProvider components={mdxPostComponents}>
                   <staticPost.Component />
                 </MDXProvider>
               ) : generated ? (

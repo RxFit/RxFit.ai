@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   Accordion,
@@ -85,8 +85,33 @@ export function CTACard({
 }) {
   const { open } = useSignupModal();
   const copy = PLAN_COPY[plan];
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Impression tracking: fire cta_card_shown exactly once per card, the
+  // first time it becomes at least half visible — so Plausible gets a true
+  // impression denominator for the inline cards (low clicks could otherwise
+  // mean either "converts poorly" or "readers never scroll this far").
+  // Re-fires only if the card is reused for a different slug/tier (SPA nav),
+  // matching the sticky bar's per-slug impression contract.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    let fired = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (fired || !entries.some((e) => e.isIntersecting)) return;
+        fired = true;
+        track("cta_card_shown", { slug, tier: plan });
+        observer.disconnect();
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [slug, plan]);
+
   return (
-    <div className="glass-card rounded-2xl p-8 my-10 relative overflow-hidden" data-testid={`blog-cta-${plan}`}>
+    <div ref={cardRef} className="glass-card rounded-2xl p-8 my-10 relative overflow-hidden" data-testid={`blog-cta-${plan}`}>
       <div className="absolute -top-16 -right-16 w-48 h-48 bg-primary/10 blur-3xl rounded-full" />
       <div className="relative">
         <div className="hud-label font-bold text-primary mb-2">{copy.name}</div>
