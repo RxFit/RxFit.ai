@@ -33,7 +33,9 @@ vi.mock("./gmailClient", () => ({
   })),
 }));
 
-import { EMAIL_TEMPLATES } from "./emailService";
+import * as emailService from "./emailService";
+
+const { EMAIL_TEMPLATES } = emailService;
 
 /** Retired palette: hexes and the rgba channel triplets of those colors. */
 const RETIRED_PALETTE = [
@@ -93,5 +95,35 @@ describe("registry completeness", () => {
     const source = fs.readFileSync(path.resolve(__dirname, "emailService.ts"), "utf-8");
     const templateCount = (source.match(/<!DOCTYPE html>/g) ?? []).length;
     expect(templateCount).toBe(entries.length);
+  });
+
+  // The doctype count above can be dodged: a future email built from a shared
+  // layout helper (or one whose HTML lives elsewhere) adds an exported
+  // builder without adding a doctype to this file — and would silently be
+  // missing from the /admin "Email previews" surface and every brand review.
+  // This guard enumerates the REAL exports at runtime (so any export shape —
+  // function or const — is caught) and requires each get*EmailHtml builder to
+  // be referenced inside the EMAIL_TEMPLATES object literal itself.
+  it("every exported get*EmailHtml builder is registered in EMAIL_TEMPLATES", () => {
+    const builderNames = Object.keys(emailService).filter((name) =>
+      /^get\w*EmailHtml$/.test(name),
+    );
+    // Sanity: the enumeration itself must not silently match nothing.
+    expect(builderNames.length).toBeGreaterThanOrEqual(7);
+
+    const source = fs.readFileSync(path.resolve(__dirname, "emailService.ts"), "utf-8");
+    const registryLiteral = source.match(/export const EMAIL_TEMPLATES[\s\S]*?\n\};/);
+    expect(
+      registryLiteral,
+      "EMAIL_TEMPLATES object literal not found in emailService.ts — update this guard's regex",
+    ).not.toBeNull();
+
+    for (const name of builderNames) {
+      expect(
+        registryLiteral![0],
+        `${name} is exported from emailService.ts but no EMAIL_TEMPLATES render calls it — ` +
+          `it would silently be missing from the /admin email previews. Register it in EMAIL_TEMPLATES.`,
+      ).toContain(`${name}(`);
+    }
   });
 });

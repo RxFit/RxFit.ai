@@ -530,9 +530,10 @@ export async function sendLeadEmail(email: string, name: string): Promise<void> 
  * emails are champagne gold #D4AF37; owner failure alerts are deliberately
  * red #EF4444), and (c) dynamic strings arrive HTML-escaped.
  *
- * ADDING A NEW EMAIL TEMPLATE? Register it here — the test counts the
- * HTML doctype declarations in this file and fails if a template exists
- * that is not in this registry.
+ * ADDING A NEW EMAIL TEMPLATE? Register it here — the tests count the
+ * HTML doctype declarations in this file AND cross-check every exported
+ * get*EmailHtml builder against this registry, failing if a template
+ * exists that is not registered (emailService.palette.test.ts).
  */
 export const EMAIL_TEMPLATES: Record<
   string,
