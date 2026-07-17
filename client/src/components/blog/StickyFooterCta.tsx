@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { X, Sparkles } from "lucide-react";
 import { useSignupModal } from "@/components/SignupModalProvider";
@@ -30,7 +30,23 @@ export default function StickyFooterCta({ slug }: { slug?: string }) {
     return () => clearTimeout(t);
   }, [slug]);
 
-  if (!visible || location === "/success") return null;
+  // The bar is actually on screen only when BOTH gates pass (show delay
+  // elapsed AND not on /success) — that's the impression moment, so click,
+  // dismiss, and suppression rates get a true denominator instead of raw
+  // pageviews. Fires once per slug (a SPA navigation to another post while
+  // the bar stays mounted is a new impression, matching the per-page slug
+  // prop on the click/dismiss/suppressed events).
+  const shown = visible && location !== "/success";
+  const impressionSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!shown) return;
+    const key = slug ?? "";
+    if (impressionSlugRef.current === key) return;
+    impressionSlugRef.current = key;
+    track("cta_sticky_shown", { slug });
+  }, [shown, slug]);
+
+  if (!shown) return null;
 
   const dismiss = () => {
     localStorage.setItem(STICKY_DISMISS_KEY, String(Date.now()));
