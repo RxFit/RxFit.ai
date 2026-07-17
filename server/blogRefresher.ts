@@ -19,9 +19,11 @@ import {
   getStaticPostRefs,
   rankPostsByRelevance,
   validateDraft,
+  buildRetryFeedback,
   type ExistingPostRef,
   type LlmPostDraft,
 } from "./blogGenerator";
+import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 import { sendPostRefreshedEmail, sendPostFailureEmail } from "./emailService";
 import { appendAlertToSheet } from "./sheetsService";
 import { findStrikingDistancePosts, pickRefreshCandidate, type StrikingQuery } from "./seoFeedback";
@@ -29,7 +31,7 @@ import { extractToc, computeReadingMinutes } from "@shared/generated-blog";
 import { STATIC_ROUTES } from "@shared/site";
 import type { GeneratedPost } from "@shared/schema";
 
-function buildRefreshPrompt(
+export function buildRefreshPrompt(
   post: GeneratedPost,
   queries: StrikingQuery[],
   research: Awaited<ReturnType<typeof researchTheme>>,
@@ -59,6 +61,8 @@ ${queries.map((q) => `- "${q.query}" — position ${q.position.toFixed(1)}, ${q.
   return `You are the senior content writer for RxFit.ai, a HealthTech SaaS that pairs an AI health dashboard (syncs wearables like Apple Watch, Oura, Whoop, Garmin) with a real human accountability coach. Brand voice: authoritative but warm, evidence-driven, practical, zero fluff.
 
 TASK: REFRESH and improve the existing blog post below. Keep its topic, angle, and overall structure recognizable — this is an update, not a new article. Improve depth, freshness, and search intent coverage.
+
+RXFIT PRICING FACTS (the existing post may quote OUTDATED prices — if you mention RxFit pricing anywhere, use these EXACT current numbers and update any stale ones; never invent or round prices): ${PLAN_PRICING.kickstart.name} is ${PLAN_PRICING.kickstart.perMonth} with a ${TRIAL_COPY}; ${PLAN_PRICING.committed.name} is ${PLAN_PRICING.committed.perYear} (saves ${PLAN_PRICING.committed.savings} vs monthly); ${PLAN_PRICING.transformation.name} is ${PLAN_PRICING.transformation.oneTime}.
 
 ${queryBlock}
 EXISTING POST (title: "${post.title}", target keyword: "${post.targetKeyword}", pillar: ${post.pillar}):
@@ -108,12 +112,17 @@ async function draftRefresh(
   queries: StrikingQuery[],
   research: Awaited<ReturnType<typeof researchTheme>>,
   existingPosts: ExistingPostRef[],
+  previousErrors?: string[],
 ): Promise<LlmPostDraft> {
+  let prompt = buildRefreshPrompt(post, queries, research, existingPosts);
+  if (previousErrors && previousErrors.length > 0) {
+    // Same retry-feedback contract as new-post drafts: tell the model the
+    // exact validation failures instead of blindly re-rolling.
+    prompt += `\n\n${buildRetryFeedback(previousErrors)}`;
+  }
   const response = await getOpenAI().chat.completions.create({
     model: "gpt-5.4",
-    messages: [
-      { role: "user", content: buildRefreshPrompt(post, queries, research, existingPosts) },
-    ],
+    messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
   const content = response.choices[0]?.message?.content;
@@ -187,7 +196,7 @@ export async function refreshOnePost(forcedSlug?: string): Promise<GeneratedPost
     if (errors.length > 0) {
       console.warn(`[blog-refresher] Refresh draft failed validation, retrying once:\n- ${errors.join("\n- ")}`);
       stage = "llm-refresh-retry";
-      draft = await draftRefresh(post, candidate.queries, research, existingPosts);
+      draft = await draftRefresh(post, candidate.queries, research, existingPosts, errors);
       stage = "validation";
       errors = validateRefreshDraft(draft, post.slug, allSlugs);
       if (errors.length > 0) {
