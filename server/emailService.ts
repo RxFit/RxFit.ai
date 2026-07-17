@@ -29,7 +29,7 @@ function createMimeMessage(to: string, subject: string, htmlBody: string): strin
   return Buffer.from(message).toString('base64url');
 }
 
-function getWelcomeEmailHtml(name: string, planName: string): string {
+export function getWelcomeEmailHtml(name: string, planName: string): string {
   const firstName = escapeHtml(name ? name.split(' ')[0] : 'there');
   const safePlanName = escapeHtml(planName);
   return `
@@ -91,7 +91,7 @@ function getWelcomeEmailHtml(name: string, planName: string): string {
 </html>`;
 }
 
-function getLeadWelcomeEmailHtml(name: string): string {
+export function getLeadWelcomeEmailHtml(name: string): string {
   const firstName = escapeHtml(name ? name.split(' ')[0] : 'there');
   return `
 <!DOCTYPE html>
@@ -226,18 +226,15 @@ async function getOwnerEmail(): Promise<string> {
   throw new Error('Could not resolve owner email (set OWNER_NOTIFICATION_EMAIL to override)');
 }
 
-/** Notify the owner that the auto-publisher shipped a new blog post. Throws on failure. */
-export async function sendPostPublishedEmail(post: {
+export function getPostPublishedEmailHtml(post: {
   title: string;
   slug: string;
   keywordTheme: string;
   pillar: string;
   readingMinutes: number;
-}): Promise<void> {
-  const gmail = await getUncachableGmailClient();
-  const to = await getOwnerEmail();
-  const url = `https://rxfit.ai/blog/${post.slug}`;
-  const html = `
+}): string {
+  const url = `https://rxfit.ai/blog/${encodeURIComponent(post.slug)}`;
+  return `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
@@ -255,23 +252,27 @@ export async function sendPostPublishedEmail(post: {
     </td></tr>
   </table>
 </body></html>`;
+}
+
+/** Notify the owner that the auto-publisher shipped a new blog post. Throws on failure. */
+export async function sendPostPublishedEmail(post: {
+  title: string;
+  slug: string;
+  keywordTheme: string;
+  pillar: string;
+  readingMinutes: number;
+}): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const to = await getOwnerEmail();
+  const html = getPostPublishedEmailHtml(post);
   const raw = createMimeMessage(to, `✅ New RxFit.ai blog post live: ${post.title}`, html);
   await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
   console.log(`[blog-publisher] Publish notification sent to ${to}`);
 }
 
-/**
- * Notify the owner that an auto-publish run failed. Best-effort (never throws).
- * Returns true when the email was actually sent, false when sending failed —
- * callers can use this to fall back to a second alert channel (e.g. the
- * Google Sheet) when Gmail itself is down.
- */
-export async function sendPostFailureEmail(stage: string, error: unknown): Promise<boolean> {
-  try {
-    const gmail = await getUncachableGmailClient();
-    const to = await getOwnerEmail();
-    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
-    const html = `
+/** Owner failure alerts are deliberately red-branded (#EF4444), not gold. */
+export function getPostFailureEmailHtml(stage: string, message: string): string {
+  return `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
@@ -288,6 +289,20 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
     </td></tr>
   </table>
 </body></html>`;
+}
+
+/**
+ * Notify the owner that an auto-publish run failed. Best-effort (never throws).
+ * Returns true when the email was actually sent, false when sending failed —
+ * callers can use this to fall back to a second alert channel (e.g. the
+ * Google Sheet) when Gmail itself is down.
+ */
+export async function sendPostFailureEmail(stage: string, error: unknown): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
+    const html = getPostFailureEmailHtml(stage, message);
     const raw = createMimeMessage(to, `❌ RxFit.ai blog auto-publish failed (${stage})`, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[blog-publisher] Failure notification sent to ${to}`);
@@ -298,26 +313,17 @@ export async function sendPostFailureEmail(stage: string, error: unknown): Promi
   }
 }
 
-/**
- * Notify the owner that an existing post was refreshed by the SEO feedback loop.
- * Best-effort (never throws). Returns true when the email was actually sent,
- * false when sending failed — callers can use this to fall back to a second
- * alert channel (e.g. the Google Sheet) when Gmail itself is down.
- */
-export async function sendPostRefreshedEmail(
+export function getPostRefreshedEmailHtml(
   post: { title: string; slug: string; refreshCount: number },
   reason: string,
   queries: string[],
-): Promise<boolean> {
-  try {
-    const gmail = await getUncachableGmailClient();
-    const to = await getOwnerEmail();
-    const url = `https://rxfit.ai/blog/${post.slug}`;
-    const queryLine =
-      queries.length > 0
-        ? `<p style="color:#94A3B8;font-size:14px;margin:0 0 4px;">Target queries: ${escapeHtml(queries.slice(0, 5).join(', '))}</p>`
-        : '';
-    const html = `
+): string {
+  const url = `https://rxfit.ai/blog/${encodeURIComponent(post.slug)}`;
+  const queryLine =
+    queries.length > 0
+      ? `<p style="color:#94A3B8;font-size:14px;margin:0 0 4px;">Target queries: ${escapeHtml(queries.slice(0, 5).join(', '))}</p>`
+      : '';
+  return `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
@@ -336,6 +342,23 @@ export async function sendPostRefreshedEmail(
     </td></tr>
   </table>
 </body></html>`;
+}
+
+/**
+ * Notify the owner that an existing post was refreshed by the SEO feedback loop.
+ * Best-effort (never throws). Returns true when the email was actually sent,
+ * false when sending failed — callers can use this to fall back to a second
+ * alert channel (e.g. the Google Sheet) when Gmail itself is down.
+ */
+export async function sendPostRefreshedEmail(
+  post: { title: string; slug: string; refreshCount: number },
+  reason: string,
+  queries: string[],
+): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const html = getPostRefreshedEmailHtml(post, reason, queries);
     const raw = createMimeMessage(to, `🔄 RxFit.ai post refreshed: ${post.title}`, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[blog-refresher] Refresh notification sent to ${to}`);
@@ -346,19 +369,14 @@ export async function sendPostRefreshedEmail(
   }
 }
 
-/**
- * Notify the owner that Stripe or Gmail credentials stopped resolving.
- * Best-effort (never throws). Returns true when the email was actually sent,
- * false when sending failed — callers can use this to fall back to a second
- * alert channel (e.g. the Google Sheet) when Gmail itself is down.
- */
-export async function sendCredentialAlertEmail(service: string, error: unknown): Promise<boolean> {
-  try {
-    const gmail = await getUncachableGmailClient();
-    const to = await getOwnerEmail();
-    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
-    const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service === 'products' ? 'Stripe plan tiers' : service === 'pricing' ? 'Pricing served to buyers' : service;
-    const impact =
+export function credentialServiceLabel(service: string): string {
+  return service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service === 'products' ? 'Stripe plan tiers' : service === 'pricing' ? 'Pricing served to buyers' : service;
+}
+
+/** Owner alert emails are deliberately red-branded (#EF4444), not gold. */
+export function getCredentialAlertEmailHtml(service: string, message: string): string {
+  const serviceLabel = credentialServiceLabel(service);
+  const impact =
       service === 'stripe'
         ? 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.'
         : service === 'sheets'
@@ -368,7 +386,7 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
         : service === 'pricing'
         ? 'Buyers on rxfit.ai are seeing STALE pricing (last-known-good snapshot) or no pricing at all — the live catalog (DB sync and Stripe API) is unreachable. Check the Stripe connection and database.'
         : 'Welcome/lead emails and blog notifications will fail until this is fixed.';
-    const html = `
+  return `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
@@ -385,7 +403,21 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     </td></tr>
   </table>
 </body></html>`;
-    const raw = createMimeMessage(to, `🚨 RxFit.ai: ${serviceLabel} credentials are broken`, html);
+}
+
+/**
+ * Notify the owner that Stripe or Gmail credentials stopped resolving.
+ * Best-effort (never throws). Returns true when the email was actually sent,
+ * false when sending failed — callers can use this to fall back to a second
+ * alert channel (e.g. the Google Sheet) when Gmail itself is down.
+ */
+export async function sendCredentialAlertEmail(service: string, error: unknown): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    const to = await getOwnerEmail();
+    const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
+    const html = getCredentialAlertEmailHtml(service, message);
+    const raw = createMimeMessage(to, `🚨 RxFit.ai: ${credentialServiceLabel(service)} credentials are broken`, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[credential-check] Alert email sent to ${to} for ${service}`);
     return true;
@@ -395,19 +427,10 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
   }
 }
 
-/**
- * Weekly digest of alert rows that landed in the "RxFit Alerts" sheet tab
- * since the last digest. Throws on failure so the digest scheduler can skip
- * bumping its state and retry hourly — that retry loop is what guarantees
- * sheet-only alerts (written during a Gmail outage) eventually reach the
- * inbox once Gmail recovers.
- */
-export async function sendAlertsDigestEmailOrThrow(
+export function getAlertsDigestEmailHtml(
   rows: { date: string; title: string; details: string }[],
   since: Date | null,
-): Promise<void> {
-  const gmail = await getUncachableGmailClient();
-  const to = await getOwnerEmail();
+): string {
   const MAX_ROWS = 50;
   const shown = rows.slice(0, MAX_ROWS);
   const sinceLabel = since
@@ -430,7 +453,7 @@ export async function sendAlertsDigestEmailOrThrow(
     rows.length > MAX_ROWS
       ? `<p style="color:#94A3B8;font-size:13px;margin:12px 0 0;">…and ${rows.length - MAX_ROWS} more row(s) — see the "RxFit Alerts" tab in the leads spreadsheet.</p>`
       : '';
-  const html = `
+  return `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
@@ -449,6 +472,22 @@ export async function sendAlertsDigestEmailOrThrow(
     </td></tr>
   </table>
 </body></html>`;
+}
+
+/**
+ * Weekly digest of alert rows that landed in the "RxFit Alerts" sheet tab
+ * since the last digest. Throws on failure so the digest scheduler can skip
+ * bumping its state and retry hourly — that retry loop is what guarantees
+ * sheet-only alerts (written during a Gmail outage) eventually reach the
+ * inbox once Gmail recovers.
+ */
+export async function sendAlertsDigestEmailOrThrow(
+  rows: { date: string; title: string; details: string }[],
+  since: Date | null,
+): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const to = await getOwnerEmail();
+  const html = getAlertsDigestEmailHtml(rows, since);
   const raw = createMimeMessage(
     to,
     `📋 RxFit.ai weekly alerts digest — ${rows.length} unresolved alert row(s)`,
@@ -481,3 +520,51 @@ export async function sendLeadEmail(email: string, name: string): Promise<void> 
     await recordCustomerEmailFailure('lead', email, name, error);
   }
 }
+
+/**
+ * Registry of every HTML-producing email template, used by the brand-palette
+ * regression test (server/emailService.palette.test.ts). Each entry renders
+ * its template with a caller-supplied probe string in every dynamic text
+ * field, so the test can assert (a) no retired teal/coral palette colors,
+ * (b) the correct brand color per template family (customer/notification
+ * emails are champagne gold #D4AF37; owner failure alerts are deliberately
+ * red #EF4444), and (c) dynamic strings arrive HTML-escaped.
+ *
+ * ADDING A NEW EMAIL TEMPLATE? Register it here — the test counts the
+ * HTML doctype declarations in this file and fails if a template exists
+ * that is not in this registry.
+ */
+export const EMAIL_TEMPLATES: Record<
+  string,
+  { brand: 'gold' | 'alert'; render: (probe: string) => string }
+> = {
+  welcome: {
+    brand: 'gold',
+    render: (p) => getWelcomeEmailHtml(p, p),
+  },
+  leadWelcome: {
+    brand: 'gold',
+    render: (p) => getLeadWelcomeEmailHtml(p),
+  },
+  postPublished: {
+    brand: 'gold',
+    render: (p) =>
+      getPostPublishedEmailHtml({ title: p, slug: 'a-slug', keywordTheme: p, pillar: p, readingMinutes: 5 }),
+  },
+  postRefreshed: {
+    brand: 'gold',
+    render: (p) => getPostRefreshedEmailHtml({ title: p, slug: 'a-slug', refreshCount: 2 }, p, [p]),
+  },
+  alertsDigest: {
+    brand: 'gold',
+    render: (p) => getAlertsDigestEmailHtml([{ date: '2026-07-17T00:00:00Z', title: p, details: p }], new Date('2026-07-10T00:00:00Z')),
+  },
+  postFailure: {
+    brand: 'alert',
+    render: (p) => getPostFailureEmailHtml(p, p),
+  },
+  credentialAlert: {
+    brand: 'alert',
+    render: (p) => getCredentialAlertEmailHtml(p, p),
+  },
+};
