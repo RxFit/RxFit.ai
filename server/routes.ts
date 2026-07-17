@@ -387,12 +387,17 @@ export async function registerRoutes(
   // Merge/sort/fall-through logic lives in createBlogIndexHandler
   // (server/blogIndexRoute.ts) so the contract is route-level tested in
   // server/blogIndexRoute.test.ts.
+  // A DB-merge failure here degrades to the prerendered static index —
+  // which omits every AI-published post — so the handler reports its
+  // serving outcome into the same "blogSsr" health service as /blog/:slug
+  // (one owner alert per outage, recovery resets, fire-and-forget).
   app.get(
     "/blog",
     createBlogIndexHandler({
       readMdxCards: () => readMdxIndexCards(),
       getPublishedPosts: () => storage.getPublishedGeneratedPosts(),
       renderPage: (posts) => renderBlogIndexPage(posts),
+      reportServing: reportBlogSsrServing,
     }),
   );
 

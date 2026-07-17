@@ -11,6 +11,12 @@
  * - DB error → next() so the prerendered static index serves instead of a 500
  * - MDX read error → next() (same degradation)
  * - render returns null (dev — no template) → next()
+ * - serving outcomes reported into the shared "blogSsr" health service
+ *   (reportServing dep, wired to reportBlogSsrServing in routes.ts): healthy
+ *   on full merged-index serves, broken when the DB merge / MDX read throws
+ *   and the stale static index (no AI posts) serves instead — fire-and-forget
+ *   so monitoring can never break the route; render-null is deliberately NOT
+ *   reported (dev has no template by design)
  *
  * blogSsr.index.test.ts covers WHAT the rendered index contains; these tests
  * cover WHETHER the route merges and serves it at all — a routes.ts refactor
@@ -222,6 +228,107 @@ describe("GET /blog index route", () => {
   });
 });
 
+describe("blog index health reporting (reportServing)", () => {
+  it("reports ok=true after serving the full merged index as crawler HTML", async () => {
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    const { res } = await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => [dbPost()],
+      renderPage: (posts) => renderBlogIndexPage(posts, TEMPLATE),
+      reportServing,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(reportServing).toHaveBeenCalledTimes(1);
+    expect(reportServing).toHaveBeenCalledWith(true, undefined);
+  });
+
+  it("reports ok=false with the error when the DB merge throws (stale static index serves)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    const boom = new Error("db down");
+    const { next } = await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => {
+        throw boom;
+      },
+      renderPage: vi.fn(),
+      reportServing,
+    });
+    errorSpy.mockRestore();
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(reportServing).toHaveBeenCalledTimes(1);
+    expect(reportServing).toHaveBeenCalledWith(false, boom);
+  });
+
+  it("reports ok=false when reading MDX cards throws (same degradation)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    const boom = new Error("fs unavailable");
+    await run({
+      readMdxCards: () => {
+        throw boom;
+      },
+      getPublishedPosts: async () => [dbPost()],
+      renderPage: vi.fn(),
+      reportServing,
+    });
+    errorSpy.mockRestore();
+
+    expect(reportServing).toHaveBeenCalledTimes(1);
+    expect(reportServing).toHaveBeenCalledWith(false, boom);
+  });
+
+  it("does NOT report on the render-null fall-through (dev has no template — not an outage)", async () => {
+    const reportServing = vi.fn().mockResolvedValue(undefined);
+    await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => [dbPost()],
+      renderPage: () => null,
+      reportServing,
+    });
+
+    expect(reportServing).not.toHaveBeenCalled();
+  });
+
+  it("never breaks the route when the reporter rejects or throws (fire-and-forget)", async () => {
+    const rejecting = vi.fn().mockRejectedValue(new Error("monitoring down"));
+    const { res } = await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => [dbPost()],
+      renderPage: (posts) => renderBlogIndexPage(posts, TEMPLATE),
+      reportServing: rejecting,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const throwing = vi.fn().mockImplementation(() => {
+      throw new Error("sync throw");
+    });
+    const second = await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => [dbPost()],
+      renderPage: (posts) => renderBlogIndexPage(posts, TEMPLATE),
+      reportServing: throwing,
+    });
+    expect(second.res.statusCode).toBe(200);
+
+    // The broken-path report is fire-and-forget too: a rejecting reporter on
+    // the DB-throw path still falls through cleanly instead of crashing.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const third = await run({
+      readMdxCards: () => [MDX_CARD],
+      getPublishedPosts: async () => {
+        throw new Error("db down");
+      },
+      renderPage: vi.fn(),
+      reportServing: rejecting,
+    });
+    errorSpy.mockRestore();
+    expect(third.next).toHaveBeenCalledOnce();
+  });
+});
+
 describe("mergeIndexCards", () => {
   it("maps DB null fields to undefined so the renderer's optional handling applies", () => {
     const merged = mergeIndexCards(
@@ -244,6 +351,13 @@ describe("routes.ts wiring", () => {
     expect(registration![0]).toContain("readMdxIndexCards");
     expect(registration![0]).toContain("getPublishedGeneratedPosts");
     expect(registration![0]).toContain("renderBlogIndexPage");
+  });
+
+  it("wires reportServing to the shared blogSsr health service (owner alerted on stale-index outages)", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "routes.ts"), "utf-8");
+    const registration = source.match(/app\.get\(\s*"\/blog",[\s\S]{0,400}?\);/);
+    expect(registration).not.toBeNull();
+    expect(registration![0]).toContain("reportServing: reportBlogSsrServing");
   });
 
   it("passes the real, unit-tested MDX reader (not a re-inlined copy) into the handler", () => {

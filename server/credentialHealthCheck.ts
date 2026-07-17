@@ -341,14 +341,17 @@ export async function reportPricingServing(ok: boolean, error?: unknown): Promis
 }
 
 /**
- * Event-driven blog-SSR monitor, reported from the GET /blog/:slug handler
- * (server/blogSlugRoute.ts): `ok=false` when storage threw and the route
- * degraded to the SPA shell — visitors still get a page, but crawlers are
- * silently served thin client-side HTML for every AI-published post while
- * the outage lasts; `ok=true` when a published DB post was served as full
- * crawler HTML. Uses the same healthy→broken transition + alert chain
- * (email → sheet fallback) as the periodic checks, so the owner is alerted
- * once per outage and recovery resets the state.
+ * Event-driven blog-SSR monitor, reported from BOTH crawler-facing blog
+ * routes: the GET /blog/:slug handler (server/blogSlugRoute.ts) and the
+ * GET /blog index handler (server/blogIndexRoute.ts). `ok=false` when
+ * storage threw and the route degraded — the slug route serves the SPA
+ * shell (crawlers silently get thin client-side HTML for every AI post),
+ * the index route serves the prerendered static file (crawlers silently
+ * get a stale index that omits every AI-published post) — while the outage
+ * lasts; `ok=true` when full crawler HTML was served (a published DB post,
+ * or the merged MDX+DB index). Both routes share one service deliberately:
+ * a DB outage breaks both the same way, so the owner gets ONE alert per
+ * outage (email → sheet fallback), and recovery resets the state.
  */
 export async function reportBlogSsrServing(ok: boolean, error?: unknown): Promise<void> {
   try {

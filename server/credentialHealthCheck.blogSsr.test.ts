@@ -1,9 +1,12 @@
 /**
- * The "blogSsr" service is event-driven: the GET /blog/:slug handler reports
- * every DB-post serving outcome via reportBlogSsrServing. When storage throws,
- * the route deliberately degrades to the SPA shell (good for visitors), but
- * crawlers then silently get thin client-side HTML for every AI-published
- * post while the outage lasts — a broken state search engines actually see,
+ * The "blogSsr" service is event-driven: BOTH crawler-facing blog routes
+ * report their serving outcomes via reportBlogSsrServing — GET /blog/:slug
+ * (server/blogSlugRoute.ts) and the GET /blog index
+ * (server/blogIndexRoute.ts). When storage throws, each route deliberately
+ * degrades (good for visitors): the slug route serves the SPA shell, the
+ * index route serves the prerendered static index that omits every
+ * AI-published post — but crawlers then silently see thin or stale HTML
+ * while the outage lasts — a broken state search engines actually see,
  * so it must trigger the same healthy→broken owner alert chain
  * (email → alerts-sheet fallback) used by the periodic credential checks:
  * one alert per outage, recovery resets the state, and the /admin health
