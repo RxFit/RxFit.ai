@@ -23,7 +23,11 @@ import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServi
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
 import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
-import { createStripeSessionRateLimit, createStripeReadRateLimit } from "./stripeRateLimits";
+import {
+  createStripeSessionRateLimit,
+  createStripeReadRateLimit,
+  createPricingThrottleReporter,
+} from "./stripeRateLimits";
 import { createEmailPreviewsHandler } from "./emailPreviewRoute";
 
 function parseFrontmatter(raw: string): Record<string, any> {
@@ -53,7 +57,14 @@ const checkoutRateLimit = createCheckoutRateLimit();
 const sessionRateLimit = createStripeSessionRateLimit();
 const customerPortalRateLimit = createStripeSessionRateLimit();
 const stripeDiagRateLimit = createStripeSessionRateLimit();
-const productsRateLimit = createStripeReadRateLimit();
+// The products limiter reports sustained mass-throttling into the pricing
+// monitor: when the limiter 429s, the handler's reportPricingServing never
+// runs, so without this hook a throttling event would blank pricing for real
+// buyers while the health card stayed green. Threshold-gated so a single
+// stray 429 doesn't page the owner.
+const productsRateLimit = createStripeReadRateLimit({
+  onLimited: createPricingThrottleReporter({ report: reportPricingServing }),
+});
 const publishableKeyRateLimit = createStripeReadRateLimit();
 
 export async function registerRoutes(

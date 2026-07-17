@@ -28,6 +28,8 @@ import type { Server } from "node:http";
 import {
   createStripeSessionRateLimit,
   createStripeReadRateLimit,
+  createPricingThrottleReporter,
+  PRICING_THROTTLE_ALERT_THRESHOLD,
 } from "./stripeRateLimits";
 
 async function withServer(
@@ -125,6 +127,147 @@ describe("createStripeReadRateLimit — generous tier", () => {
   }, 15000);
 });
 
+describe("createStripeReadRateLimit — onLimited hook (pricing-blackout monitor)", () => {
+  it("calls onLimited on every 429 but never on a 200, and keeps the standard 429 body", async () => {
+    let limitedCalls = 0;
+    await withServer(
+      (app) => {
+        app.get(
+          "/api/stripe/products",
+          createStripeReadRateLimit({ onLimited: () => limitedCalls++ }),
+          (_req, res) => {
+            res.status(200).json({ data: [] });
+          },
+        );
+      },
+      async (base) => {
+        const get = () => fetch(`${base}/api/stripe/products`);
+        for (let batch = 0; batch < 10; batch++) {
+          const results = await Promise.all(Array.from({ length: 10 }, get));
+          for (const res of results) expect(res.status).toBe(200);
+        }
+        expect(limitedCalls).toBe(0);
+        const first429 = await get();
+        expect(first429.status).toBe(429);
+        expect(await first429.json()).toEqual(LIMIT_BODY);
+        expect(limitedCalls).toBe(1);
+        const second429 = await get();
+        expect(second429.status).toBe(429);
+        expect(limitedCalls).toBe(2);
+      },
+    );
+  }, 15000);
+
+  it("a throwing onLimited hook never breaks the 429 response", async () => {
+    await withServer(
+      (app) => {
+        app.get(
+          "/api/stripe/products",
+          createStripeReadRateLimit({
+            onLimited: () => {
+              throw new Error("monitoring blew up");
+            },
+          }),
+          (_req, res) => {
+            res.status(200).json({ data: [] });
+          },
+        );
+      },
+      async (base) => {
+        const get = () => fetch(`${base}/api/stripe/products`);
+        for (let batch = 0; batch < 10; batch++) {
+          await Promise.all(Array.from({ length: 10 }, get));
+        }
+        const throttled = await get();
+        expect(throttled.status).toBe(429);
+        expect(await throttled.json()).toEqual(LIMIT_BODY);
+      },
+    );
+  }, 15000);
+});
+
+describe("createPricingThrottleReporter — threshold-gated pricing report", () => {
+  it("does not report below the threshold (one stray 429 never pages the owner)", () => {
+    const reports: Array<{ ok: boolean; error?: unknown }> = [];
+    const onLimited = createPricingThrottleReporter({
+      report: (ok, error) => {
+        reports.push({ ok, error });
+      },
+      threshold: 5,
+      windowMs: 60_000,
+      now: () => 1_000,
+    });
+    for (let i = 0; i < 4; i++) onLimited();
+    expect(reports).toHaveLength(0);
+  });
+
+  it("reports broken (ok=false) once the 429 count reaches the threshold within the window", () => {
+    const reports: Array<{ ok: boolean; error?: unknown }> = [];
+    const onLimited = createPricingThrottleReporter({
+      report: (ok, error) => {
+        reports.push({ ok, error });
+      },
+      threshold: 5,
+      windowMs: 60_000,
+      now: () => 1_000,
+    });
+    for (let i = 0; i < 5; i++) onLimited();
+    expect(reports).toHaveLength(1);
+    expect(reports[0].ok).toBe(false);
+    expect(String((reports[0].error as Error).message)).toMatch(/429/);
+    expect(String((reports[0].error as Error).message)).toMatch(/pricing/i);
+    // Continued throttling keeps reporting broken — recordOutcome dedupes
+    // alerts (only the healthy→broken transition pages the owner), so this
+    // is safe and keeps the status snapshot's lastCheckedAt fresh.
+    onLimited();
+    expect(reports).toHaveLength(2);
+    expect(reports[1].ok).toBe(false);
+  });
+
+  it("old 429s outside the rolling window do not count toward the threshold", () => {
+    const reports: Array<{ ok: boolean }> = [];
+    let t = 0;
+    const onLimited = createPricingThrottleReporter({
+      report: (ok) => {
+        reports.push({ ok });
+      },
+      threshold: 3,
+      windowMs: 1_000,
+      now: () => t,
+    });
+    onLimited(); // t=0
+    t = 400;
+    onLimited(); // t=400
+    t = 2_000; // both prior hits now outside the 1s window
+    onLimited();
+    expect(reports).toHaveLength(0);
+    t = 2_100;
+    onLimited();
+    t = 2_200;
+    onLimited(); // 3 hits within window → report
+    expect(reports).toHaveLength(1);
+    expect(reports[0].ok).toBe(false);
+  });
+
+  it("a rejecting async report function is swallowed (fire-and-forget)", async () => {
+    const onLimited = createPricingThrottleReporter({
+      report: async () => {
+        throw new Error("report channel down");
+      },
+      threshold: 1,
+      windowMs: 60_000,
+    });
+    expect(() => onLimited()).not.toThrow();
+    // Let the rejected promise settle; the .catch inside must swallow it
+    // (an unhandled rejection would fail the test run).
+    await new Promise((r) => setTimeout(r, 10));
+  });
+
+  it("default threshold is high enough that a single stray 429 can't page the owner", () => {
+    expect(PRICING_THROTTLE_ALERT_THRESHOLD).toBeGreaterThan(1);
+  });
+});
+
 describe("wiring guards — routes.ts keeps every Stripe-touching route behind its limiter", () => {
   const routesSrc = fs.readFileSync(path.join(__dirname, "routes.ts"), "utf8");
 
@@ -132,7 +275,9 @@ describe("wiring guards — routes.ts keeps every Stripe-touching route behind i
     expect(routesSrc).toMatch(/const\s+sessionRateLimit\s*=\s*createStripeSessionRateLimit\(\)/);
     expect(routesSrc).toMatch(/const\s+customerPortalRateLimit\s*=\s*createStripeSessionRateLimit\(\)/);
     expect(routesSrc).toMatch(/const\s+stripeDiagRateLimit\s*=\s*createStripeSessionRateLimit\(\)/);
-    expect(routesSrc).toMatch(/const\s+productsRateLimit\s*=\s*createStripeReadRateLimit\(\)/);
+    expect(routesSrc).toMatch(
+      /const\s+productsRateLimit\s*=\s*createStripeReadRateLimit\(\s*\{\s*onLimited:\s*createPricingThrottleReporter\(\s*\{\s*report:\s*reportPricingServing\s*\}\s*\)/,
+    );
     expect(routesSrc).toMatch(/const\s+publishableKeyRateLimit\s*=\s*createStripeReadRateLimit\(\)/);
   });
 
