@@ -17,6 +17,7 @@ import { STATIC_SITEMAP_URLS } from "./sitemapStatic";
 import { buildRobotsTxt } from "./robots";
 import { renderGeneratedPostPage, renderBlogIndexPage, type BlogIndexCard } from "./blogSsr";
 import { createBlogSlugHandler } from "./blogSlugRoute";
+import { createBlogIndexHandler } from "./blogIndexRoute";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing } from "./credentialHealthCheck";
@@ -411,34 +412,17 @@ export async function registerRoutes(
       .filter((p) => p.title && !p.slug.startsWith("_"));
   };
 
-  app.get("/blog", async (_req, res, next) => {
-    try {
-      const mdxCards = readMdxIndexCards();
-      const mdxSlugs = new Set(mdxCards.map((p) => p.slug));
-      const dbCards: BlogIndexCard[] = (await storage.getPublishedGeneratedPosts())
-        .filter((p) => !mdxSlugs.has(p.slug))
-        .map((p) => ({
-          slug: p.slug,
-          title: p.title,
-          description: p.description,
-          date: p.date,
-          updatedDate: p.updatedDate ?? undefined,
-          heroImage: p.heroImage ?? undefined,
-          author: p.author,
-          tags: p.tags,
-          readingMinutes: p.readingMinutes,
-        }));
-      const posts = [...mdxCards, ...dbCards].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
-      const page = renderBlogIndexPage(posts);
-      if (!page) return next();
-      return res.status(200).type("html").send(page);
-    } catch (error) {
-      console.error("Error rendering blog index page:", error);
-      return next();
-    }
-  });
+  // Merge/sort/fall-through logic lives in createBlogIndexHandler
+  // (server/blogIndexRoute.ts) so the contract is route-level tested in
+  // server/blogIndexRoute.test.ts.
+  app.get(
+    "/blog",
+    createBlogIndexHandler({
+      readMdxCards: readMdxIndexCards,
+      getPublishedPosts: () => storage.getPublishedGeneratedPosts(),
+      renderPage: (posts) => renderBlogIndexPage(posts),
+    }),
+  );
 
   // Runtime SSR for generated posts: prerendered MDX posts are static files,
   // but DB posts appear after the deploy, so their crawlable HTML is rendered
