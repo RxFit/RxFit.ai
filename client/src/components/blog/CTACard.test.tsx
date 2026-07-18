@@ -2,11 +2,16 @@
  * @vitest-environment jsdom
  *
  * Guards the inline CTA card impression contract: `cta_card_shown`
- * {slug, tier} fires exactly once per card, the first time the card becomes
- * at least half visible (IntersectionObserver, threshold 0.5) — never for
- * cards the reader doesn't scroll to. This gives Plausible a true
+ * {slug, tier, plan} fires exactly once per card, the first time the card
+ * becomes at least half visible (IntersectionObserver, threshold 0.5) —
+ * never for cards the reader doesn't scroll to. This gives Plausible a true
  * impression→click denominator per tier and placement depth, so a low click
  * count can be told apart from "the card sits below where readers stop."
+ *
+ * Prop-naming contract (guarded here on BOTH events): the plan is sent under
+ * both `tier` AND `plan` with the same value, because historically the
+ * impression only sent `tier` and the click only sent `plan`, silently
+ * splitting the same plan across two labels in Plausible breakdowns.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
@@ -79,7 +84,7 @@ describe("CTACard impression tracking", () => {
     vi.unstubAllGlobals();
   });
 
-  it("fires cta_card_shown {slug, tier} once the card first becomes half visible — not on mount", () => {
+  it("fires cta_card_shown {slug, tier, plan} once the card first becomes half visible — not on mount", () => {
     render(<CTACard plan="kickstart" slug="test-post" />);
 
     // Card renders and is observed at the 50% visibility threshold,
@@ -92,7 +97,7 @@ describe("CTACard impression tracking", () => {
 
     observer.intersect(true);
     expect(eventsNamed("cta_card_shown")).toEqual([
-      ["cta_card_shown", { slug: "test-post", tier: "kickstart" }],
+      ["cta_card_shown", { slug: "test-post", tier: "kickstart", plan: "kickstart" }],
     ]);
   });
 
@@ -107,7 +112,7 @@ describe("CTACard impression tracking", () => {
 
     observer.intersect(true, 0.6);
     expect(eventsNamed("cta_card_shown")).toEqual([
-      ["cta_card_shown", { slug: "test-post", tier: "kickstart" }],
+      ["cta_card_shown", { slug: "test-post", tier: "kickstart", plan: "kickstart" }],
     ]);
   });
 
@@ -145,8 +150,8 @@ describe("CTACard impression tracking", () => {
     lastObserver().intersect(true);
 
     expect(eventsNamed("cta_card_shown")).toEqual([
-      ["cta_card_shown", { slug: "post-one", tier: "kickstart" }],
-      ["cta_card_shown", { slug: "post-two", tier: "kickstart" }],
+      ["cta_card_shown", { slug: "post-one", tier: "kickstart", plan: "kickstart" }],
+      ["cta_card_shown", { slug: "post-two", tier: "kickstart", plan: "kickstart" }],
     ]);
   });
 
@@ -162,13 +167,13 @@ describe("CTACard impression tracking", () => {
     // Only the first card is scrolled to.
     first.intersect(true);
     expect(eventsNamed("cta_card_shown")).toEqual([
-      ["cta_card_shown", { slug: "test-post", tier: "kickstart" }],
+      ["cta_card_shown", { slug: "test-post", tier: "kickstart", plan: "kickstart" }],
     ]);
 
     second.intersect(true);
     expect(eventsNamed("cta_card_shown")).toEqual([
-      ["cta_card_shown", { slug: "test-post", tier: "kickstart" }],
-      ["cta_card_shown", { slug: "test-post", tier: "transformation" }],
+      ["cta_card_shown", { slug: "test-post", tier: "kickstart", plan: "kickstart" }],
+      ["cta_card_shown", { slug: "test-post", tier: "transformation", plan: "transformation" }],
     ]);
   });
 
@@ -177,8 +182,11 @@ describe("CTACard impression tracking", () => {
     lastObserver().intersect(true);
 
     fireEvent.click(screen.getByTestId("button-blog-cta-kickstart"));
+    // The click must carry the SAME unified prop pair as the impression
+    // (`plan` AND `tier`), so a per-plan impression→click breakdown never
+    // splits one plan across two labels.
     expect(eventsNamed("cta_inline_click")).toEqual([
-      ["cta_inline_click", { plan: "kickstart", slug: "test-post" }],
+      ["cta_inline_click", { plan: "kickstart", tier: "kickstart", slug: "test-post" }],
     ]);
     expect(openMock).toHaveBeenCalledWith("kickstart");
     expect(eventsNamed("cta_card_shown")).toHaveLength(1);

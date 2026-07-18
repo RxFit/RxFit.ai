@@ -104,7 +104,11 @@ export function CTACard({
         // impression denominator with barely-visible cards.
         if (fired || !entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.5)) return;
         fired = true;
-        track("cta_card_shown", { slug, tier: plan });
+        // Both CTA events send the plan under BOTH prop names (`tier` and
+        // `plan`, same value): historically the impression only had `tier`
+        // and the click only had `plan`, which silently split Plausible
+        // breakdowns. Old dashboards keep working; new ones can use either.
+        track("cta_card_shown", { slug, tier: plan, plan });
         observer.disconnect();
       },
       { threshold: 0.5 },
@@ -121,7 +125,8 @@ export function CTACard({
         <p className="text-lg text-foreground font-medium mb-6 max-w-xl">{copy.pitch}</p>
         <button
           onClick={() => {
-            track("cta_inline_click", { plan, slug });
+            // `tier` + `plan` both sent — see the impression note above.
+            track("cta_inline_click", { plan, tier: plan, slug });
             open(plan);
           }}
           className="btn-primary px-6 py-3 rounded-xl inline-flex items-center gap-2"
