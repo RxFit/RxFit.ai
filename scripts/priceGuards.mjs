@@ -33,7 +33,10 @@ export function scanCodeForHardcodedPrices(pricing, relPath, content) {
   const { amounts, trialDays } = pricing;
   const amountRes = amounts.map((a) => ({
     amount: a,
-    re: new RegExp(`\\$${a}(?![\\d.])`, "g"),
+    // (?!\d) stops half-matching longer amounts ("$490" for a=49);
+    // (?!\.\d) stops half-matching cents ("$49.99") while still matching a
+    // sentence-ending "$49." — a plain period after the amount is a match.
+    re: new RegExp(`\\$${a}(?!\\d)(?!\\.\\d)`, "g"),
   }));
   const trialRes = [
     new RegExp(`\\b${trialDays}[-\\s][Dd]ay\\b`, "g"),
@@ -99,7 +102,9 @@ export function scanMdxPriceClaims(pricing, file, body) {
   const sentences = body.split(/(?<=[.!?])\s+|\n/);
   for (const sentence of sentences) {
     if (!/rxfit/i.test(sentence)) continue;
-    for (const m of sentence.matchAll(/\$(\d+)(?![\d.])/g)) {
+    // (?!\d)(?!\.\d): don't half-match cents ("$49.99"), but DO match a
+    // whole-dollar amount at sentence end ("RxFit is $53.").
+    for (const m of sentence.matchAll(/\$(\d+)(?!\d)(?!\.\d)/g)) {
       const val = Number(m[1]);
       if (!allowedDollars.has(val))
         out.push(`${file}: RxFit price mention "$${m[1]}" does not match any PLAN_PRICING amount/savings (${[...allowedDollars].join(", ")}) — update this sentence: "${sentence.trim().slice(0, 100)}"`);
@@ -164,7 +169,9 @@ export function scanFaqPriceClaims(pricing, file, faq) {
         out.push(`${label}: trial claim "${m[0]}" no longer matches PLAN_PRICING trialDays (${trialDays})`);
     }
     if (!/rxfit/i.test(text)) return;
-    for (const m of text.matchAll(/\$(\d+)(?![\d.])/g)) {
+    // Same pattern as the body scan: no cents half-matches, but
+    // sentence-ending "$53." is a match.
+    for (const m of text.matchAll(/\$(\d+)(?!\d)(?!\.\d)/g)) {
       const val = Number(m[1]);
       if (!allowedDollars.has(val))
         out.push(`${label}: RxFit price mention "$${m[1]}" does not match any PLAN_PRICING amount/savings (${[...allowedDollars].join(", ")}) — fix this Q/A: "${text.trim().slice(0, 100)}"`);

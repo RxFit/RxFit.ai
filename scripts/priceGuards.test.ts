@@ -72,6 +72,16 @@ describe("scanCodeForHardcodedPrices", () => {
     expect(errs).toEqual([]);
   });
 
+  it("flags a literal plan price at sentence end (period immediately after the amount)", () => {
+    const errs = scanCodeForHardcodedPrices(
+      PRICING,
+      "client/src/pages/Z.tsx",
+      `const pitch = "Get started for just $49.";`,
+    );
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toContain('hardcoded plan price "$49"');
+  });
+
   it("flags literal Stripe unit_amount and trial_period_days in server code", () => {
     const errs = scanCodeForHardcodedPrices(
       PRICING,
@@ -128,6 +138,25 @@ describe("scanMdxPriceClaims", () => {
       "content/blog/post.mdx",
       "Watch your 7-day trend in HRV. A personal trainer costs $500 per month. RxFit is different.",
     );
+    expect(errs).toEqual([]);
+  });
+
+  it("flags a wrong price at the very end of a sentence (\"RxFit is $53.\")", () => {
+    // Regression: the old lookahead (?![\d.]) skipped any amount followed by
+    // a period, so sentence-ending wrong prices slipped past every gate.
+    const errs = scanMdxPriceClaims(PRICING, "content/blog/post.mdx", "RxFit is $53.");
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toContain('"$53"');
+  });
+
+  it("accepts a CURRENT price at sentence end and still never half-matches cents", () => {
+    const errs = scanMdxPriceClaims(
+      PRICING,
+      "content/blog/post.mdx",
+      "RxFit is $49. Some apps advertise RxFit-beating value at $19.99 or even $49.99 monthly.",
+    );
+    // "$49." end-of-sentence is the allowed amount; "$19.99"/"$49.99" cents
+    // amounts are not scanned as whole-dollar claims (same as before the fix).
     expect(errs).toEqual([]);
   });
 });
@@ -209,6 +238,14 @@ describe("scanFaqPriceClaims", () => {
   it("handles malformed input (non-array faq, missing q/a) without throwing", () => {
     expect(scanFaqPriceClaims(PRICING, "x", null as never)).toEqual([]);
     expect(scanFaqPriceClaims(PRICING, "x", [null, { q: "RxFit?" }, {}] as never)).toEqual([]);
+  });
+
+  it("flags a wrong price at the end of an answer sentence", () => {
+    const errs = scanFaqPriceClaims(PRICING, "generated_posts/x", [
+      { q: "How much does RxFit cost?", a: "It is $53." },
+    ]);
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toContain('"$53"');
   });
 });
 

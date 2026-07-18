@@ -78,7 +78,7 @@ describe("validate-seo DB broken-link gate", () => {
         `INSERT INTO generated_posts
            (slug, title, description, keyword_theme, pillar, author, tldr, key_takeaways, body_markdown, faq, status, date)
          VALUES ($1, 'Test post', 'RxFit plans start at $53 monthly.', 'test', 'test', 'Test',
-                 'RxFit is $53 per month.',
+                 'RxFit is $53.',
                  ARRAY['RxFit now costs $53 monthly.'],
                  'RxFit costs just $53 per month. See [pricing](/#pricing) for details.',
                  '[{"q": "Does RxFit have a free trial?", "a": "Yes — a 14-day free trial."}]'::jsonb,
