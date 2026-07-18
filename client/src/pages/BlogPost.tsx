@@ -13,14 +13,15 @@ import { getPostBySlug, getRelatedPosts } from "@/lib/blogLoader";
 import { useGeneratedPost, toFrontmatter } from "@/lib/generatedPosts";
 import { track } from "@/lib/analytics";
 import { appendUtm } from "@/lib/utm";
-
-function formatDate(date: string) {
-  try {
-    return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  } catch {
-    return date;
-  }
-}
+// Tag chips, byline dates, and the reading-time label are shared with the
+// crawler-facing SSR (server/blogSsr.ts buildArticleHtml) via
+// shared/blog-index-card.ts — never inline them here, or visitors and
+// crawlers drift apart. Drift-guarded in server/blogSsr.index.test.ts.
+import {
+  BLOG_CARD_TAG_CHIP_CLASS,
+  formatBlogCardDate,
+  blogCardReadingTime,
+} from "@shared/blog-index-card";
 
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
@@ -165,7 +166,7 @@ export default function BlogPost() {
           <div className="max-w-3xl">
             <div className="flex flex-wrap gap-2 mb-4">
               {(fm.tags || []).map((t) => (
-                <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
+                <span key={t} className={BLOG_CARD_TAG_CHIP_CLASS}>
                   {t}
                 </span>
               ))}
@@ -182,12 +183,12 @@ export default function BlogPost() {
               <div>
                 <div className="text-foreground font-medium">{fm.author}</div>
                 <div className="flex items-center gap-3">
-                  <span>{formatDate(fm.date)}</span>
+                  <span>{formatBlogCardDate(fm.date)}</span>
                   {fm.updatedDate && (
-                    <span data-testid="text-updated-date">Updated {formatDate(fm.updatedDate)}</span>
+                    <span data-testid="text-updated-date">Updated {formatBlogCardDate(fm.updatedDate)}</span>
                   )}
                   <span className="inline-flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {readingMinutes} min read
+                    <Clock className="w-3 h-3" /> {blogCardReadingTime(readingMinutes)}
                   </span>
                 </div>
               </div>

@@ -9,6 +9,10 @@
  * shared hero copy in blog-index-seo.ts closed. Drift-guarded in
  * server/blogSsr.index.test.ts (SSR output must contain these constants, and
  * neither renderer may inline the literals).
+ *
+ * The tag chip class, date formatter, and reading-time label are ALSO the
+ * post-page (/blog/:slug) byline contract: client/src/pages/BlogPost.tsx and
+ * blogSsr.ts buildArticleHtml both consume them, guarded the same way.
  */
 
 /** How many tags a card shows (both renderers must slice to this). */

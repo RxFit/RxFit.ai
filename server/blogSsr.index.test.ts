@@ -274,5 +274,45 @@ describe("blogSsr.ts card markup wiring (drift guard)", () => {
     expect(src, "tag cap must come from BLOG_CARD_TAG_LIMIT").toContain(
       ".slice(0, BLOG_CARD_TAG_LIMIT)",
     );
+    expect(src, '"min read" must come from blogCardReadingTime()').not.toContain("min read");
+    expect(
+      src,
+      "dates must come from formatBlogCardDate, not a local formatter",
+    ).not.toContain("toLocaleDateString");
+  });
+});
+
+/**
+ * Post-page (/blog/:slug) byline drift guard: BlogPost.tsx renders the same
+ * tag chips, byline dates, and reading-time label that blogSsr.ts
+ * buildArticleHtml serves to crawlers. Both must source them from
+ * shared/blog-index-card.ts — if BlogPost.tsx re-inlines the chip class
+ * literal or a local date formatter, a shared-constant redesign would change
+ * the crawler HTML while visitors keep the old style. Fail loudly here.
+ */
+describe("BlogPost.tsx tag/byline wiring (drift guard)", () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, "../client/src/pages/BlogPost.tsx"),
+    "utf-8",
+  );
+
+  it("imports and uses the shared chip class, date formatter, and reading-time label", () => {
+    expect(src).toMatch(/from "@shared\/blog-index-card"/);
+    expect(src).toContain("className={BLOG_CARD_TAG_CHIP_CLASS}");
+    expect(src).toContain("formatBlogCardDate(");
+    expect(src).toContain("blogCardReadingTime(");
+  });
+
+  it("does not re-inline the chip class literal or a local date/reading-time formatter", () => {
+    expect(
+      src,
+      "tag chip class list must not be duplicated inline",
+    ).not.toContain(BLOG_CARD_TAG_CHIP_CLASS);
+    expect(
+      src,
+      "byline dates must come from formatBlogCardDate, not a local formatter",
+    ).not.toContain("toLocaleDateString");
+    expect(src, "no local formatDate helper").not.toMatch(/function formatDate\(/);
+    expect(src, '"min read" must come from blogCardReadingTime()').not.toContain("min read");
   });
 });

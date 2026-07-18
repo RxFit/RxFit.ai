@@ -256,10 +256,6 @@ export function markdownToHtml(markdown: string): string {
   return html;
 }
 
-function formatDate(date: string): string {
-  return formatBlogCardDate(date);
-}
-
 function buildArticleHtml(post: GeneratedPost): string {
   const bodyHtml = markdownToHtml(post.bodyMarkdown);
   const heroSrc = post.heroImage ? sanitizeUrl(post.heroImage) : "";
@@ -299,7 +295,7 @@ function buildArticleHtml(post: GeneratedPost): string {
           <div class="w-10 h-10 rounded-full bg-muted"></div>
           <div>
             <div class="text-foreground font-medium">${escapeHtml(post.author)}</div>
-            <div class="flex items-center gap-3"><span>${escapeHtml(formatDate(post.date))}</span>${post.updatedDate ? `<span>Updated ${escapeHtml(formatDate(post.updatedDate))}</span>` : ""}<span>${post.readingMinutes} min read</span></div>
+            <div class="flex items-center gap-3"><span>${escapeHtml(formatBlogCardDate(post.date))}</span>${post.updatedDate ? `<span>Updated ${escapeHtml(formatBlogCardDate(post.updatedDate))}</span>` : ""}<span>${blogCardReadingTime(post.readingMinutes)}</span></div>
           </div>
         </div>
       </div>
