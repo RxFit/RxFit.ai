@@ -2,6 +2,7 @@
 
 ## In scope
 - Public marketing homepage (`/`)
+- Compare page (`/compare`)
 - Blog index (`/blog`)
 - Blog posts (`/blog/:slug`)
 - Public trust and legal pages (`/privacy`, `/terms`, `/contact`)
@@ -29,4 +30,5 @@
 ## Notes
 - The public site is built with Vite + React and served by Express.
 - In-scope public routes are prerendered at build time into static HTML, so Google, social crawlers, and AI crawlers can read route-specific content and metadata without waiting for client-side rendering.
+- Generated database-backed blog posts are SEO-critical runtime surfaces: `/blog`, `/blog/:slug`, and `/sitemap.xml` must keep serving crawlable outputs for published posts even during transient data/SSR failures.
 - `app.rxfit.ai` remains a separate repository and should only be considered for reciprocal cross-domain SEO work, not direct source edits in this repo.
