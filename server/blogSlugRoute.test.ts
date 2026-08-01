@@ -7,7 +7,10 @@
  * - unknown/MDX slug (DB miss) → next() so static files / SPA shell serve it
  * - draft or archived DB post → next() without ever rendering (no leak)
  * - render returns null (dev — no template) → next()
- * - storage throws → next() (degrade to SPA shell, not a 500)
+ * - storage throws + no cache → 503 + Retry-After (crawlers retry, index
+ *   entry preserved — NOT the SPA shell which is thin for crawlers)
+ * - storage throws + warm cache → 200 with last-good HTML + Cache-Control
+ *   stale-if-error (crawlers keep seeing real content through transient failures)
  *
  * blogSsr.render.test.ts covers WHAT the rendered page contains; these tests
  * cover WHETHER the route serves it at all — a refactor that stops checking
@@ -61,13 +64,18 @@ const POST: GeneratedPost = {
 };
 
 function mockRes() {
+  const headers: Record<string, string> = {};
   const res = {
     statusCode: null as number | null,
     contentType: null as string | null,
     body: null as string | null,
+    headers,
     status: vi.fn(),
     type: vi.fn(),
     send: vi.fn(),
+    setHeader: vi.fn((name: string, value: string) => {
+      headers[name.toLowerCase()] = String(value);
+    }),
   };
   res.status.mockImplementation((code: number) => {
     res.statusCode = code;
@@ -150,7 +158,7 @@ describe("GET /blog/:slug dispatch", () => {
     expect(res.send).not.toHaveBeenCalled();
   });
 
-  it("falls through (not 500) when storage throws, so crawlers get the SPA shell", async () => {
+  it("serves 503 + Retry-After when storage throws and no cache is warm (crawlers retry, not de-index)", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { res, next } = await run({
       getPostBySlug: vi.fn().mockRejectedValue(new Error("db down")),
@@ -158,9 +166,40 @@ describe("GET /blog/:slug dispatch", () => {
     });
     errorSpy.mockRestore();
 
-    expect(next).toHaveBeenCalledOnce();
-    expect(res.status).not.toHaveBeenCalled();
-    expect(res.send).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(503);
+    expect(res.headers["retry-after"]).toBe("300");
+  });
+
+  it("serves cached HTML (200 + Cache-Control stale-if-error) when storage throws after cache is warm", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const goodHtml = "<html>cached-post-page</html>";
+    let callCount = 0;
+
+    const handler = createBlogSlugHandler({
+      getPostBySlug: async () => {
+        callCount++;
+        if (callCount === 1) return POST;
+        throw new Error("db down");
+      },
+      renderPage: () => (callCount === 1 ? goodHtml : null),
+    });
+
+    const req = { params: { slug: POST.slug } } as unknown as Request;
+
+    // Warm the cache.
+    await handler(req, mockRes() as unknown as Response, vi.fn());
+
+    // DB is now down.
+    const res2 = mockRes();
+    const next2 = vi.fn();
+    await handler(req, res2 as unknown as Response, next2);
+    errorSpy.mockRestore();
+
+    expect(next2).not.toHaveBeenCalled();
+    expect(res2.statusCode).toBe(200);
+    expect(res2.body).toBe(goodHtml);
+    expect(res2.headers["cache-control"]).toContain("stale-if-error");
   });
 });
 
@@ -178,7 +217,7 @@ describe("blog SSR health reporting (reportServing)", () => {
     expect(reportServing).toHaveBeenCalledWith(true, undefined);
   });
 
-  it("reports ok=false with the error on the storage-throw path", async () => {
+  it("reports ok=false with the error on the storage-throw path (503 or cached content serves)", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const reportServing = vi.fn().mockResolvedValue(undefined);
     const boom = new Error("db down");
@@ -189,7 +228,7 @@ describe("blog SSR health reporting (reportServing)", () => {
     });
     errorSpy.mockRestore();
 
-    expect(next).toHaveBeenCalledOnce();
+    expect(next).not.toHaveBeenCalled();
     expect(reportServing).toHaveBeenCalledTimes(1);
     expect(reportServing).toHaveBeenCalledWith(false, boom);
   });

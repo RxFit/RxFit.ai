@@ -450,6 +450,11 @@ export async function registerRoutes(
   // hostname requested them.
   const baseUrl = SITE_URL;
 
+  // Last-known-good snapshot of generated-post slugs for the sitemap.
+  // Warmed on first successful DB fetch; used as fallback when the DB is
+  // unreachable so the sitemap never silently shrinks during outages.
+  let sitemapGeneratedPostsCache: { slug: string; date: string }[] | null = null;
+
   app.get("/sitemap.xml", async (_req, res) => {
     // Static-page entries live in server/sitemapStatic.ts (unit-tested to
     // stay in sync with shared/site.ts STATIC_ROUTES).
@@ -458,11 +463,20 @@ export async function registerRoutes(
     let generatedPosts: { slug: string; date: string }[] = [];
     try {
       const mdxSlugs = new Set(mdxPosts.map((p) => p.slug));
-      generatedPosts = (await storage.getPublishedGeneratedPosts())
+      const fetched = (await storage.getPublishedGeneratedPosts())
         .filter((p) => !mdxSlugs.has(p.slug))
         .map((p) => ({ slug: p.slug, date: p.updatedDate || p.date }));
+      // Cache the result so we can serve a complete sitemap through outages.
+      sitemapGeneratedPostsCache = fetched;
+      generatedPosts = fetched;
     } catch (err) {
       console.error("Error reading generated posts for sitemap:", err);
+      // Fall back to the last-known-good snapshot so generated-post URLs
+      // stay in the sitemap during transient DB failures instead of silently
+      // vanishing (which triggers Googlebot de-indexing cycles).
+      if (sitemapGeneratedPostsCache) {
+        generatedPosts = sitemapGeneratedPostsCache;
+      }
     }
     const postUrls = [...mdxPosts, ...generatedPosts].map((p) => ({
       loc: `/blog/${p.slug}`,
