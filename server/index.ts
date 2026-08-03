@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { startBlogScheduler } from "./blogScheduler";
@@ -84,6 +85,16 @@ export function log(message: string, source = "express") {
         res.status(400).json({ error: 'Webhook processing error' });
       }
     }
+  );
+
+  app.use(
+    compression({
+      // serveStatic uses res.sendFile, which honours Range requests. A 206's
+      // Content-Range describes the uncompressed file, so compressing a partial
+      // body would corrupt it.
+      filter: (req, res) =>
+        res.statusCode !== 206 && compression.filter(req, res),
+    }),
   );
 
   app.use(

@@ -9,6 +9,7 @@ import { prerender } from "./prerender";
 const allowlist = [
   "@google/generative-ai",
   "axios",
+  "compression",
   "connect-pg-simple",
   "cors",
   "date-fns",
