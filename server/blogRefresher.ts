@@ -28,6 +28,12 @@ import { findStrikingDistancePosts, pickRefreshCandidate, type StrikingQuery } f
 import { extractToc, computeReadingMinutes } from "@shared/generated-blog";
 import { STATIC_ROUTES } from "@shared/site";
 import type { GeneratedPost } from "@shared/schema";
+import {
+  checkExternalLinks,
+  linkHealthErrors,
+  linkHealthWarnings,
+  type LinkCheckOptions,
+} from "./linkHealth";
 
 function buildRefreshPrompt(
   post: GeneratedPost,
@@ -136,6 +142,30 @@ export function validateRefreshDraft(
 }
 
 /**
+ * validateRefreshDraft plus outbound link health. A refresh rewrites the whole
+ * body, so it can introduce dead or staging citations exactly as a new post
+ * can — the refresh path needs the same gate.
+ */
+export async function validateRefreshDraftIncludingLinks(
+  draft: LlmPostDraft,
+  ownSlug: string,
+  allSlugs: Set<string>,
+  opts: LinkCheckOptions = {},
+): Promise<string[]> {
+  const errors = validateRefreshDraft(draft, ownSlug, allSlugs);
+  const results = await checkExternalLinks(draft.bodyMarkdown ?? "", opts);
+
+  const warnings = linkHealthWarnings(results);
+  if (warnings.length > 0) {
+    console.warn(
+      `[blog-refresher] Non-blocking link warnings:\n- ${warnings.join("\n- ")}`,
+    );
+  }
+
+  return [...errors, ...linkHealthErrors(results)];
+}
+
+/**
  * Run one refresh cycle. Returns the refreshed post, or null when no post
  * currently needs a refresh. Sends a failure email and rethrows on error.
  */
@@ -183,13 +213,13 @@ export async function refreshOnePost(forcedSlug?: string): Promise<GeneratedPost
     let draft = await draftRefresh(post, candidate.queries, research, existingPosts);
 
     stage = "validation";
-    let errors = validateRefreshDraft(draft, post.slug, allSlugs);
+    let errors = await validateRefreshDraftIncludingLinks(draft, post.slug, allSlugs);
     if (errors.length > 0) {
       console.warn(`[blog-refresher] Refresh draft failed validation, retrying once:\n- ${errors.join("\n- ")}`);
       stage = "llm-refresh-retry";
       draft = await draftRefresh(post, candidate.queries, research, existingPosts);
       stage = "validation";
-      errors = validateRefreshDraft(draft, post.slug, allSlugs);
+      errors = await validateRefreshDraftIncludingLinks(draft, post.slug, allSlugs);
       if (errors.length > 0) {
         throw new Error(`Refresh draft failed validation twice:\n- ${errors.join("\n- ")}`);
       }

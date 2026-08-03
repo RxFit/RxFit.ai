@@ -12,6 +12,12 @@ import OpenAI from "openai";
 import { parse as parseYaml } from "yaml";
 import { storage } from "./storage";
 import { researchTheme, type ExaResult } from "./exaClient";
+import {
+  checkExternalLinks,
+  linkHealthErrors,
+  linkHealthWarnings,
+  type LinkCheckOptions,
+} from "./linkHealth";
 import { sendPostPublishedEmail, sendPostFailureEmail } from "./emailService";
 import { appendAlertToSheet } from "./sheetsService";
 import { generateAndStoreHeroImage } from "./heroImage";
@@ -319,6 +325,36 @@ export function validateDraft(draft: LlmPostDraft, existingSlugs: Set<string>): 
  * Escapes markdown-significant characters in the title so LLM-authored titles
  * can never alter link structure.
  */
+/**
+ * validateDraft plus outbound link health.
+ *
+ * Kept separate from validateDraft so that function stays synchronous and
+ * pure — it is also used for retry feedback and by the refresher, and neither
+ * should be forced to await the network.
+ *
+ * Both sets of errors are returned together so a single retry can fix
+ * everything at once rather than surfacing structural problems first and link
+ * problems only on the next pass. Transient link failures are logged but never
+ * returned: a briefly-unreachable publisher must not block a correct post.
+ */
+export async function validateDraftIncludingLinks(
+  draft: LlmPostDraft,
+  existingSlugs: Set<string>,
+  opts: LinkCheckOptions = {},
+): Promise<string[]> {
+  const errors = validateDraft(draft, existingSlugs);
+  const results = await checkExternalLinks(draft.bodyMarkdown ?? "", opts);
+
+  const warnings = linkHealthWarnings(results);
+  if (warnings.length > 0) {
+    console.warn(
+      `[blog-publisher] Non-blocking link warnings:\n- ${warnings.join("\n- ")}`,
+    );
+  }
+
+  return [...errors, ...linkHealthErrors(results)];
+}
+
 export function buildRelatedReadingAppendix(newPost: { slug: string; title: string }): string {
   const safeTitle = newPost.title.replace(/[\[\]()\\]/g, "").trim();
   return `\n\n**Related reading:** [${safeTitle}](/blog/${newPost.slug})`;
@@ -386,13 +422,13 @@ export async function generateAndPublishPost(): Promise<GeneratedPost> {
     let draft = await draftPost(theme.theme, theme.pillar, research, existingPosts);
 
     stage = "validation";
-    let errors = validateDraft(draft, existingSlugs);
+    let errors = await validateDraftIncludingLinks(draft, existingSlugs);
     if (errors.length > 0) {
       console.warn(`[blog-publisher] Draft failed validation, retrying once:\n- ${errors.join("\n- ")}`);
       stage = "llm-draft-retry";
       draft = await draftPost(theme.theme, theme.pillar, research, existingPosts, errors);
       stage = "validation";
-      errors = validateDraft(draft, existingSlugs);
+      errors = await validateDraftIncludingLinks(draft, existingSlugs);
       if (errors.length > 0) {
         throw new Error(`Generated draft failed validation twice:\n- ${errors.join("\n- ")}`);
       }

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { validateDraft, buildRetryFeedback, type LlmPostDraft } from "./blogGenerator";
+import {
+  validateDraft,
+  validateDraftIncludingLinks,
+  buildRetryFeedback,
+  type LlmPostDraft,
+} from "./blogGenerator";
 
 function goodBody(): string {
   const para = "This is a sentence about wearable data and coaching consistency. ".repeat(6);
@@ -168,6 +173,70 @@ describe("validateDraft", () => {
       noSlugs,
     );
     expect(errors.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+/**
+ * The gate that would have caught the two citation failures found in the
+ * 2026-08-02 Ahrefs audit. Fetch is injected so these never touch the network.
+ */
+describe("validateDraftIncludingLinks", () => {
+  const okFetch = (async () => new Response(null, { status: 200 })) as unknown as typeof fetch;
+
+  it("passes a clean draft whose external links resolve", async () => {
+    await expect(
+      validateDraftIncludingLinks(makeDraft(), noSlugs, { fetchImpl: okFetch }),
+    ).resolves.toEqual([]);
+  });
+
+  it("blocks a draft citing a dead URL — the cdc.gov failure", async () => {
+    const deadFetch = (async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      return new Response(null, { status: url.includes("cdc.gov") ? 404 : 200 });
+    }) as unknown as typeof fetch;
+
+    const draft = makeDraft({
+      bodyMarkdown: `${goodBody()}\n\nPer [CDC](https://www.cdc.gov/physicalactivity/index.html), motivation matters.`,
+    });
+    const errors = await validateDraftIncludingLinks(draft, noSlugs, { fetchImpl: deadFetch });
+    expect(errors.join("\n")).toContain("cdc.gov");
+    expect(errors.join("\n")).toContain("404");
+  });
+
+  it("blocks a draft citing a staging hostname — the preview-www.nature.com failure", async () => {
+    const draft = makeDraft({
+      bodyMarkdown: `${goodBody()}\n\n<Stat value="1" label="x" source="https://preview-www.nature.com/articles/s41598-026-42405-2" />`,
+    });
+    // No fetch needed: the host screen is offline and must fire regardless.
+    const errors = await validateDraftIncludingLinks(draft, noSlugs, {
+      fetchImpl: (() => {
+        throw new Error("network must not be touched");
+      }) as unknown as typeof fetch,
+    });
+    expect(errors.join("\n")).toContain("preview-www.nature.com");
+    expect(errors.join("\n")).toContain("staging");
+  });
+
+  it("does NOT block on a publisher that bot-blocks with 403/406", async () => {
+    const blockingFetch = (async () => new Response(null, { status: 406 })) as unknown as typeof fetch;
+    await expect(
+      validateDraftIncludingLinks(makeDraft(), noSlugs, { fetchImpl: blockingFetch }),
+    ).resolves.toEqual([]);
+  });
+
+  it("does NOT block when a source is merely unreachable", async () => {
+    const downFetch = (async () => new Response(null, { status: 503 })) as unknown as typeof fetch;
+    await expect(
+      validateDraftIncludingLinks(makeDraft(), noSlugs, { fetchImpl: downFetch }),
+    ).resolves.toEqual([]);
+  });
+
+  it("reports structural and link errors together so one retry can fix both", async () => {
+    const deadFetch = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const draft = makeDraft({ keyTakeaways: ["only one"] });
+    const errors = await validateDraftIncludingLinks(draft, noSlugs, { fetchImpl: deadFetch });
+    expect(errors.some((e) => e.includes("keyTakeaways"))).toBe(true);
+    expect(errors.some((e) => e.startsWith("external link"))).toBe(true);
   });
 });
 
