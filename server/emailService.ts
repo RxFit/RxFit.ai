@@ -347,6 +347,86 @@ export async function sendPostRefreshedEmail(
 }
 
 /**
+ * How a credential alert should be explained to the owner.
+ *
+ * Classified by the ERROR, not the service name: a missing secret, a rejected
+ * key and a drifted price all arrive as "stripe" but need different remedies.
+ * The production incident sent a "re-authorize the connection in Integrations"
+ * instruction for an error whose own text said to set STRIPE_SECRET_KEY — and
+ * following it would have resolved the sandbox connection, turning the monitor
+ * green while live checkout stayed broken.
+ */
+export type CredentialAlertKind =
+  | "stripe-missing-secret"
+  | "stripe-test-key"
+  | "stripe-rejected-key"
+  | "stripe-catalog-mismatch"
+  | "connector";
+
+/** Pure. Order matters: the catalog and test-key messages also say "Stripe". */
+export function classifyCredentialAlert(service: string, message: string): CredentialAlertKind {
+  if (service === 'stripe') {
+    if (/no longer matches the site's advertised pricing/i.test(message)) return 'stripe-catalog-mismatch';
+    if (/TEST-mode keys|livemode=false/i.test(message)) return 'stripe-test-key';
+    if (/Set STRIPE_SECRET_KEY|No Stripe credentials found|connection not found via Connector|resolved empty/i.test(message)) return 'stripe-missing-secret';
+    if (/Invalid API Key|No API key provided|\b401\b/i.test(message)) return 'stripe-rejected-key';
+  }
+  return 'connector';
+}
+
+/** Pure. Headline (also used in the subject), impact and remedy copy. */
+export function credentialAlertCopy(
+  service: string,
+  serviceLabel: string,
+  kind: CredentialAlertKind,
+): { headline: string; impact: string; remedy: string } {
+  const checkoutImpact = 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.';
+
+  switch (kind) {
+    case 'stripe-missing-secret':
+      return {
+        headline: 'Set STRIPE_SECRET_KEY in Replit → Secrets',
+        impact: checkoutImpact,
+        remedy:
+          'Open the Replit workspace → Secrets for the PRODUCTION deployment and set STRIPE_SECRET_KEY to the LIVE secret key (sk_live_…) for the Stripe account that owns the site\'s pinned price IDs, then redeploy. Re-authorizing the Stripe connection under Integrations is NOT the fix here — that path resolves the sandbox/test connection, which would make this alert go green while live checkout keeps 500ing. Confirm recovery at /api/internal/credential-health instead of waiting for the next hourly sweep.',
+      };
+    case 'stripe-test-key':
+      return {
+        headline: 'A TEST-mode Stripe key is serving the live site',
+        impact: checkoutImpact,
+        remedy:
+          'Replace STRIPE_SECRET_KEY in Replit → Secrets with the live sk_live_… key and redeploy. Do not dismiss this because the API call succeeded — it succeeded against the TEST account; the site\'s price IDs are livemode and will 404.',
+      };
+    case 'stripe-rejected-key':
+      return {
+        headline: 'Stripe rejected the key — rotate it',
+        impact: checkoutImpact,
+        remedy:
+          'The key resolved but Stripe refused it. Rotate it in the Stripe dashboard and update STRIPE_SECRET_KEY in Replit → Secrets. Re-authorizing the connector will not help: a key is being supplied, it is being refused.',
+      };
+    case 'stripe-catalog-mismatch':
+      return {
+        headline: 'A pinned Stripe price no longer matches the advertised price',
+        impact:
+          'The Stripe key works — this is a pricing mismatch. Buyers may be charged an amount the site never displayed, or checkout may fail for the affected tier.',
+        remedy:
+          'Compare the price(s) named above against PLAN_PRICING / LIVE_PRICE_IDS in shared/stripe-constants.ts and bring them back into agreement — either correct the price in the Stripe dashboard, or update the constants and redeploy so the displayed price and the charged price ship together. Do NOT add metadata.tier to any product: nothing in the site reads product metadata to pick a price.',
+      };
+    default:
+      return {
+        headline: 'Re-authorize the connection in Replit → Integrations',
+        impact:
+          service === 'sheets'
+            ? 'Lead rows will silently stop syncing to the spreadsheet AND the backup alert channel is dead until this is fixed.'
+            : service === 'stripe'
+            ? checkoutImpact
+            : 'Welcome/lead emails and blog notifications will fail until this is fixed.',
+        remedy: `open the Replit workspace → Integrations and re-authorize the ${serviceLabel} connection.`,
+      };
+  }
+}
+
+/**
  * Notify the owner that Stripe or Gmail credentials stopped resolving.
  * Best-effort (never throws). Returns true when the email was actually sent,
  * false when sending failed — callers can use this to fall back to a second
@@ -358,12 +438,8 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     const to = await getOwnerEmail();
     const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
     const serviceLabel = service === 'stripe' ? 'Stripe' : service === 'gmail' ? 'Gmail' : service === 'sheets' ? 'Google Sheets' : service;
-    const impact =
-      service === 'stripe'
-        ? 'Checkout and pricing on rxfit.ai will fail (500s) until this is fixed.'
-        : service === 'sheets'
-        ? 'Lead rows will silently stop syncing to the spreadsheet AND the backup alert channel is dead until this is fixed.'
-        : 'Welcome/lead emails and blog notifications will fail until this is fixed.';
+    const kind = classifyCredentialAlert(service, message);
+    const { headline, impact, remedy } = credentialAlertCopy(service, serviceLabel, kind);
     const html = `
 <!DOCTYPE html>
 <html><body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
@@ -373,15 +449,18 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
         <tr><td align="center" style="padding-bottom:24px;"><h1 style="color:#EF4444;font-size:24px;margin:0;">RxFit.ai Credential Monitor</h1></td></tr>
         <tr><td>
           <h2 style="color:#F8FAFC;font-size:20px;margin:0 0 16px;">${escapeHtml(serviceLabel)} credentials are BROKEN</h2>
-          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 12px;">The hourly health check could not resolve ${escapeHtml(serviceLabel)} credentials (checked twice). ${escapeHtml(impact)}</p>
+          <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 12px;">The hourly health check FAILED for ${escapeHtml(serviceLabel)} (checked twice). ${escapeHtml(impact)}</p>
           <pre style="color:#FCA5A5;background:rgba(239,68,68,0.08);border-radius:8px;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(message.slice(0, 4000))}</pre>
-          <p style="color:#64748B;font-size:13px;margin:16px 0 0;">Fix: open the Replit workspace → Integrations and re-authorize the ${escapeHtml(serviceLabel)} connection. You'll only get this email once per outage; recovery is logged automatically.</p>
+          <p style="color:#64748B;font-size:13px;margin:16px 0 0;">Fix: ${escapeHtml(remedy)} You'll only get this email once per outage; recovery is logged automatically.</p>
         </td></tr>
       </table>
     </td></tr>
   </table>
 </body></html>`;
-    const raw = createMimeMessage(to, `🚨 RxFit.ai: ${serviceLabel} credentials are broken`, html);
+    // Append rather than rewrite, so existing mail filters keep matching — and
+    // so the phone notification itself names the knob to turn.
+    const subject = `🚨 RxFit.ai: ${serviceLabel} credentials are broken — ${headline}`.slice(0, 140);
+    const raw = createMimeMessage(to, subject, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[credential-check] Alert email sent to ${to} for ${service}`);
     return true;

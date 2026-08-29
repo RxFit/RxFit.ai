@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 /**
  * Guards the plan → priceId wiring ABOVE the signup modal:
- *  - useSignupModal().open("committed") opens the modal showing the committed
- *    plan and submits checkout with the committed price ID,
- *  - when /api/stripe/products fails, the LIVE_PRICE_IDS fallback is used,
- *  - when /api/stripe/products succeeds, fetched metadata.tier → prices[0].id
- *    overrides the fallback for that tier (and only that tier).
+ *  - useSignupModal().open(tier) opens the modal showing that plan and submits
+ *    checkout with that tier's pinned LIVE_PRICE_IDS entry,
+ *  - NOTHING can move that price: the provider issues no catalog fetch, so no
+ *    Stripe response can override it (and the server re-derives the price from
+ *    `plan` anyway — see server/checkoutSession.test.ts).
  * A regression here would send buyers to checkout for the wrong plan even
  * though SignupModal's own tests pass.
+ *
+ * The deleted cases asserted a `metadata.tier → prices[0].id` override. That
+ * mapping assumed one Stripe product per tier while the live catalog puts all
+ * three tiers on ONE product, so the override could only ever collapse every
+ * tier onto a single arbitrary price. The test encoded the bug as the contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -51,16 +56,12 @@ function jsonResponse(status: number, body: unknown) {
 }
 
 /**
- * fetch mock that routes by URL:
- *  - /api/stripe/products → the given products result (or a rejection),
- *  - /api/stripe/checkout → a successful checkout session.
+ * fetch mock that routes by URL. Only /api/stripe/checkout is expected —
+ * any other request (notably a resurrected /api/stripe/products catalog
+ * fetch) rejects loudly rather than being quietly tolerated.
  */
-function routeFetch(products: { reject: true } | { body: unknown }) {
+function routeFetch() {
   fetchMock.mockImplementation((url: string) => {
-    if (url === "/api/stripe/products") {
-      if ("reject" in products) return Promise.reject(new Error("network down"));
-      return Promise.resolve(jsonResponse(200, products.body));
-    }
     if (url === "/api/stripe/checkout") {
       return Promise.resolve(
         jsonResponse(200, { url: "https://checkout.stripe.com/c/session_abc" }),
@@ -116,79 +117,41 @@ async function openModalAndSubmit(plan: PlanTier) {
 }
 
 describe("SignupModalProvider plan → priceId wiring", () => {
-  it("open('committed') with failed products fetch uses the LIVE_PRICE_IDS fallback", async () => {
-    routeFetch({ reject: true });
+  it("submits the pinned price ID for each tier", async () => {
+    for (const tier of ["kickstart", "committed", "transformation"] as PlanTier[]) {
+      routeFetch();
+      renderProvider(tier);
+
+      const body = await openModalAndSubmit(tier);
+      expect(body.plan).toBe(tier);
+      expect(body.priceId).toBe(LIVE_PRICE_IDS[tier]);
+
+      cleanup();
+      fetchMock.mockReset();
+    }
+  });
+
+  it("open('committed') shows the committed plan copy", async () => {
+    routeFetch();
     renderProvider("committed");
 
-    const body = await openModalAndSubmit("committed");
-
-    // Modal shows the committed plan copy…
+    await openModalAndSubmit("committed");
     expect(screen.getByText(new RegExp(PLAN_PRICING.committed.name)).textContent).toContain(
       "Annual Plan",
     );
-    // …and checkout is submitted with the committed fallback price ID.
-    expect(body.plan).toBe("committed");
-    expect(body.priceId).toBe(LIVE_PRICE_IDS.committed);
   });
 
-  it("fetched products override the fallback via metadata.tier → prices[0].id", async () => {
-    routeFetch({
-      body: {
-        data: [
-          {
-            metadata: { tier: "committed" },
-            prices: [{ id: "price_live_committed_override" }],
-          },
-        ],
-      },
-    });
-    renderProvider("committed");
-
-    // Wait until the products fetch has been consumed so the override is applied.
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([url]) => url === "/api/stripe/products"),
-      ).toBe(true);
-    });
-
-    const body = await openModalAndSubmit("committed");
-    expect(body.plan).toBe("committed");
-    expect(body.priceId).toBe("price_live_committed_override");
-  });
-
-  it("a partial products response overrides only the tiers it contains", async () => {
-    routeFetch({
-      body: {
-        data: [
-          {
-            metadata: { tier: "kickstart" },
-            prices: [{ id: "price_live_kickstart_override" }],
-          },
-          // Malformed entries are ignored, not crashed on.
-          { metadata: {}, prices: [{ id: "price_ignored" }] },
-          { metadata: { tier: "transformation" }, prices: [] },
-        ],
-      },
-    });
-    renderProvider("committed");
-
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([url]) => url === "/api/stripe/products"),
-      ).toBe(true);
-    });
-
-    // committed was not in the response → still the fallback price ID.
-    const body = await openModalAndSubmit("committed");
-    expect(body.priceId).toBe(LIVE_PRICE_IDS.committed);
-  });
-
-  it("an unexpected products response shape is ignored and the fallback survives", async () => {
-    routeFetch({ body: { products: "wrong-shape" } });
+  it("issues no catalog fetch — nothing can change the submitted price ID", async () => {
+    // The regression that matters. The provider previously fetched
+    // /api/stripe/products and let the response override the price. Any
+    // resurrection of that path fails here.
+    routeFetch();
     renderProvider("kickstart");
 
     const body = await openModalAndSubmit("kickstart");
-    expect(body.plan).toBe("kickstart");
     expect(body.priceId).toBe(LIVE_PRICE_IDS.kickstart);
+    expect(
+      fetchMock.mock.calls.every(([url]) => url === "/api/stripe/checkout"),
+    ).toBe(true);
   });
 });

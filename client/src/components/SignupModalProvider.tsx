@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import SignupModal from "./SignupModal";
 import { LIVE_PRICE_IDS, type PlanTier } from "@shared/stripe-constants";
 
@@ -17,29 +17,21 @@ export function useSignupModal(): SignupModalContextValue {
   return ctx;
 }
 
+/**
+ * The price a buyer is sent to checkout with comes from LIVE_PRICE_IDS, and the
+ * server re-derives it from `plan` regardless (see server/checkoutSession.ts).
+ *
+ * This provider used to fetch /api/stripe/products and override the pinned IDs
+ * via `product.metadata.tier -> product.prices[0].id`. That mapping assumes one
+ * Stripe product per tier; the real catalog puts all three tiers on a SINGLE
+ * product, so the override could only ever collapse every tier onto one
+ * arbitrary price (the cheapest via the DB path, the newest via the API path).
+ * It was inert only because no product carried metadata.tier — adding one would
+ * have started mischarging. Removed rather than repaired.
+ */
 export function SignupModalProvider({ children }: { children: React.ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanTier>("kickstart");
-  const [priceIds, setPriceIds] = useState<Record<string, string>>(LIVE_PRICE_IDS);
-
-  useEffect(() => {
-    fetch("/api/stripe/products")
-      .then((res) => res.json())
-      .then((data) => {
-        const ids: Record<string, string> = {};
-        for (const product of data.data || []) {
-          const tier = product.metadata?.tier;
-          if (tier && product.prices?.[0]?.id) {
-            ids[tier] = product.prices[0].id;
-          }
-        }
-        if (Object.keys(ids).length > 0) {
-          setPriceIds((prev) => ({ ...prev, ...ids }));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   const open = (plan: PlanTier) => {
     setSelectedPlan(plan);
     setModalOpen(true);
@@ -53,7 +45,7 @@ export function SignupModalProvider({ children }: { children: React.ReactNode })
         isOpen={modalOpen}
         onClose={close}
         plan={selectedPlan}
-        priceId={priceIds[selectedPlan] || null}
+        priceId={LIVE_PRICE_IDS[selectedPlan]}
       />
     </SignupModalContext.Provider>
   );
