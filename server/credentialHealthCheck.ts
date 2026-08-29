@@ -17,6 +17,14 @@
  *  - recovery is logged (and resets the alert state) so a future outage
  *    alerts again.
  *
+ * The Stripe check goes further than credential resolution: it also asserts,
+ * read-only, that the three pinned LIVE_PRICE_IDS still match the pricing the
+ * site advertises, and that a live deployment is not silently running
+ * test-mode keys. Both live inside the SAME `stripe` service on purpose — a
+ * separate plan-tier service would re-alert on the identical root cause,
+ * which is how one broken credential once produced two emails, the second
+ * prescribing a Stripe metadata edit that would have mischarged buyers.
+ *
  * Enabled in production automatically; in development set
  * CREDENTIAL_HEALTHCHECK=true to run it.
  */
@@ -25,6 +33,7 @@ import { getUncachableGmailClient } from "./gmailClient";
 import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
+import { PLAN_TIERS, priceIdForTier, priceMismatches, type PriceShape } from "@shared/stripe-catalog";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
@@ -108,7 +117,59 @@ async function checkStripe(): Promise<void> {
   // balance.retrieve is the cheapest authenticated read (no list, no params)
   // and works for every account/mode.
   const stripe = await getUncachableStripeClient();
-  await stripe.balance.retrieve();
+  const balance = await stripe.balance.retrieve();
+
+  // A TEST-mode key makes balance.retrieve() succeed while every live checkout
+  // 500s on our livemode price IDs — the monitor goes green while the site is
+  // dead. That is exactly what happens if a missing STRIPE_SECRET_KEY is
+  // "fixed" by re-authorizing the connector, which stripeClient labels
+  // "Sandbox mode".
+  if (
+    process.env.REPLIT_DEPLOYMENT === "1" &&
+    (balance as { livemode?: boolean })?.livemode === false
+  ) {
+    throw new Error(
+      "Stripe credentials resolved but they are TEST-mode keys (balance.livemode=false) on the live deployment. Live checkout will 500 — the site's pinned price IDs are livemode. Set the live sk_live_… key as STRIPE_SECRET_KEY in Replit Secrets.",
+    );
+  }
+
+  // …then verify the CATALOG. A working key proves nothing about the prices
+  // buyers are actually sent to.
+  await checkStripeCatalog(stripe);
+}
+
+/**
+ * Read-only agreement check between the three pinned LIVE_PRICE_IDS and the
+ * pricing the site advertises. Three prices.retrieve calls, no writes.
+ *
+ * Deliberately consults NO product metadata: zero live products carry
+ * metadata.tier, so a check keyed on it could only ever fail — which is what
+ * made the old "stripe plan tiers" alert fire hourly with a remedy that would
+ * have started mischarging buyers had anyone followed it.
+ *
+ * Folded into checkStripe rather than added as a fourth service so that one
+ * root cause (an unresolvable credential) produces exactly ONE alert email.
+ */
+async function checkStripeCatalog(stripe: any): Promise<void> {
+  const problems: string[] = [];
+  for (const tier of PLAN_TIERS) {
+    const id = priceIdForTier(tier);
+    try {
+      const price = await stripe.prices.retrieve(id);
+      for (const m of priceMismatches(tier, price as PriceShape)) {
+        problems.push(`${tier} (${id}): ${m}`);
+      }
+    } catch (error: any) {
+      problems.push(`${tier} (${id}): could not be retrieved from Stripe — ${error?.message ?? String(error)}`);
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      "Live Stripe catalog no longer matches the site's advertised pricing:\n- " +
+        problems.join("\n- ") +
+        "\nCheckout will charge the wrong amount or fail. Fix the price in the Stripe dashboard, or update LIVE_PRICE_IDS / PLAN_PRICING in shared/stripe-constants.ts and redeploy.",
+    );
+  }
 }
 
 async function checkGmail(): Promise<void> {
@@ -233,7 +294,7 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe, Gmail & Sheets credentials at boot and hourly");
+  console.log("[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly");
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }

@@ -4,6 +4,21 @@ import { PLAN_PRICING } from '@shared/stripe-constants';
 async function createProducts() {
   const stripe = await getUncachableStripeClient();
 
+  // Refuse to run against a live account. This script name-matches products
+  // ("Kickstart", "Committed", "Transformation") which do NOT exist in the live
+  // catalog — the real tiers are three prices on one "RxFit.ai" product — so it
+  // would create duplicates, including a recurring yearly Transformation price
+  // where the real one is one-time. It is a test/sandbox seeding tool.
+  const probe = await stripe.products.list({ limit: 1 });
+  if (probe.data[0]?.livemode) {
+    throw new Error(
+      "Refusing to seed products against a LIVE Stripe account. This script is for test/sandbox accounts only: " +
+        "the live catalog already carries the site's tiers as three prices on a single product, and seeding would " +
+        "create duplicates plus a recurring Transformation price where the live one is one-time. " +
+        "Point STRIPE_SECRET_KEY at a test key before running it.",
+    );
+  }
+
   const existingProducts = await stripe.products.list({ limit: 100 });
   const existingNames = existingProducts.data.map(p => p.name);
 

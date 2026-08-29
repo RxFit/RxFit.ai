@@ -4,6 +4,7 @@
  * the Google Sheet; if that also throws, log loudly but never crash.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { healthyStripeClient } from "./stripeHealthFixtures";
 
 const getStripeSecretKey = vi.fn();
 const getUncachableStripeClient = vi.fn();
@@ -33,7 +34,7 @@ describe("credential health check alert fallback", () => {
     vi.useFakeTimers();
     // Default: both services healthy.
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
-    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance" }) } });
+    getUncachableStripeClient.mockResolvedValue(healthyStripeClient());
     getUncachableGmailClient.mockResolvedValue({});
     // Healthy sheets client: token resolves AND the metadata probe succeeds.
     getUncachableGoogleSheetClient.mockResolvedValue({

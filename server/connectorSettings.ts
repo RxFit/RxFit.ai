@@ -32,8 +32,10 @@ export async function getConnectionSettings(
   const items: any[] = data.items ?? [];
   const matches = items.filter((item) => item.connector_name === connectorName);
   if (environment) {
-    const envMatch = matches.find((item) => item.environment === environment);
-    if (envMatch) return envMatch;
+    // Never substitute another environment: returning a development connection
+    // for a requested production one is how a test-mode key ends up serving the
+    // live site while the health check reports green.
+    return matches.find((item) => item.environment === environment);
   }
   return matches[0];
 }

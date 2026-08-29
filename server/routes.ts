@@ -5,6 +5,8 @@ import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { buildCheckoutSessionParams } from "./checkoutSession";
+import { resolvePlanTier, priceIdForTier } from "@shared/stripe-catalog";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { sendWelcomeEmail, sendLeadEmail } from "./emailService";
@@ -172,45 +174,44 @@ export async function registerRoutes(
     try {
       const { priceId, email, name, plan, clientReferenceId } = req.body;
 
-      if (!priceId) {
-        return res.status(400).json({ message: "Price ID is required." });
+      // The charged price is derived from `plan` alone. A client-supplied
+      // `priceId` is accepted in the body for compatibility with already-cached
+      // browser bundles but is deliberately NOT trusted: without this, any
+      // caller could check out against any active price in the account.
+      const tier = resolvePlanTier(plan);
+      if (!tier) {
+        return res.status(400).json({ message: "A valid plan is required." });
+      }
+      const resolvedPriceId = priceIdForTier(tier);
+      if (priceId && priceId !== resolvedPriceId) {
+        console.warn("[checkout] ignoring client-supplied priceId", { plan: tier, supplied: priceId, using: resolvedPriceId });
       }
 
       const existing = await storage.getLeadByEmail(email);
       if (!existing && email) {
         try {
-          await storage.createLead({ email, name: name || undefined, plan: plan || 'kickstart' });
+          await storage.createLead({ email, name: name || undefined, plan: tier });
         } catch (e) {
         }
       }
 
       const stripe = await getUncachableStripeClient();
-      const priceObj = await stripe.prices.retrieve(priceId);
+      const priceObj = await stripe.prices.retrieve(resolvedPriceId);
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const sessionParams = buildCheckoutSessionParams({
+        tier,
+        priceObj,
+        baseUrl,
+        email,
+        clientReferenceId,
+      });
 
-      const sessionParams: any = {
-        payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/#pricing`,
-        allow_promotion_codes: true,
-      };
-      sessionParams.mode = priceObj.recurring ? 'subscription' : 'payment';
-
-      if (email) {
-        sessionParams.customer_email = email;
-      }
-
-      if (clientReferenceId && typeof clientReferenceId === 'string') {
-        sessionParams.client_reference_id = clientReferenceId.slice(0, 200);
-      }
-
-      const session = await stripe.checkout.sessions.create(sessionParams);
+      const session = await stripe.checkout.sessions.create(sessionParams as any);
 
       return res.json({ url: session.url });
     } catch (error: any) {
-      console.error("Error creating checkout session:", { priceId: req.body.priceId, error: error.message, code: error.code, type: error.type });
+      console.error("Error creating checkout session:", { plan: req.body.plan, error: error.message, code: error.code, type: error.type });
       return res.status(500).json({ message: "Failed to create checkout session." });
     }
   });
