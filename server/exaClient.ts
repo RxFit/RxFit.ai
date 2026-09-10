@@ -3,6 +3,8 @@
  * Requires the EXA_API_KEY secret at runtime; fails loudly when missing.
  */
 
+import { screenUrl } from "./linkHealth";
+
 export interface ExaResult {
   title: string;
   url: string;
@@ -46,6 +48,18 @@ async function exaSearch(query: string, numResults: number): Promise<ExaResult[]
 
   return (data.results ?? [])
     .filter((r) => r.url && r.text)
+    .filter((r) => {
+      // Drop staging hostnames and bad schemes before they reach the writing
+      // prompt. A `preview-www.nature.com` URL came back from Exa, was cited by
+      // the LLM, and shipped to production — cheapest place to stop that is
+      // here, where the check costs nothing.
+      const problem = screenUrl(r.url!);
+      if (problem) {
+        console.warn(`[exa] Discarding unusable source ${r.url} — ${problem.reason}`);
+        return false;
+      }
+      return true;
+    })
     .map((r) => ({
       title: r.title || r.url!,
       url: r.url!,

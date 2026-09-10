@@ -47,6 +47,16 @@ vi.mock("./sheetsService", () => ({
   appendAlertToSheet: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Outbound link checking is real network I/O and is covered exhaustively in
+// linkHealth.test.ts with an injected fetch. Stub it here so this test stays
+// about the retry-feedback loop and never depends on example.com resolving.
+vi.mock("./linkHealth", () => ({
+  checkExternalLinks: vi.fn().mockResolvedValue([]),
+  linkHealthErrors: vi.fn().mockReturnValue([]),
+  linkHealthWarnings: vi.fn().mockReturnValue([]),
+  screenUrl: vi.fn().mockReturnValue(null),
+}));
+
 function makeBody(): string {
   const para = "Wearable data only helps when someone turns it into daily action and accountability. ".repeat(15);
   return [
