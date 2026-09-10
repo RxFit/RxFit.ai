@@ -12,6 +12,8 @@ import { describe, it, expect } from "vitest";
 import {
   extractExternalLinks,
   screenUrl,
+  isPublicIp,
+  publicDnsLookup,
   checkLink,
   checkExternalLinks,
   linkHealthErrors,
@@ -221,5 +223,212 @@ describe("error and warning partitioning", () => {
     expect(linkHealthErrors(results).join("\n")).not.toContain("https://d/");
     expect(linkHealthWarnings(results)).toHaveLength(1);
     expect(linkHealthWarnings(results)[0]).toContain("https://d/");
+  });
+});
+
+describe("SSRF screening — non-public destinations must never be fetched", () => {
+  it("rejects every non-public IP literal offline, including cloud metadata", () => {
+    for (const url of [
+      "http://169.254.169.254/latest/meta-data",
+      "http://172.16.0.1/a",
+      "http://172.31.255.255/a",
+      "http://100.64.0.1/a",
+      "http://0.0.0.0/a",
+      "http://192.0.2.1/a",
+      "http://198.51.100.7/a",
+      "http://203.0.113.9/a",
+      "http://224.0.0.1/a",
+      "http://[::1]/a",
+      "http://[fe80::1]/a",
+      "http://[fec0::1]/a",
+      "http://[fd00::1]/a",
+      "http://[2001:db8::1]/a",
+      "http://[2002::1]/a",
+      "http://[100::1]/a",
+      "http://[5f00::1]/a",
+      "http://[3fff::1]/a",
+      "http://[::ffff:127.0.0.1]/a",
+      "http://[::ffff:a9fe:a9fe]/a",
+    ]) {
+      const r = screenUrl(url);
+      expect(r?.verdict, url).toBe("forbidden-host");
+    }
+  });
+
+  it("isPublicIp accepts real public addresses", () => {
+    for (const ip of ["8.8.8.8", "1.1.1.1", "104.18.32.47", "2606:4700::6810:84e5", "2001:4860:4860::8888"]) {
+      expect(isPublicIp(ip), ip).toBe(true);
+    }
+    for (const ip of [
+      "127.0.0.1", "10.0.0.5", "192.168.1.1", "169.254.169.254",
+      "::1", "::", "fec0::1", "2001:db8::1", "2002::1", "100::1",
+      "5f00::1", "3fff::1",
+    ]) {
+      expect(isPublicIp(ip), ip).toBe(false);
+    }
+  });
+
+  it("rejects exactly 3fff::/20, not its neighbours (boundary check)", () => {
+    expect(isPublicIp("3fff:0fff::1")).toBe(false); // inside /20
+    expect(isPublicIp("3fff::1")).toBe(false); // /20 base
+    expect(isPublicIp("3fff:1000::1")).toBe(true); // just outside /20
+    expect(isPublicIp("3ffe:ffff::1")).toBe(true); // just before 3fff::
+  });
+
+  it("blocks a hostname that DNS-resolves to a private address, before any fetch", async () => {
+    const never = (() => {
+      throw new Error("network must not be touched");
+    }) as unknown as typeof fetch;
+    const r = await checkLink("https://sneaky.example.com/x", {
+      fetchImpl: never,
+      lookupImpl: async () => [{ address: "169.254.169.254", family: 4 }],
+    });
+    expect(r.verdict).toBe("forbidden-host");
+    expect(r.reason).toContain("sneaky.example.com");
+  });
+
+  it("blocks when ANY resolved address is non-public", async () => {
+    const never = (() => {
+      throw new Error("network must not be touched");
+    }) as unknown as typeof fetch;
+    const r = await checkLink("https://mixed.example.com/x", {
+      fetchImpl: never,
+      lookupImpl: async () => [
+        { address: "8.8.8.8", family: 4 },
+        { address: "10.0.0.7", family: 4 },
+      ],
+    });
+    expect(r.verdict).toBe("forbidden-host");
+  });
+
+  it("treats DNS failure as transient, never blocking", async () => {
+    const r = await checkLink("https://flaky.example.com/x", {
+      fetchImpl: stubFetch({ "flaky.example.com": 200 }),
+      lookupImpl: async () => {
+        throw new Error("ENOTFOUND");
+      },
+    });
+    expect(r.verdict).toBe("unreachable");
+  });
+
+  it("fetches normally when DNS resolves to public addresses", async () => {
+    const r = await checkLink("https://example.com/x", {
+      fetchImpl: stubFetch({ "example.com": 200 }),
+      lookupImpl: async () => [{ address: "93.184.216.34", family: 4 }],
+    });
+    expect(r.verdict).toBe("ok");
+  });
+
+  it("follows a public→public redirect chain (the doi.org pattern)", async () => {
+    const seen: string[] = [];
+    const impl = (async (input: string | URL | Request) => {
+      const u = typeof input === "string" ? input : input.toString();
+      seen.push(u);
+      if (u.includes("doi.org")) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://www.nature.com/articles/s41598-026-42405-2" },
+        });
+      }
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const r = await checkLink("https://doi.org/10.1038/x", { fetchImpl: impl });
+    expect(r.verdict).toBe("ok");
+    expect(r.status).toBe(200);
+    expect(seen).toEqual([
+      "https://doi.org/10.1038/x",
+      "https://www.nature.com/articles/s41598-026-42405-2",
+    ]);
+  });
+
+  it("blocks a public URL that redirects to a private or metadata endpoint", async () => {
+    const seen: string[] = [];
+    const impl = (async (input: string | URL | Request) => {
+      seen.push(typeof input === "string" ? input : input.toString());
+      return new Response(null, {
+        status: 302,
+        headers: { location: "http://169.254.169.254/latest/meta-data" },
+      });
+    }) as unknown as typeof fetch;
+
+    const r = await checkLink("https://evil.example.com/a", { fetchImpl: impl });
+    expect(r.verdict).toBe("forbidden-host");
+    expect(r.reason).toContain("redirects to");
+    expect(seen).toEqual(["https://evil.example.com/a"]); // hop never fetched
+  });
+
+  it("blocks a redirect to a disallowed scheme", async () => {
+    const impl = (async () =>
+      new Response(null, { status: 302, headers: { location: "file:///etc/passwd" } }),
+    ) as unknown as typeof fetch;
+    const r = await checkLink("https://evil.example.com/a", { fetchImpl: impl });
+    expect(r.verdict).toBe("invalid");
+  });
+
+  it("gives up (non-blocking) on an endless redirect loop", async () => {
+    const impl = (async (input: string | URL | Request) => {
+      const u = typeof input === "string" ? input : input.toString();
+      return new Response(null, { status: 302, headers: { location: `${u}?hop` } });
+    }) as unknown as typeof fetch;
+    const r = await checkLink("https://loop.example.com/a", { fetchImpl: impl });
+    expect(r.verdict).toBe("unreachable");
+    expect(linkHealthErrors([r])).toEqual([]);
+  });
+});
+
+describe("publicDnsLookup — the address the transport dials is vetted", () => {
+  it("refuses the connection when resolution yields only non-public addresses", async () => {
+    const err: Error = await new Promise((resolve) => {
+      publicDnsLookup(
+        "rebind.example",
+        {},
+        (e) => resolve(e ?? new Error("unexpected success")),
+        async () => [{ address: "169.254.169.254", family: 4 }],
+      );
+    });
+    expect(err.message).toContain("non-public");
+    expect((err as NodeJS.ErrnoException).code).toBe("ENOTFOUND");
+  });
+
+  it("strips non-public answers from a mixed response", async () => {
+    const addrs = await new Promise<Array<{ address: string; family: number }>>((resolve, reject) => {
+      publicDnsLookup(
+        "mixed.example",
+        { all: true },
+        (e, a) => (e ? reject(e) : resolve(a as Array<{ address: string; family: number }>)),
+        async () => [
+          { address: "10.0.0.7", family: 4 },
+          { address: "8.8.8.8", family: 4 },
+        ],
+      );
+    });
+    expect(addrs).toEqual([{ address: "8.8.8.8", family: 4 }]);
+  });
+
+  it("returns a public answer in the single-address form", async () => {
+    const got = await new Promise<{ address: string; family: number }>((resolve, reject) => {
+      publicDnsLookup(
+        "example.com",
+        {},
+        (e, a, f) => (e ? reject(e) : resolve({ address: a as string, family: f as number })),
+        async () => [{ address: "93.184.216.34", family: 4 }],
+      );
+    });
+    expect(got).toEqual({ address: "93.184.216.34", family: 4 });
+  });
+
+  it("propagates resolver errors to the transport", async () => {
+    const err: Error = await new Promise((resolve) => {
+      publicDnsLookup(
+        "down.example",
+        {},
+        (e) => resolve(e as Error),
+        async () => {
+          throw new Error("ENOTFOUND");
+        },
+      );
+    });
+    expect(err.message).toContain("ENOTFOUND");
   });
 });
