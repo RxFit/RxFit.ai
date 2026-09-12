@@ -463,8 +463,10 @@ test_unsafe_orphan_is_not_published() {
     # A rescue branch this run did not create: stale, hand-made, or from a
     # checkout whose history was never gated. The name prefix says nothing.
     git switch -c replit-rescue/unsafe >/dev/null 2>&1
-    printf 'KEY=unsafe-orphan-canary\n' > .env
-    git add -f .env
+    # A path the baseline does not already track, so the path-level assertion
+    # below cannot be satisfied by the fixture's own committed .env.
+    printf '{"private_key":"unsafe-orphan-canary"}\n' > service-account-orphan.json
+    git add service-account-orphan.json
     git commit -m 'stale rescue branch carrying a credential' >/dev/null
     git switch -c replit-rescue/safe-work >/dev/null 2>&1
     git reset --hard main >/dev/null 2>&1
@@ -489,6 +491,12 @@ test_unsafe_orphan_is_not_published() {
   test "$hits" = "0" || fail "unsafe orphaned rescue branch was published"
   test -z "$(git -C "$case_root/work" ls-remote --heads origin \
     'refs/heads/replit-rescue/unsafe')" || fail "unsafe orphan ref reached the remote"
+  # Also assert on the path name, not just the content: a leak whose blob differs
+  # from the canary would still show up as a tree entry in the origin repo.
+  local origin_objects
+  origin_objects=$(git -C "$case_root/origin.git" rev-list --all --objects 2>/dev/null |
+    awk '{print $2}' | grep -c 'service-account-orphan.json' || true)
+  test "$origin_objects" = "0" || fail "credential path reached the origin repository"
   # ...and it must still exist locally: skipping is not deleting.
   test -n "$(git -C "$case_root/work" branch --list 'replit-rescue/unsafe')" ||
     fail "unsafe orphan was destroyed instead of left alone"
