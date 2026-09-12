@@ -105,7 +105,35 @@ test_failed_push_blocks_reset() {
   printf 'PASS: failed remote backup prevented checkout reset\n'
 }
 
+test_env_template_is_not_treated_as_sensitive() {
+  local case_root="$TEST_ROOT/env-template"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'STRIPE_SECRET_KEY=\n' > .env.example
+    git add .env.example
+    git commit -m 'document required env vars' >/dev/null
+  )
+
+  # `.env.example` matches the `.env.*` credential rule by shape but holds no
+  # values. Classifying it as sensitive aborts the rescue and leaves the stuck
+  # checkout stuck, so the template must stay on the safe side of the classifier.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "committed .env.example template aborted the rescue"
+
+  local branch
+  branch=$(rescue_branch "$case_root/work")
+  test -n "$branch" || fail "rescue branch was not created for a template-only commit"
+  (cd "$case_root/work" && MSYS_NO_PATHCONV=1 git show "$branch:.env.example") |
+    grep -q 'STRIPE_SECRET_KEY=' || fail "template was not preserved on the rescue branch"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset after a template-only commit"
+  printf 'PASS: .env.example template rescued instead of blocking recovery\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
+test_env_template_is_not_treated_as_sensitive
 printf 'All fix-replit-git safety tests passed.\n'

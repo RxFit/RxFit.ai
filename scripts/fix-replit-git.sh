@@ -63,6 +63,11 @@ run() {
 # the edit and a push can't leak it.
 is_sensitive() {
   case "$1" in
+    # Templates list variable *names*, never values, and are meant to be tracked
+    # and pushed — .gitignore keeps .env.example out of the .env ignore rule.
+    # Checked first so `.env.example` is not swept up by the `.env.*` rule below,
+    # which would otherwise abort the whole rescue over a committed template.
+    *.example|*.sample|*.template|*.dist) return 1 ;;
     .env|.env.*|*/.env|*/.env.*) return 0 ;;
     *.pem|*.key|*.p12|*.pfx|*.jks) return 0 ;;
     *service-account*.json|*credentials.json|*client_secret*.json) return 0 ;;
