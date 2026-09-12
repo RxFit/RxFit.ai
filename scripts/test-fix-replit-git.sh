@@ -507,7 +507,50 @@ test_unsafe_orphan_is_not_published() {
   printf 'PASS: unsafe orphan withheld, clean orphan still published\n'
 }
 
+test_same_name_different_commit_is_still_published() {
+  local case_root="$TEST_ROOT/oid-collision"
+  init_case "$case_root"
+  local remote_oid
+  (
+    cd "$case_root/work"
+    git switch -c replit-rescue/COLLIDE >/dev/null 2>&1
+    printf 'another recovery\n' > other.txt
+    git add other.txt
+    git commit -m 'rescue branch already on the remote' >/dev/null
+    git push origin replit-rescue/COLLIDE >/dev/null 2>&1
+    # Same name locally, different commit, carrying work that exists nowhere else.
+    git reset --hard main >/dev/null 2>&1
+    printf 'oid-collision-canary\n' > resolution.txt
+    git add resolution.txt
+    git commit -m 'my unpushed rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  remote_oid=$(git -C "$case_root/work" ls-remote origin \
+    refs/heads/replit-rescue/COLLIDE | cut -f1)
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+
+  # Matching remote refs by name alone treated this as already durable: the local
+  # commit was skipped, never published, and the checkout reset regardless.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed against a same-named remote rescue ref"
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'oid-collision-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" != "0" || fail "local rescue commit was never published to the remote"
+  test "$(git -C "$case_root/work" ls-remote origin refs/heads/replit-rescue/COLLIDE | cut -f1)" \
+    = "$remote_oid" || fail "the pre-existing remote rescue ref was overwritten"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset"
+  printf 'PASS: same-name different-commit rescue ref published beside the remote one\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_same_name_different_commit_is_still_published
 test_unsafe_orphan_is_not_published
 test_rebase_restores_original_branch_not_main
 test_dangling_symlink_is_copied_aside

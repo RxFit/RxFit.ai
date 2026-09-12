@@ -346,28 +346,62 @@ fi
 # branch the remote does not have, so the retry makes it durable too.
 ORPHANED=""
 UNSAFE_ORPHANS=""
-REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null |
-  awk '{print $2}' | sed 's#^refs/heads/##' || true)
+ASSIGNED=""
+# Keep the object IDs, not just the names. A remote ref that merely shares a name
+# is not this commit: two recoveries can pick the same one-second stamp, and
+# treating the name as proof of durability would skip the local ref, reset the
+# checkout, and leave its commits published nowhere.
+REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null || true)
+
+remote_oid_for() {
+  printf '%s\n' "$REMOTE_RESCUE" | awk -v n="refs/heads/$1" '$2 == n { print $1; exit }'
+}
+
+# First remote name not already taken, and not already claimed earlier in this run.
+free_remote_name() {
+  local base="$1" cand="$1" n=1
+  while [ -n "$(remote_oid_for "$cand")" ] ||
+        case $'\n'"$ASSIGNED"$'\n' in *$'\n'"$cand"$'\n'*) true ;; *) false ;; esac; do
+    n=$((n + 1))
+    cand="$base-$n"
+  done
+  printf '%s' "$cand"
+}
+
 while IFS= read -r b; do
   [ -n "$b" ] || continue
-  case $'\n'"$REMOTE_RESCUE"$'\n' in
-    *$'\n'"$b"$'\n'*) continue ;;
-  esac
+  # Durable only when the remote ref is this exact commit.
+  if [ "$(remote_oid_for "$b")" = "$(git rev-parse "$b")" ]; then
+    continue
+  fi
   # These refs are adopted, not created here: the name alone says nothing about
   # what they carry. One could be stale, hand-made, or from a checkout whose
   # history this run never gated, so scan each on its own before publishing it.
   # Pushing on the strength of the name prefix would be a push path with no
   # credential containment at all.
+  # Publishing under a new name is still publishing, so it goes through the same
+  # scan as every other push path.
   if [ -n "$(sensitive_paths_in_range "$TARGET_REF..$b")" ]; then
     UNSAFE_ORPHANS="${UNSAFE_ORPHANS}${b}"$'\n'
   else
-    ORPHANED="${ORPHANED}${b}"$'\n'
+    __target=$(free_remote_name "$b")
+    ASSIGNED="${ASSIGNED}${__target}"$'\n'
+    if [ "$__target" = "$b" ]; then
+      ORPHANED="${ORPHANED}${b}"$'\n'
+    else
+      # Name taken remotely by a different commit — publish beside it, not over it.
+      ORPHANED="${ORPHANED}${b}:${__target}"$'\n'
+    fi
   fi
 done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
+unset __target
 
 if [ -n "$ORPHANED" ]; then
   say "rescue branches from an earlier run that never reached GitHub:"
-  printf '%s' "$ORPHANED" | sed 's/^/    /'
+  # Render "local:remote" as a rename so the reason is obvious in the log.
+  printf '%s' "$ORPHANED" |
+    sed -e 's/^\([^:]*\):\(.*\)$/\1 -> \2  (name taken remotely by a different commit)/' \
+        -e 's/^/    /'
 fi
 
 if [ -n "$UNSAFE_ORPHANS" ]; then
