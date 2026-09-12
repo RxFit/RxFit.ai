@@ -132,8 +132,115 @@ test_env_template_is_not_treated_as_sensitive() {
   printf 'PASS: .env.example template rescued instead of blocking recovery\n'
 }
 
+advance_remote() {
+  # Move origin/main on by rewriting safe.txt, so the next local pull conflicts.
+  local case_root="$1" content="$2"
+  git clone "$case_root/origin.git" "$case_root/seed" >/dev/null 2>&1
+  (
+    cd "$case_root/seed"
+    git config user.name "Replit recovery test"
+    git config user.email "replit-recovery-test@example.invalid"
+    printf '%s\n' "$content" > safe.txt
+    git commit -am remote >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+}
+
+remote_rescue_refs() {
+  git -C "$1" ls-remote --heads origin 'refs/heads/replit-rescue/*'
+}
+
+test_rebase_scans_restored_tip_not_transient_head() {
+  local case_root="$TEST_ROOT/rebase-tip"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'first\n' > extra.txt
+    git add extra.txt
+    git commit -m c1-safe >/dev/null
+    printf 'local\n' > safe.txt
+    git commit -am c2-conflicting >/dev/null
+    printf '{"private_key":"rebase-tip-canary"}\n' > service-account-prod.json
+    git add service-account-prod.json
+    git commit -m c3-credential >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git rebase origin/main >/dev/null 2>&1) || true
+
+  # Mid-rebase HEAD holds only the replayed commits; the credential commit comes
+  # back when the rebase aborts. Scanning HEAD would clear the gate and publish it.
+  if (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1); then
+    fail "credential commit behind a conflicted rebase was accepted"
+  fi
+  test -z "$(remote_rescue_refs "$case_root/work")" ||
+    fail "rescue branch reached the remote despite credential history"
+  local origin_objects
+  origin_objects=$(git -C "$case_root/origin.git" rev-list --all --objects 2>/dev/null |
+    awk '{print $2}' | grep -c 'service-account-prod.json' || true)
+  test "$origin_objects" = "0" || fail "credential path reached the origin repository"
+  printf 'PASS: conflicted rebase scans the restored tip, not the transient HEAD\n'
+}
+
+test_untracked_collision_is_copied_before_forced_checkout() {
+  local case_root="$TEST_ROOT/untracked-collision"
+  init_case "$case_root"
+  printf 'untracked-collision-canary\n' > "$case_root/work/scratch.txt"
+  git clone "$case_root/origin.git" "$case_root/seed" >/dev/null 2>&1
+  (
+    cd "$case_root/seed"
+    git config user.name "Replit recovery test"
+    git config user.email "replit-recovery-test@example.invalid"
+    printf 'remote version\n' > scratch.txt
+    git add scratch.txt
+    git commit -m 'remote starts tracking scratch' >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+
+  # checkout -f overwrites an untracked path the target tracks, and that content
+  # was deliberately never staged, so it has to be copied aside beforehand.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on an untracked/tracked path collision"
+  grep -R -q 'untracked-collision-canary' "$case_root/work"/.replit-rescue-* ||
+    fail "colliding untracked file was destroyed instead of copied aside"
+  printf 'PASS: untracked collision copied aside before forced checkout\n'
+}
+
+test_conflict_resolution_survives_the_abort() {
+  local case_root="$TEST_ROOT/resolution"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  (
+    cd "$case_root/work"
+    printf 'resolution-canary\n' > safe.txt
+    git add safe.txt
+  )
+
+  # `git merge --abort` restores the pre-merge tree, so a resolution made after
+  # the merge stopped is gone before the ordinary backup step ever looks.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on a partially resolved conflict"
+  local snapshot
+  snapshot=$(git -C "$case_root/work" branch --list 'replit-rescue/*-conflict-state' \
+    --format='%(refname:short)' | head -n1)
+  test -n "$snapshot" || fail "no conflict-state snapshot branch was created"
+  (cd "$case_root/work" && MSYS_NO_PATHCONV=1 git show "$snapshot:safe.txt") |
+    grep -q 'resolution-canary' || fail "conflict resolution was not snapshotted"
+  remote_rescue_refs "$case_root/work" | grep -q -- '-conflict-state' ||
+    fail "conflict-state snapshot was not pushed to the remote"
+  printf 'PASS: conflict resolution snapshotted before the abort\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
 test_env_template_is_not_treated_as_sensitive
+test_rebase_scans_restored_tip_not_transient_head
+test_untracked_collision_is_copied_before_forced_checkout
+test_conflict_resolution_survives_the_abort
 printf 'All fix-replit-git safety tests passed.\n'

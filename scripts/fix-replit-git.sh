@@ -138,15 +138,31 @@ fi
 TARGET_SHA=$(git rev-parse --short "$TARGET_REF")
 say "target: $TARGET_REF ($TARGET_SHA) $(git log -1 --format='%s' "$TARGET_REF")"
 
-# Local-only commits are measured from the pre-merge HEAD, which is still the
-# branch tip while a merge is conflicted.
-LOCAL_ONLY=$(git rev-list --count "$TARGET_REF"..HEAD)
-BEHIND=$(git rev-list --count "HEAD..$TARGET_REF")
+# The commit the rescue branch will actually be created from. During a merge,
+# cherry-pick or revert, HEAD is still the branch tip. During a *rebase* it is
+# not: HEAD is a detached, partially-replayed commit, and the original tip comes
+# back only when the rebase is aborted. Scanning HEAD there would inspect a few
+# replayed commits and miss whatever else the restored tip carries, so resolve
+# the tip that the rescue will really publish.
+if [ -f "$GIT_DIR/rebase-merge/orig-head" ]; then
+  TIP=$(cat "$GIT_DIR/rebase-merge/orig-head")
+elif [ -f "$GIT_DIR/rebase-apply/orig-head" ]; then
+  TIP=$(cat "$GIT_DIR/rebase-apply/orig-head")
+else
+  TIP=$(git rev-parse HEAD)
+fi
+
+if [ "$TIP" != "$(git rev-parse HEAD)" ]; then
+  say "rebase in progress; the tip restored by the abort is $(git rev-parse --short "$TIP")"
+fi
+
+LOCAL_ONLY=$(git rev-list --count "$TARGET_REF".."$TIP")
+BEHIND=$(git rev-list --count "$TIP..$TARGET_REF")
 say "divergence: $LOCAL_ONLY local-only commit(s), $BEHIND commit(s) behind $TARGET_REF"
 
 if [ "$LOCAL_ONLY" != "0" ]; then
   say "local-only commits that must be preserved:"
-  git log --oneline "$TARGET_REF"..HEAD | sed 's/^/    /'
+  git log --oneline "$TARGET_REF".."$TIP" | sed 's/^/    /'
 fi
 
 # A rescue branch publishes the complete local-only commit graph. Path filtering
@@ -161,7 +177,7 @@ if [ "$LOCAL_ONLY" != "0" ]; then
         SENSITIVE_LOCAL_HISTORY="${SENSITIVE_LOCAL_HISTORY}${f}"$'\n'
       fi
     done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
-  done < <(git rev-list "$TARGET_REF"..HEAD)
+  done < <(git rev-list "$TARGET_REF".."$TIP")
 fi
 
 if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
@@ -170,6 +186,55 @@ if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
   say "No rescue branch was pushed and the checkout was not reset."
   say "Remove the credential material from local history, then run this script again."
   exit 1
+fi
+
+STAMP=$(date -u +%Y%m%d-%H%M%S)
+BACKUP_BRANCH="replit-rescue/$STAMP"
+CONFLICT_BRANCH="replit-rescue/$STAMP-conflict-state"
+ASIDE_DIR="$REPO_ROOT/.replit-rescue-$STAMP"
+
+step "snapshotting the conflicted tree"
+
+# Aborting restores the *pre*-merge state, so any conflict resolution already
+# made — edited or staged after the merge stopped — is discarded with it, and
+# the later backup (taken after the abort) never sees it. Snapshot the tree as
+# it stands now, before the abort, so half-finished resolution work survives.
+#
+# A conflicted index holds unmerged entries and `git write-tree` refuses to run
+# against it, so build the snapshot in a throwaway index seeded from HEAD. That
+# also means the index starts clean, so :(exclude) pathspecs are enough to keep
+# credential paths at their committed content rather than the working-tree one.
+SNAPSHOT_MADE=0
+if [ -n "$IN_PROGRESS" ] && [ "$DRY_RUN" != "1" ]; then
+  if ! git config user.email >/dev/null 2>&1; then
+    export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-Replit Rescue}"
+    export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-replit-rescue@localhost}"
+    export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-Replit Rescue}"
+    export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-replit-rescue@localhost}"
+  fi
+  TMP_INDEX="$GIT_DIR/replit-rescue-index.$$"
+  rm -f "$TMP_INDEX"
+  GIT_INDEX_FILE="$TMP_INDEX" git read-tree HEAD
+  GIT_INDEX_FILE="$TMP_INDEX" git add -u -- . ':(exclude).env' ':(exclude).env.*' \
+    ':(exclude)*.pem' ':(exclude)*.key' ':(exclude)*.p12' ':(exclude)*.pfx' \
+    ':(exclude)*.jks' ':(exclude)*service-account*.json' \
+    ':(exclude)*credentials.json' ':(exclude)*client_secret*.json' 2>/dev/null || true
+  SNAP_TREE=$(GIT_INDEX_FILE="$TMP_INDEX" git write-tree)
+  rm -f "$TMP_INDEX"
+  if [ "$SNAP_TREE" != "$(git rev-parse "HEAD^{tree}")" ]; then
+    SNAP_COMMIT=$(git commit-tree "$SNAP_TREE" -p HEAD \
+      -m "Conflicted Replit tree as found ($STAMP)" \
+      -m "Snapshot taken by scripts/fix-replit-git.sh before aborting the $IN_PROGRESS, so any conflict resolution already made is not lost. May contain conflict markers for files that were still unresolved.")
+    git update-ref "refs/heads/$CONFLICT_BRANCH" "$SNAP_COMMIT"
+    SNAPSHOT_MADE=1
+    say "saved the conflicted tree to $CONFLICT_BRANCH ($(git rev-parse --short "$SNAP_COMMIT"))"
+  else
+    say "conflicted tree matches HEAD; no resolution work to snapshot"
+  fi
+elif [ -n "$IN_PROGRESS" ]; then
+  say "would snapshot the conflicted tree to $CONFLICT_BRANCH before aborting"
+else
+  say "no interrupted operation, so nothing to snapshot"
 fi
 
 step "clearing the interrupted operation"
@@ -212,11 +277,7 @@ if [ -n "$TRACKED_DIRTY" ]; then
   done <<< "$TRACKED_DIRTY"
 fi
 
-STAMP=$(date -u +%Y%m%d-%H%M%S)
-BACKUP_BRANCH="replit-rescue/$STAMP"
-ASIDE_DIR="$REPO_ROOT/.replit-rescue-$STAMP"
-
-if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ]; then
+if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ]; then
   say "no local commits and no tracked edits — nothing to back up"
   BACKUP_BRANCH=""
 else
@@ -235,7 +296,7 @@ else
   fi
 
   say "rescue branch: $BACKUP_BRANCH (at current HEAD, so all $LOCAL_ONLY local commit(s) come along)"
-  run git branch "$BACKUP_BRANCH" HEAD
+  run git branch "$BACKUP_BRANCH" "$TIP"
 
   if [ -n "$SAFE_DIRTY" ]; then
     say "committing tracked edits onto the rescue branch:"
@@ -275,19 +336,48 @@ else
   fi
 
   step "pushing the rescue branch to GitHub"
+  PUSH_REFS="$BACKUP_BRANCH"
+  if [ "$SNAPSHOT_MADE" = "1" ]; then
+    PUSH_REFS="$PUSH_REFS $CONFLICT_BRANCH"
+  fi
   if [ "$DRY_RUN" = "1" ]; then
-    say "would run: git push -u origin $BACKUP_BRANCH"
-  elif git push -u origin "$BACKUP_BRANCH"; then
-    say "pushed: $BACKUP_BRANCH is now on GitHub and safe even if this container is wiped"
+    say "would run: git push -u origin $PUSH_REFS"
+  elif git push -u origin $PUSH_REFS; then
+    say "pushed: $PUSH_REFS now on GitHub and safe even if this container is wiped"
   else
     say "ERROR: push failed, so the remote backup is not durable."
-    say "The local rescue branch remains at: $BACKUP_BRANCH"
+    say "The local rescue branch(es) remain at: $PUSH_REFS"
     say "The checkout was not reset. Restore GitHub write access and run again."
     exit 1
   fi
 fi
 
 step "resetting the checkout to $TARGET_REF"
+
+# `git reset --hard` leaves untracked files alone, but `git checkout -f` does not:
+# an untracked path that obstructs a path the target tracks is overwritten or
+# removed. That happens exactly when the remote has started tracking a file the
+# container still has as a local-only scratch file, so copy those aside first —
+# they were deliberately excluded from the rescue commit and exist nowhere else.
+COLLIDING=""
+while IFS= read -r u; do
+  [ -n "$u" ] || continue
+  if git cat-file -e "$TARGET_REF:$u" 2>/dev/null; then
+    COLLIDING="${COLLIDING}${u}"$'\n'
+  fi
+done <<< "$(git ls-files --others --exclude-standard)"
+
+if [ -n "$COLLIDING" ]; then
+  say "these untracked files collide with paths $TARGET_REF tracks:"
+  printf '%s' "$COLLIDING" | sed 's/^/    /'
+  say "the forced checkout would overwrite them, so copying them to:"
+  say "    $ASIDE_DIR"
+  while IFS= read -r u; do
+    [ -n "$u" ] || continue
+    run mkdir -p "$ASIDE_DIR/$(dirname "$u")"
+    run cp -- "$u" "$ASIDE_DIR/$u"
+  done <<< "$COLLIDING"
+fi
 
 # -f is safe here precisely because the backup above already captured these edits;
 # without it the leftover working-tree changes can block the branch switch.
@@ -314,8 +404,11 @@ say "checkout is now clean at $(git log -1 --format='%h %s')"
 if [ -n "$BACKUP_BRANCH" ]; then
   say "your previous state is preserved on: $BACKUP_BRANCH"
 fi
-if [ -n "$SENSITIVE_DIRTY" ]; then
-  say "credential files were copied aside to: $ASIDE_DIR"
+if [ "$SNAPSHOT_MADE" = "1" ]; then
+  say "the conflicted tree as found is on:  $CONFLICT_BRANCH"
+fi
+if [ -n "$SENSITIVE_DIRTY" ] || [ -n "$COLLIDING" ]; then
+  say "files copied aside on disk:          $ASIDE_DIR"
 fi
 say "Replit's Git pane should now show a clean tree. If it still looks stuck,"
 say "close and reopen the Git tab to force it to re-read the checkout."
