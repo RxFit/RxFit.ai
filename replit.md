@@ -141,9 +141,10 @@ the plan without changing anything.
 
 Deliberate safety properties:
 - It never runs `git clean`, so untracked files (`.env`, scratch notes) survive the reset.
-  The one case where a forced checkout would still overwrite an untracked file — the
-  remote has begun tracking a path the container holds as a local scratch file — is
-  detected and copied to `.replit-rescue-<utc-stamp>/` first.
+  Paths a forced checkout would still destroy are copied to `.replit-rescue-<utc-stamp>/`
+  first: a path the remote has begun tracking that the container holds as an untracked
+  or *ignored* file, a directory the remote replaced with a file (nested contents and
+  all), and a file sitting where the remote needs a directory.
 - It never stages a credential-shaped file. A tracked-and-modified one is copied to
   `.replit-rescue-<utc-stamp>/` on disk instead of being committed, so a rescue branch
   pushed to GitHub cannot carry secrets.
@@ -154,7 +155,12 @@ Deliberate safety properties:
   variable names, not values.
 - If the conflict was already partly resolved, the tree is snapshotted to
   `replit-rescue/<utc-stamp>-conflict-state` *before* the abort, since aborting restores
-  the pre-merge state and would otherwise discard that resolution work.
+  the pre-merge state and would otherwise discard that resolution work. Credential paths
+  in that snapshot are held at their committed content, classified by the same
+  `is_sensitive` used everywhere else so nested ones like `config/.env` cannot slip past
+  a root-only pathspec.
+- `--dry-run` changes nothing: it does not prune remote-tracking refs. It still fetches,
+  since every comparison it reports depends on the target ref.
 
 Recover rescued work afterwards with `git switch replit-rescue/<utc-stamp>`.
 `scripts/test-fix-replit-git.sh` covers all of the above; run it after changing either script.

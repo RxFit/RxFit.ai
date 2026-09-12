@@ -125,7 +125,12 @@ if [ -n "$CONFLICTED" ]; then
 fi
 
 step "syncing refs from GitHub"
-if ! git fetch origin --prune; then
+
+# No --prune: it deletes remote-tracking refs, which a dry run must not do. The
+# fetch itself is unconditional because every comparison below needs the target
+# ref, and it only advances remote-tracking refs — reported honestly at the end
+# rather than claimed as "nothing happened".
+if ! git fetch origin; then
   say "ERROR: could not reach GitHub. Check the container's network/credentials."
   exit 1
 fi
@@ -188,6 +193,16 @@ if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
   exit 1
 fi
 
+# Tracked paths that is_sensitive considers credential-shaped, at any depth. The
+# snapshot below restores these to their committed content so a working-tree
+# secret cannot ride along in the pushed conflict-state branch.
+SENSITIVE_TRACKED=""
+while IFS= read -r -d '' f; do
+  if is_sensitive "$f"; then
+    SENSITIVE_TRACKED="${SENSITIVE_TRACKED}${f}"$'\n'
+  fi
+done < <(git ls-tree -r --name-only -z HEAD)
+
 STAMP=$(date -u +%Y%m%d-%H%M%S)
 BACKUP_BRANCH="replit-rescue/$STAMP"
 CONFLICT_BRANCH="replit-rescue/$STAMP-conflict-state"
@@ -215,10 +230,15 @@ if [ -n "$IN_PROGRESS" ] && [ "$DRY_RUN" != "1" ]; then
   TMP_INDEX="$GIT_DIR/replit-rescue-index.$$"
   rm -f "$TMP_INDEX"
   GIT_INDEX_FILE="$TMP_INDEX" git read-tree HEAD
-  GIT_INDEX_FILE="$TMP_INDEX" git add -u -- . ':(exclude).env' ':(exclude).env.*' \
-    ':(exclude)*.pem' ':(exclude)*.key' ':(exclude)*.p12' ':(exclude)*.pfx' \
-    ':(exclude)*.jks' ':(exclude)*service-account*.json' \
-    ':(exclude)*credentials.json' ':(exclude)*client_secret*.json' 2>/dev/null || true
+  GIT_INDEX_FILE="$TMP_INDEX" git add -u 2>/dev/null || true
+  # Stage everything, then put credential paths back to their committed content.
+  # A `:(exclude).env` pathspec matches only a root-level .env and would let
+  # config/.env through, so the single is_sensitive classifier decides here too —
+  # one definition of "credential-shaped", applied identically everywhere.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    GIT_INDEX_FILE="$TMP_INDEX" git reset -q HEAD -- "$f" 2>/dev/null || true
+  done <<< "$SENSITIVE_TRACKED"
   SNAP_TREE=$(GIT_INDEX_FILE="$TMP_INDEX" git write-tree)
   rm -f "$TMP_INDEX"
   if [ "$SNAP_TREE" != "$(git rev-parse "HEAD^{tree}")" ]; then
@@ -290,8 +310,14 @@ else
     say "    $ASIDE_DIR"
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      run mkdir -p "$ASIDE_DIR/$(dirname "$f")"
-      run cp -- "$f" "$ASIDE_DIR/$f"
+      # The path can be dirty because it was *deleted*; there is then nothing to
+      # copy, and an unguarded cp would fail and take the whole run down with it.
+      if [ -e "$f" ]; then
+        run mkdir -p "$ASIDE_DIR/$(dirname "$f")"
+        run cp -- "$f" "$ASIDE_DIR/$f"
+      else
+        say "    ($f was deleted locally — no content to copy aside)"
+      fi
     done <<< "$SENSITIVE_DIRTY"
   fi
 
@@ -359,23 +385,50 @@ step "resetting the checkout to $TARGET_REF"
 # removed. That happens exactly when the remote has started tracking a file the
 # container still has as a local-only scratch file, so copy those aside first —
 # they were deliberately excluded from the rescue commit and exist nowhere else.
+# Walk the target's paths rather than the working tree's: the target tree is
+# bounded by the repo, while listing every untracked path would have to descend
+# node_modules. Three ways a target path can be obstructed locally, all of which
+# `checkout -f` resolves by destroying the local side:
+#   1. the path exists as an untracked file       (ignored ones included)
+#   2. the path exists as a directory, because the target turned it into a file
+#   3. an ancestor of the path exists as a file, where the target needs a directory
+declare -A IS_TRACKED=()
+while IFS= read -r -d '' f; do
+  IS_TRACKED["$f"]=1
+done < <(git ls-files -z)
+
 COLLIDING=""
-while IFS= read -r u; do
-  [ -n "$u" ] || continue
-  if git cat-file -e "$TARGET_REF:$u" 2>/dev/null; then
-    COLLIDING="${COLLIDING}${u}"$'\n'
+add_collision() {
+  case $'\n'"$COLLIDING" in
+    *$'\n'"$1"$'\n'*) return 0 ;;   # already recorded
+  esac
+  COLLIDING="${COLLIDING}${1}"$'\n'
+}
+
+while IFS= read -r -d '' p; do
+  if [ -d "$p" ] && [ ! -L "$p" ]; then
+    add_collision "$p"
+  elif [ -e "$p" ] && [ -z "${IS_TRACKED[$p]:-}" ]; then
+    add_collision "$p"
   fi
-done <<< "$(git ls-files --others --exclude-standard)"
+  d=$(dirname "$p")
+  while [ "$d" != "." ] && [ "$d" != "/" ]; do
+    if [ -f "$d" ] && [ -z "${IS_TRACKED[$d]:-}" ]; then
+      add_collision "$d"
+    fi
+    d=$(dirname "$d")
+  done
+done < <(git ls-tree -r --name-only -z "$TARGET_REF")
 
 if [ -n "$COLLIDING" ]; then
-  say "these untracked files collide with paths $TARGET_REF tracks:"
+  say "these local paths obstruct paths $TARGET_REF tracks:"
   printf '%s' "$COLLIDING" | sed 's/^/    /'
-  say "the forced checkout would overwrite them, so copying them to:"
+  say "the forced checkout would destroy them, so copying them to:"
   say "    $ASIDE_DIR"
   while IFS= read -r u; do
     [ -n "$u" ] || continue
     run mkdir -p "$ASIDE_DIR/$(dirname "$u")"
-    run cp -- "$u" "$ASIDE_DIR/$u"
+    run cp -a -- "$u" "$ASIDE_DIR/$u"
   done <<< "$COLLIDING"
 fi
 

@@ -236,6 +236,137 @@ test_conflict_resolution_survives_the_abort() {
   printf 'PASS: conflict resolution snapshotted before the abort\n'
 }
 
+remote_clone() {
+  # A second clone used to move origin/main in ways advance_remote doesn't cover.
+  local case_root="$1" name="$2"
+  git clone "$case_root/origin.git" "$case_root/$name" >/dev/null 2>&1
+  git -C "$case_root/$name" config user.name "Replit recovery test"
+  git -C "$case_root/$name" config user.email "replit-recovery-test@example.invalid"
+}
+
+test_ignored_file_obstruction_is_copied_aside() {
+  local case_root="$TEST_ROOT/ignored-obstruction"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'ignored.txt\n' > .gitignore
+    git add .gitignore
+    git commit -m 'ignore a scratch file' >/dev/null
+    git push origin main >/dev/null 2>&1
+    printf 'ignored-obstruction-canary\n' > ignored.txt
+  )
+  remote_clone "$case_root" seed2
+  (
+    cd "$case_root/seed2"
+    printf 'remote version\n' > ignored.txt
+    git add -f ignored.txt
+    git commit -m 'remote starts tracking the ignored path' >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+
+  # `--exclude-standard` hides ignored files, so an ignored path the target has
+  # begun tracking looked like no obstruction at all and was overwritten.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on an ignored-file obstruction"
+  grep -R -q 'ignored-obstruction-canary' "$case_root/work"/.replit-rescue-* ||
+    fail "ignored file was destroyed instead of copied aside"
+  printf 'PASS: ignored file obstructing a tracked path is copied aside\n'
+}
+
+test_directory_swap_preserves_nested_untracked() {
+  local case_root="$TEST_ROOT/dir-swap"
+  init_case "$case_root"
+  mkdir -p "$case_root/work/scratch"
+  printf 'nested-obstruction-canary\n' > "$case_root/work/scratch/note"
+  remote_clone "$case_root" seed2
+  (
+    cd "$case_root/seed2"
+    printf 'now a file\n' > scratch
+    git add scratch
+    git commit -m 'scratch becomes a file' >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+
+  # Checking only `$TARGET_REF:$path` missed this: nothing obstructs `scratch`
+  # by name, but the checkout must delete the whole local directory to place a
+  # file there, taking the nested untracked note with it.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on a directory-to-file swap"
+  grep -R -q 'nested-obstruction-canary' "$case_root/work"/.replit-rescue-* ||
+    fail "nested untracked file was destroyed instead of copied aside"
+  printf 'PASS: directory replaced by a file preserves nested untracked content\n'
+}
+
+test_deleted_sensitive_file_does_not_abort() {
+  local case_root="$TEST_ROOT/deleted-sensitive"
+  init_case "$case_root"
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  rm -f "$case_root/work/.env"
+
+  # A deleted tracked credential path is still "dirty" and still classifies as
+  # sensitive, but there is no content to copy — an unguarded cp took the run down.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "a locally deleted credential file aborted the recovery"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset after a deleted credential file"
+  printf 'PASS: locally deleted credential file does not abort recovery\n'
+}
+
+test_nested_credential_excluded_from_snapshot() {
+  local case_root="$TEST_ROOT/nested-credential"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    mkdir -p config
+    printf 'OLD=placeholder\n' > config/.env
+    git add -f config/.env
+    git commit -m 'track a nested env file' >/dev/null
+    git push origin main >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  printf 'SECRET=nested-snapshot-canary\n' > "$case_root/work/config/.env"
+
+  # `:(exclude).env` matches only a root-level .env, so config/.env was staged
+  # into the snapshot and pushed. is_sensitive is the single classifier now.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed with a nested credential file"
+  local hits
+  # `git grep` exits 1 when it matches nothing, which under `set -o pipefail`
+  # would abort this script on the success case. Swallow it before counting.
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'nested-snapshot-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" = "0" || fail "nested credential reached the origin repository"
+  printf 'PASS: nested credential kept out of the conflict snapshot\n'
+}
+
+test_dry_run_does_not_prune_refs() {
+  local case_root="$TEST_ROOT/dry-run-prune"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    git push origin main:refs/heads/doomed >/dev/null 2>&1
+    git fetch origin >/dev/null 2>&1
+  )
+  # Delete the branch inside the bare repo rather than via `push --delete`, which
+  # would also drop the local remote-tracking ref and leave nothing to prune.
+  git -C "$case_root/origin.git" update-ref -d refs/heads/doomed
+  test -n "$(git -C "$case_root/work" rev-parse --verify -q origin/doomed || true)" ||
+    fail "test setup did not leave a stale remote-tracking ref"
+
+  # --dry-run promises to change nothing; `fetch --prune` deleted refs anyway.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" --dry-run >/dev/null 2>&1) ||
+    fail "dry run exited non-zero"
+  test -n "$(git -C "$case_root/work" rev-parse --verify -q origin/doomed || true)" ||
+    fail "dry run pruned a remote-tracking ref"
+  printf 'PASS: dry run leaves remote-tracking refs alone\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
@@ -243,4 +374,9 @@ test_env_template_is_not_treated_as_sensitive
 test_rebase_scans_restored_tip_not_transient_head
 test_untracked_collision_is_copied_before_forced_checkout
 test_conflict_resolution_survives_the_abort
+test_ignored_file_obstruction_is_copied_aside
+test_directory_swap_preserves_nested_untracked
+test_deleted_sensitive_file_does_not_abort
+test_nested_credential_excluded_from_snapshot
+test_dry_run_does_not_prune_refs
 printf 'All fix-replit-git safety tests passed.\n'
