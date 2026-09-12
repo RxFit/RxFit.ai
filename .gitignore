@@ -4,3 +4,12 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Credentials: Replit injects these via Secrets, but an untracked .env in the
+# container would otherwise be committable by a stray `git add -A`.
+.env
+.env.*
+!.env.example
+
+# Scratch dirs written by scripts/fix-replit-git.sh when rescuing a stuck checkout.
+.replit-rescue-*

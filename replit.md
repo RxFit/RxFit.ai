@@ -120,6 +120,51 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - Testimonial section
 - Mobile responsive
 
+## Recovering a stuck Replit git checkout
+Replit's Git pane has no "abort merge" control, so a pull that conflicts leaves the
+workspace wedged: the pane keeps showing the conflict and no further sync is possible.
+Nothing outside the container can clear this — the git state lives on the Replit
+machine — so this is one of the emergency-fallback CLIs referred to under User
+Preferences. Normal operation still never requires it.
+
+From the Replit Shell, one line does it:
+
+```bash
+git fetch origin && git show origin/main:scripts/fix-replit-git.sh | bash
+```
+
+`scripts/fix-replit-git.sh` reaches a clean checkout without the data loss that a bare
+`git reset --hard origin/main` causes. It aborts the interrupted merge/rebase, parks
+every local commit and tracked edit on a timestamped `replit-rescue/<utc-stamp>` branch
+and pushes it to GitHub, and only then resets to `origin/main`. Add `--dry-run` to see
+the plan without changing anything.
+
+Deliberate safety properties:
+- It never runs `git clean`, so untracked files (`.env`, scratch notes) survive the reset.
+  Paths a forced checkout would still destroy are copied to `.replit-rescue-<utc-stamp>/`
+  first: a path the remote has begun tracking that the container holds as an untracked
+  or *ignored* file, a directory the remote replaced with a file (nested contents and
+  all), and a file sitting where the remote needs a directory.
+- It never stages a credential-shaped file. A tracked-and-modified one is copied to
+  `.replit-rescue-<utc-stamp>/` on disk instead of being committed, so a rescue branch
+  pushed to GitHub cannot carry secrets.
+- It refuses to push or reset if a local-only commit already touches a credential-shaped
+  path, and it leaves the checkout unchanged if the remote rescue push fails. That history
+  is measured from the tip an abort would restore, not from a transient rebase `HEAD`.
+  Templates (`*.example`, `*.sample`, `*.template`, `*.dist`) are exempt — they carry
+  variable names, not values.
+- If the conflict was already partly resolved, the tree is snapshotted to
+  `replit-rescue/<utc-stamp>-conflict-state` *before* the abort, since aborting restores
+  the pre-merge state and would otherwise discard that resolution work. Credential paths
+  in that snapshot are held at their committed content, classified by the same
+  `is_sensitive` used everywhere else so nested ones like `config/.env` cannot slip past
+  a root-only pathspec.
+- `--dry-run` changes nothing: it does not prune remote-tracking refs. It still fetches,
+  since every comparison it reports depends on the target ref.
+
+Recover rescued work afterwards with `git switch replit-rescue/<utc-stamp>`.
+`scripts/test-fix-replit-git.sh` covers all of the above; run it after changing either script.
+
 ## User Preferences
 - The owner does NOT manually operate this site. All features and recommended tasks must be fully automated/self-operating (scheduled jobs, automatic alerts, self-healing checks) — never assume the owner will run CLIs, click dashboard buttons, or perform manual publish/maintenance steps. Manual CLIs may exist as emergency fallbacks only, with an automated primary path.
 - "RxFit Concierge" champagne-gold Lux-Industrial / Command-HUD aesthetic (supersedes the prior teal/coral palette)
