@@ -158,6 +158,9 @@ Deliberate safety properties:
   the reset lands on `main` and force-resets it while you were on another branch.
 - A retry after a rejected push also pushes any rescue branch an earlier run left
   behind, so a stranded conflict snapshot becomes durable instead of being reset past.
+  Those adopted branches are scanned for credential-shaped paths first, exactly as
+  local history is: one carrying any is left in the container rather than published,
+  and recovery continues. The branch name alone never authorises a push.
 - If the conflict was already partly resolved, the tree is snapshotted to
   `replit-rescue/<utc-stamp>-conflict-state` *before* the abort, since aborting restores
   the pre-merge state and would otherwise discard that resolution work. Credential paths

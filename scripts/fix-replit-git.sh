@@ -75,6 +75,22 @@ is_sensitive() {
   esac
 }
 
+# Credential-shaped paths touched anywhere in a commit range, one per line.
+# Used by every path that decides whether a ref is safe to publish: a push path
+# that does not run this is a push path with no credential containment.
+sensitive_paths_in_range() {
+  local range="$1" out="" commit f
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    while IFS= read -r -d '' f; do
+      if is_sensitive "$f"; then
+        out="${out}${f}"$'\n'
+      fi
+    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
+  done < <(git rev-list "$range")
+  printf '%s' "$out"
+}
+
 step "inspecting checkout"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -193,13 +209,7 @@ fi
 # local-only commit touched a credential-shaped path.
 SENSITIVE_LOCAL_HISTORY=""
 if [ "$LOCAL_ONLY" != "0" ]; then
-  while IFS= read -r commit; do
-    while IFS= read -r -d '' f; do
-      if is_sensitive "$f"; then
-        SENSITIVE_LOCAL_HISTORY="${SENSITIVE_LOCAL_HISTORY}${f}"$'\n'
-      fi
-    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
-  done < <(git rev-list "$TARGET_REF".."$TIP")
+  SENSITIVE_LOCAL_HISTORY=$(sensitive_paths_in_range "$TARGET_REF..$TIP")
 fi
 
 if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
@@ -335,6 +345,7 @@ fi
 # losing exactly the resolution it was created to protect. Collect any local rescue
 # branch the remote does not have, so the retry makes it durable too.
 ORPHANED=""
+UNSAFE_ORPHANS=""
 REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null |
   awk '{print $2}' | sed 's#^refs/heads/##' || true)
 while IFS= read -r b; do
@@ -342,12 +353,29 @@ while IFS= read -r b; do
   case $'\n'"$REMOTE_RESCUE"$'\n' in
     *$'\n'"$b"$'\n'*) continue ;;
   esac
-  ORPHANED="${ORPHANED}${b}"$'\n'
+  # These refs are adopted, not created here: the name alone says nothing about
+  # what they carry. One could be stale, hand-made, or from a checkout whose
+  # history this run never gated, so scan each on its own before publishing it.
+  # Pushing on the strength of the name prefix would be a push path with no
+  # credential containment at all.
+  if [ -n "$(sensitive_paths_in_range "$TARGET_REF..$b")" ]; then
+    UNSAFE_ORPHANS="${UNSAFE_ORPHANS}${b}"$'\n'
+  else
+    ORPHANED="${ORPHANED}${b}"$'\n'
+  fi
 done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
 
 if [ -n "$ORPHANED" ]; then
   say "rescue branches from an earlier run that never reached GitHub:"
   printf '%s' "$ORPHANED" | sed 's/^/    /'
+fi
+
+if [ -n "$UNSAFE_ORPHANS" ]; then
+  say "WARNING: these local rescue branches touch credential-shaped paths and"
+  say "will NOT be pushed. They stay in this container, intact:"
+  printf '%s' "$UNSAFE_ORPHANS" | sed 's/^/    /'
+  say "Recovery continues — nothing is lost, and nothing is published. Strip the"
+  say "credential material from them if you want them backed up to GitHub."
 fi
 
 if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ] && [ -z "$ORPHANED" ]; then

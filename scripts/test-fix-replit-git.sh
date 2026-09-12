@@ -455,7 +455,52 @@ test_retry_pushes_orphaned_rescue_branches() {
   printf 'PASS: retry makes an earlier stranded rescue branch durable\n'
 }
 
+test_unsafe_orphan_is_not_published() {
+  local case_root="$TEST_ROOT/unsafe-orphan"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    # A rescue branch this run did not create: stale, hand-made, or from a
+    # checkout whose history was never gated. The name prefix says nothing.
+    git switch -c replit-rescue/unsafe >/dev/null 2>&1
+    printf 'KEY=unsafe-orphan-canary\n' > .env
+    git add -f .env
+    git commit -m 'stale rescue branch carrying a credential' >/dev/null
+    git switch -c replit-rescue/safe-work >/dev/null 2>&1
+    git reset --hard main >/dev/null 2>&1
+    printf 'real work\n' > notes.txt
+    git add notes.txt
+    git commit -m 'legitimately rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed while an unsafe orphan was present"
+
+  # The credential must not reach the remote, in any object.
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'unsafe-orphan-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" = "0" || fail "unsafe orphaned rescue branch was published"
+  test -z "$(git -C "$case_root/work" ls-remote --heads origin \
+    'refs/heads/replit-rescue/unsafe')" || fail "unsafe orphan ref reached the remote"
+  # ...and it must still exist locally: skipping is not deleting.
+  test -n "$(git -C "$case_root/work" branch --list 'replit-rescue/unsafe')" ||
+    fail "unsafe orphan was destroyed instead of left alone"
+  # A clean orphan must still be made durable.
+  test -n "$(git -C "$case_root/work" ls-remote --heads origin \
+    'refs/heads/replit-rescue/safe-work')" ||
+    fail "a clean orphaned rescue branch was not published"
+  printf 'PASS: unsafe orphan withheld, clean orphan still published\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_unsafe_orphan_is_not_published
 test_rebase_restores_original_branch_not_main
 test_dangling_symlink_is_copied_aside
 test_retry_pushes_orphaned_rescue_branches
