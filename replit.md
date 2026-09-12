@@ -139,15 +139,25 @@ every local commit and tracked edit on a timestamped `replit-rescue/<utc-stamp>`
 and pushes it to GitHub, and only then resets to `origin/main`. Add `--dry-run` to see
 the plan without changing anything.
 
-Two deliberate safety properties:
+Deliberate safety properties:
 - It never runs `git clean`, so untracked files (`.env`, scratch notes) survive the reset.
+  The one case where a forced checkout would still overwrite an untracked file — the
+  remote has begun tracking a path the container holds as a local scratch file — is
+  detected and copied to `.replit-rescue-<utc-stamp>/` first.
 - It never stages a credential-shaped file. A tracked-and-modified one is copied to
   `.replit-rescue-<utc-stamp>/` on disk instead of being committed, so a rescue branch
   pushed to GitHub cannot carry secrets.
 - It refuses to push or reset if a local-only commit already touches a credential-shaped
-  path, and it leaves the checkout unchanged if the remote rescue push fails.
+  path, and it leaves the checkout unchanged if the remote rescue push fails. That history
+  is measured from the tip an abort would restore, not from a transient rebase `HEAD`.
+  Templates (`*.example`, `*.sample`, `*.template`, `*.dist`) are exempt — they carry
+  variable names, not values.
+- If the conflict was already partly resolved, the tree is snapshotted to
+  `replit-rescue/<utc-stamp>-conflict-state` *before* the abort, since aborting restores
+  the pre-merge state and would otherwise discard that resolution work.
 
 Recover rescued work afterwards with `git switch replit-rescue/<utc-stamp>`.
+`scripts/test-fix-replit-git.sh` covers all of the above; run it after changing either script.
 
 ## User Preferences
 - The owner does NOT manually operate this site. All features and recommended tasks must be fully automated/self-operating (scheduled jobs, automatic alerts, self-healing checks) — never assume the owner will run CLIs, click dashboard buttons, or perform manual publish/maintenance steps. Manual CLIs may exist as emergency fallbacks only, with an automated primary path.
