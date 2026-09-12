@@ -75,6 +75,22 @@ is_sensitive() {
   esac
 }
 
+# Credential-shaped paths touched anywhere in a commit range, one per line.
+# Used by every path that decides whether a ref is safe to publish: a push path
+# that does not run this is a push path with no credential containment.
+sensitive_paths_in_range() {
+  local range="$1" out="" commit f
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    while IFS= read -r -d '' f; do
+      if is_sensitive "$f"; then
+        out="${out}${f}"$'\n'
+      fi
+    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
+  done < <(git rev-list "$range")
+  printf '%s' "$out"
+}
+
 step "inspecting checkout"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -95,6 +111,23 @@ if ! git rev-parse --verify --quiet HEAD >/dev/null; then
 fi
 
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+
+# During a rebase HEAD is detached, so the symbolic-ref above is empty even though
+# `git rebase --abort` checks the original branch back out. Treating that as a
+# genuinely detached checkout makes the reset below land on `main` and force-reset
+# it while the operator was on another branch entirely. The rebase state records
+# the real branch, so read it; "detached HEAD" there means it really was detached.
+for __head_name in "$GIT_DIR/rebase-merge/head-name" "$GIT_DIR/rebase-apply/head-name"; do
+  if [ -f "$__head_name" ]; then
+    __ref=$(cat "$__head_name")
+    case "$__ref" in
+      refs/heads/*) BRANCH="${__ref#refs/heads/}" ;;
+      *)            BRANCH="" ;;
+    esac
+    break
+  fi
+done
+unset __head_name __ref
 if [ -n "$BRANCH" ]; then
   say "branch: $BRANCH"
 else
@@ -176,13 +209,7 @@ fi
 # local-only commit touched a credential-shaped path.
 SENSITIVE_LOCAL_HISTORY=""
 if [ "$LOCAL_ONLY" != "0" ]; then
-  while IFS= read -r commit; do
-    while IFS= read -r -d '' f; do
-      if is_sensitive "$f"; then
-        SENSITIVE_LOCAL_HISTORY="${SENSITIVE_LOCAL_HISTORY}${f}"$'\n'
-      fi
-    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
-  done < <(git rev-list "$TARGET_REF".."$TIP")
+  SENSITIVE_LOCAL_HISTORY=$(sensitive_paths_in_range "$TARGET_REF..$TIP")
 fi
 
 if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
@@ -203,7 +230,54 @@ while IFS= read -r -d '' f; do
   fi
 done < <(git ls-tree -r --name-only -z HEAD)
 
+# Keep the object IDs of the remote's rescue refs, not just their names. A remote
+# ref that merely shares a name is not the same commit, and the difference decides
+# both which names are free below and whether a local ref is really backed up.
+ASSIGNED=""
+REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null || true)
+
+remote_oid_for() {
+  printf '%s\n' "$REMOTE_RESCUE" | awk -v n="refs/heads/$1" '$2 == n { print $1; exit }'
+}
+
+# Is this commit already published under *any* rescue name? A ref pushed under a
+# fallback name is just as durable as one under its own, and durability is a
+# property of the commit, not of the name it landed on.
+remote_has_oid() {
+  printf '%s\n' "$REMOTE_RESCUE" |
+    awk -v o="$1" '$1 == o { found = 1; exit } END { exit !found }'
+}
+
+# First remote name not already taken, and not already claimed earlier in this run.
+free_remote_name() {
+  local base="$1" cand="$1" n=1
+  while [ -n "$(remote_oid_for "$cand")" ] ||
+        case $'\n'"$ASSIGNED"$'\n' in *$'\n'"$cand"$'\n'*) true ;; *) false ;; esac; do
+    n=$((n + 1))
+    cand="$base-$n"
+  done
+  printf '%s' "$cand"
+}
+
+# Second resolution is not enough on its own: the documented response to a
+# rejected push is to re-run, and a prompt retry lands in the same second, so the
+# branch name collides, `git branch` fails and set -e ends the run mid-recovery.
+# The remote counts too — a name already on origin at another commit is pushable
+# only as a non-fast-forward, which fails the whole push and aborts the recovery.
+# Walk to a name free in both places.
 STAMP=$(date -u +%Y%m%d-%H%M%S)
+__n=1
+__stamp="$STAMP"
+while git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp" ||
+      git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp-conflict-state" ||
+      [ -n "$(remote_oid_for "replit-rescue/$__stamp")" ] ||
+      [ -n "$(remote_oid_for "replit-rescue/$__stamp-conflict-state")" ]; do
+  __n=$((__n + 1))
+  __stamp="$STAMP-$__n"
+done
+STAMP="$__stamp"
+unset __n __stamp
+
 BACKUP_BRANCH="replit-rescue/$STAMP"
 CONFLICT_BRANCH="replit-rescue/$STAMP-conflict-state"
 ASIDE_DIR="$REPO_ROOT/.replit-rescue-$STAMP"
@@ -297,7 +371,71 @@ if [ -n "$TRACKED_DIRTY" ]; then
   done <<< "$TRACKED_DIRTY"
 fi
 
-if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ]; then
+# A previous run may have created rescue branches and then failed to push them —
+# the fail-closed path exits before resetting, and the operator re-runs once access
+# is restored. By then the abort has happened, so that run sees nothing to back up
+# and would reset while the earlier snapshot still exists only in this container,
+# losing exactly the resolution it was created to protect. Collect any local rescue
+# branch the remote does not have, so the retry makes it durable too.
+ORPHANED=""
+UNSAFE_ORPHANS=""
+
+while IFS= read -r b; do
+  [ -n "$b" ] || continue
+  # This run's own refs are already in the push set by name; re-adopting them here
+  # would queue the same source twice, once bare and once renamed, and the bare
+  # one would be rejected as a non-fast-forward, failing the entire push.
+  if [ "$b" = "$BACKUP_BRANCH" ] || [ "$b" = "$CONFLICT_BRANCH" ]; then
+    continue
+  fi
+  # Durable when the remote holds this exact commit — under this name, or under a
+  # fallback name an earlier run had to use. Checking only the matching name made
+  # recovery non-idempotent: every later run re-published the same commit under the
+  # next free suffix and added a backup branch alongside it, so rescue refs grew
+  # without bound on a checkout that needed no rescuing at all.
+  __oid=$(git rev-parse "$b")
+  if [ "$(remote_oid_for "$b")" = "$__oid" ] || remote_has_oid "$__oid"; then
+    continue
+  fi
+  # These refs are adopted, not created here: the name alone says nothing about
+  # what they carry. One could be stale, hand-made, or from a checkout whose
+  # history this run never gated, so scan each on its own before publishing it.
+  # Pushing on the strength of the name prefix would be a push path with no
+  # credential containment at all.
+  # Publishing under a new name is still publishing, so it goes through the same
+  # scan as every other push path.
+  if [ -n "$(sensitive_paths_in_range "$TARGET_REF..$b")" ]; then
+    UNSAFE_ORPHANS="${UNSAFE_ORPHANS}${b}"$'\n'
+  else
+    __target=$(free_remote_name "$b")
+    ASSIGNED="${ASSIGNED}${__target}"$'\n'
+    if [ "$__target" = "$b" ]; then
+      ORPHANED="${ORPHANED}${b}"$'\n'
+    else
+      # Name taken remotely by a different commit — publish beside it, not over it.
+      ORPHANED="${ORPHANED}${b}:${__target}"$'\n'
+    fi
+  fi
+done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
+unset __target __oid
+
+if [ -n "$ORPHANED" ]; then
+  say "rescue branches from an earlier run that never reached GitHub:"
+  # Render "local:remote" as a rename so the reason is obvious in the log.
+  printf '%s' "$ORPHANED" |
+    sed -e 's/^\([^:]*\):\(.*\)$/\1 -> \2  (name taken remotely by a different commit)/' \
+        -e 's/^/    /'
+fi
+
+if [ -n "$UNSAFE_ORPHANS" ]; then
+  say "WARNING: these local rescue branches touch credential-shaped paths and"
+  say "will NOT be pushed. They stay in this container, intact:"
+  printf '%s' "$UNSAFE_ORPHANS" | sed 's/^/    /'
+  say "Recovery continues — nothing is lost, and nothing is published. Strip the"
+  say "credential material from them if you want them backed up to GitHub."
+fi
+
+if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ] && [ -z "$ORPHANED" ]; then
   say "no local commits and no tracked edits — nothing to back up"
   BACKUP_BRANCH=""
 else
@@ -362,10 +500,27 @@ else
   fi
 
   step "pushing the rescue branch to GitHub"
-  PUSH_REFS="$BACKUP_BRANCH"
+  PUSH_REFS=""
+  if [ -n "$BACKUP_BRANCH" ]; then
+    PUSH_REFS="$BACKUP_BRANCH"
+  fi
   if [ "$SNAPSHOT_MADE" = "1" ]; then
     PUSH_REFS="$PUSH_REFS $CONFLICT_BRANCH"
   fi
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    # Compare on the source ref, not the whole refspec: "x" and "x:y" push the
+    # same local ref, and queueing both sends x to two destinations in one push.
+    __src="${b%%:*}"
+    __dup=0
+    for __q in $PUSH_REFS; do
+      if [ "${__q%%:*}" = "$__src" ]; then __dup=1; break; fi
+    done
+    [ "$__dup" = "0" ] || continue
+    PUSH_REFS="$PUSH_REFS $b"
+  done <<< "$ORPHANED"
+  unset __src __dup __q
+  PUSH_REFS="${PUSH_REFS# }"
   if [ "$DRY_RUN" = "1" ]; then
     say "would run: git push -u origin $PUSH_REFS"
   elif git push -u origin $PUSH_REFS; then
@@ -406,14 +561,16 @@ add_collision() {
 }
 
 while IFS= read -r -d '' p; do
+  # -e follows the link, so a *dangling* symlink reads as absent while still
+  # obstructing the checkout; -L catches it. Same for an obstructing ancestor.
   if [ -d "$p" ] && [ ! -L "$p" ]; then
     add_collision "$p"
-  elif [ -e "$p" ] && [ -z "${IS_TRACKED[$p]:-}" ]; then
+  elif { [ -e "$p" ] || [ -L "$p" ]; } && [ -z "${IS_TRACKED[$p]:-}" ]; then
     add_collision "$p"
   fi
   d=$(dirname "$p")
   while [ "$d" != "." ] && [ "$d" != "/" ]; do
-    if [ -f "$d" ] && [ -z "${IS_TRACKED[$d]:-}" ]; then
+    if { [ -e "$d" ] || [ -L "$d" ]; } && [ ! -d "$d" ] && [ -z "${IS_TRACKED[$d]:-}" ]; then
       add_collision "$d"
     fi
     d=$(dirname "$d")

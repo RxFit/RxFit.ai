@@ -367,7 +367,296 @@ test_dry_run_does_not_prune_refs() {
   printf 'PASS: dry run leaves remote-tracking refs alone\n'
 }
 
+test_rebase_restores_original_branch_not_main() {
+  local case_root="$TEST_ROOT/rebase-branch"
+  init_case "$case_root"
+  local main_sha
+  (
+    cd "$case_root/work"
+    printf 'precious\n' > main-only.txt
+    git add main-only.txt
+    git commit -m 'unpushed work on main' >/dev/null
+    git switch -c feature >/dev/null 2>&1
+    printf 'feature\n' > safe.txt
+    git commit -am feature-change >/dev/null
+  )
+  main_sha=$(git -C "$case_root/work" rev-parse main)
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git rebase origin/main >/dev/null 2>&1) || true
+
+  # Mid-rebase HEAD is detached, so a symbolic-ref capture is empty and the reset
+  # treated it as a detached checkout — landing on `main` and force-resetting it
+  # while the operator was on `feature`.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed during a conflicted rebase"
+  test "$(git -C "$case_root/work" symbolic-ref --quiet --short HEAD)" = "feature" ||
+    fail "recovery left the checkout on the wrong branch after a rebase"
+  test "$(git -C "$case_root/work" rev-parse main)" = "$main_sha" ||
+    fail "main was force-reset during a rebase on another branch"
+  printf 'PASS: conflicted rebase returns to its own branch, main untouched\n'
+}
+
+test_dangling_symlink_is_copied_aside() {
+  local case_root="$TEST_ROOT/dangling-symlink"
+  init_case "$case_root"
+  ln -s /nonexistent/target "$case_root/work/dangling.txt"
+  remote_clone "$case_root" seed2
+  (
+    cd "$case_root/seed2"
+    printf 'remote content\n' > dangling.txt
+    git add dangling.txt
+    git commit -m 'remote tracks that path' >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+
+  # -e follows the link, so a dangling symlink reads as absent while still being
+  # destroyed by the forced checkout.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on a dangling symlink obstruction"
+  local aside
+  aside=$(find "$case_root/work" -maxdepth 2 -path '*/.replit-rescue-*/dangling.txt' | head -n1)
+  test -n "$aside" || fail "dangling symlink was destroyed instead of copied aside"
+  printf 'PASS: dangling symlink obstruction copied aside\n'
+}
+
+test_retry_pushes_orphaned_rescue_branches() {
+  local case_root="$TEST_ROOT/retry-orphan"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  (
+    cd "$case_root/work"
+    printf 'retry-orphan-canary\n' > safe.txt
+    git add safe.txt
+  )
+  printf '%s\n' '#!/bin/sh' 'exit 1' > "$case_root/origin.git/hooks/pre-receive"
+  chmod +x "$case_root/origin.git/hooks/pre-receive"
+
+  # First run fails closed: snapshot exists only locally.
+  if (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1); then
+    fail "recovery continued despite a rejected push"
+  fi
+  test -n "$(git -C "$case_root/work" branch --list 'replit-rescue/*-conflict-state')" ||
+    fail "no local snapshot survived the rejected push"
+
+  # The instructed retry must make that earlier snapshot durable, not just push a
+  # fresh rescue branch and reset. A prompt retry also lands in the same second,
+  # so the branch name must not collide with the one the first run created.
+  rm -f "$case_root/origin.git/hooks/pre-receive"
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "retry after restored access did not complete"
+  remote_rescue_refs "$case_root/work" | grep -q -- '-conflict-state' ||
+    fail "retry left the earlier conflict snapshot stranded in the container"
+  printf 'PASS: retry makes an earlier stranded rescue branch durable\n'
+}
+
+test_unsafe_orphan_is_not_published() {
+  local case_root="$TEST_ROOT/unsafe-orphan"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    # A rescue branch this run did not create: stale, hand-made, or from a
+    # checkout whose history was never gated. The name prefix says nothing.
+    git switch -c replit-rescue/unsafe >/dev/null 2>&1
+    # A path the baseline does not already track, so the path-level assertion
+    # below cannot be satisfied by the fixture's own committed .env.
+    printf '{"private_key":"unsafe-orphan-canary"}\n' > service-account-orphan.json
+    git add service-account-orphan.json
+    git commit -m 'stale rescue branch carrying a credential' >/dev/null
+    git switch -c replit-rescue/safe-work >/dev/null 2>&1
+    git reset --hard main >/dev/null 2>&1
+    printf 'real work\n' > notes.txt
+    git add notes.txt
+    git commit -m 'legitimately rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed while an unsafe orphan was present"
+
+  # The credential must not reach the remote, in any object.
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'unsafe-orphan-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" = "0" || fail "unsafe orphaned rescue branch was published"
+  test -z "$(git -C "$case_root/work" ls-remote --heads origin \
+    'refs/heads/replit-rescue/unsafe')" || fail "unsafe orphan ref reached the remote"
+  # Also assert on the path name, not just the content: a leak whose blob differs
+  # from the canary would still show up as a tree entry in the origin repo.
+  local origin_objects
+  origin_objects=$(git -C "$case_root/origin.git" rev-list --all --objects 2>/dev/null |
+    awk '{print $2}' | grep -c 'service-account-orphan.json' || true)
+  test "$origin_objects" = "0" || fail "credential path reached the origin repository"
+  # ...and it must still exist locally: skipping is not deleting.
+  test -n "$(git -C "$case_root/work" branch --list 'replit-rescue/unsafe')" ||
+    fail "unsafe orphan was destroyed instead of left alone"
+  # A clean orphan must still be made durable.
+  test -n "$(git -C "$case_root/work" ls-remote --heads origin \
+    'refs/heads/replit-rescue/safe-work')" ||
+    fail "a clean orphaned rescue branch was not published"
+  printf 'PASS: unsafe orphan withheld, clean orphan still published\n'
+}
+
+test_same_name_different_commit_is_still_published() {
+  local case_root="$TEST_ROOT/oid-collision"
+  init_case "$case_root"
+  local remote_oid
+  (
+    cd "$case_root/work"
+    git switch -c replit-rescue/COLLIDE >/dev/null 2>&1
+    printf 'another recovery\n' > other.txt
+    git add other.txt
+    git commit -m 'rescue branch already on the remote' >/dev/null
+    git push origin replit-rescue/COLLIDE >/dev/null 2>&1
+    # Same name locally, different commit, carrying work that exists nowhere else.
+    git reset --hard main >/dev/null 2>&1
+    printf 'oid-collision-canary\n' > resolution.txt
+    git add resolution.txt
+    git commit -m 'my unpushed rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  remote_oid=$(git -C "$case_root/work" ls-remote origin \
+    refs/heads/replit-rescue/COLLIDE | cut -f1)
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+
+  # Matching remote refs by name alone treated this as already durable: the local
+  # commit was skipped, never published, and the checkout reset regardless.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed against a same-named remote rescue ref"
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'oid-collision-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" != "0" || fail "local rescue commit was never published to the remote"
+  test "$(git -C "$case_root/work" ls-remote origin refs/heads/replit-rescue/COLLIDE | cut -f1)" \
+    = "$remote_oid" || fail "the pre-existing remote rescue ref was overwritten"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset"
+  printf 'PASS: same-name different-commit rescue ref published beside the remote one\n'
+}
+
+test_new_branch_names_avoid_remote_collisions() {
+  local case_root="$TEST_ROOT/remote-name-collision"
+  init_case "$case_root"
+  local decoy
+  (
+    cd "$case_root/work"
+    git switch -c decoy >/dev/null 2>&1
+    printf 'someone elses recovery\n' > decoy.txt
+    git add decoy.txt
+    git commit -m decoy >/dev/null
+    git switch main >/dev/null 2>&1
+  )
+  decoy=$(git -C "$case_root/work" rev-parse decoy)
+  (
+    cd "$case_root/work"
+    git branch -D decoy >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  (
+    cd "$case_root/work"
+    printf 'remote-collision-canary\n' > safe.txt
+    git add safe.txt
+    # Occupy the names this run is about to generate, at a different commit.
+    # A window of seconds covers the gap between here and the script's own date call.
+    local n
+    for off in 0 1 2 3 4 5; do
+      n=$(date -u -d "+${off} seconds" +%Y%m%d-%H%M%S 2>/dev/null || date -u +%Y%m%d-%H%M%S)
+      git push origin "$decoy:refs/heads/replit-rescue/$n" >/dev/null 2>&1 || true
+      git push origin "$decoy:refs/heads/replit-rescue/$n-conflict-state" >/dev/null 2>&1 || true
+    done
+    git fetch origin >/dev/null 2>&1
+  )
+
+  # Choosing a name free only locally makes the push a non-fast-forward against
+  # the remote ref of the same name, which fails the whole push and aborts the
+  # recovery. The name must be free on both sides.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "a remote rescue name collision aborted the recovery"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset after a remote name collision"
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'remote-collision-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" != "0" || fail "rescued work was not published under a free name"
+  # None of the pre-existing refs may have been moved off the decoy commit.
+  local moved
+  moved=$(git -C "$case_root/work" ls-remote --heads origin 'refs/heads/replit-rescue/*' |
+    awk -v d="$decoy" '$1 != d' | wc -l | tr -d ' ')
+  test "$moved" != "0" || fail "test did not actually publish anything new"
+  printf 'PASS: new rescue names avoid remote collisions instead of failing the push\n'
+}
+
+test_recovery_is_idempotent_after_a_fallback_name() {
+  local case_root="$TEST_ROOT/idempotent-fallback"
+  init_case "$case_root"
+  local my_oid
+  (
+    cd "$case_root/work"
+    git switch -c replit-rescue/COLLIDE >/dev/null 2>&1
+    printf 'another recovery\n' > other.txt
+    git add other.txt
+    git commit -m 'rescue name already on the remote' >/dev/null
+    git push origin replit-rescue/COLLIDE >/dev/null 2>&1
+    git reset --hard main >/dev/null 2>&1
+    printf 'idempotency-canary\n' > rescued.txt
+    git add rescued.txt
+    git commit -m 'my rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    git fetch origin >/dev/null 2>&1
+  )
+  my_oid=$(git -C "$case_root/work" rev-parse replit-rescue/COLLIDE)
+
+  # First run has to publish under a fallback name, since the original is taken.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "first recovery failed"
+  local after_first
+  after_first=$(remote_rescue_refs "$case_root/work" | wc -l | tr -d ' ')
+
+  # Durability is a property of the commit, not the name it landed on. Comparing
+  # only the matching name made every later run republish the same commit under
+  # the next free suffix, growing rescue refs without bound.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "second recovery failed"
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "third recovery failed"
+
+  local after_third copies
+  after_third=$(remote_rescue_refs "$case_root/work" | wc -l | tr -d ' ')
+  test "$after_third" = "$after_first" ||
+    fail "repeat runs proliferated rescue refs ($after_first then $after_third)"
+  copies=$(remote_rescue_refs "$case_root/work" | awk -v o="$my_oid" '$1 == o' | wc -l | tr -d ' ')
+  test "$copies" = "1" || fail "rescued commit published $copies times, expected once"
+  printf 'PASS: repeat runs do not republish a commit already durable elsewhere\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_recovery_is_idempotent_after_a_fallback_name
+test_new_branch_names_avoid_remote_collisions
+test_same_name_different_commit_is_still_published
+test_unsafe_orphan_is_not_published
+test_rebase_restores_original_branch_not_main
+test_dangling_symlink_is_copied_aside
+test_retry_pushes_orphaned_rescue_branches
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
 test_env_template_is_not_treated_as_sensitive
