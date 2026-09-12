@@ -144,6 +144,8 @@ Two deliberate safety properties:
 - It never stages a credential-shaped file. A tracked-and-modified one is copied to
   `.replit-rescue-<utc-stamp>/` on disk instead of being committed, so a rescue branch
   pushed to GitHub cannot carry secrets.
+- It refuses to push or reset if a local-only commit already touches a credential-shaped
+  path, and it leaves the checkout unchanged if the remote rescue push fails.
 
 Recover rescued work afterwards with `git switch replit-rescue/<utc-stamp>`.
 

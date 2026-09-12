@@ -144,6 +144,29 @@ if [ "$LOCAL_ONLY" != "0" ]; then
   git log --oneline "$TARGET_REF"..HEAD | sed 's/^/    /'
 fi
 
+# A rescue branch publishes the complete local-only commit graph. Path filtering
+# during the later uncommitted-edit step cannot remove a credential file that is
+# already present in one of those commits, so refuse to push or reset when any
+# local-only commit touched a credential-shaped path.
+SENSITIVE_LOCAL_HISTORY=""
+if [ "$LOCAL_ONLY" != "0" ]; then
+  while IFS= read -r commit; do
+    while IFS= read -r -d '' f; do
+      if is_sensitive "$f"; then
+        SENSITIVE_LOCAL_HISTORY="${SENSITIVE_LOCAL_HISTORY}${f}"$'\n'
+      fi
+    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
+  done < <(git rev-list "$TARGET_REF"..HEAD)
+fi
+
+if [ -n "$SENSITIVE_LOCAL_HISTORY" ]; then
+  say "ERROR: local-only commit history touches credential-shaped paths:"
+  printf '%s' "$SENSITIVE_LOCAL_HISTORY" | sort -u | sed 's/^/    /'
+  say "No rescue branch was pushed and the checkout was not reset."
+  say "Remove the credential material from local history, then run this script again."
+  exit 1
+fi
+
 step "clearing the interrupted operation"
 
 # Aborting restores the working tree to its pre-merge state, which puts back any
@@ -226,10 +249,14 @@ else
         export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-replit-rescue@localhost}"
         say "  (no git identity configured; committing as Replit Rescue)"
       fi
-      git add -u -- . ':(exclude).env' ':(exclude).env.*' ':(exclude)*.pem' \
-        ':(exclude)*.key' ':(exclude)*.p12' ':(exclude)*.pfx' ':(exclude)*.jks' \
-        ':(exclude)*service-account*.json' ':(exclude)*credentials.json' \
-        ':(exclude)*client_secret*.json'
+      # Start from HEAD so a sensitive file staged before this script cannot
+      # remain in the index and leak through write-tree. Then stage only the
+      # paths already classified as safe above.
+      git reset -q HEAD --
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        git add -u -- "$f"
+      done <<< "$SAFE_DIRTY"
       TREE=$(git write-tree)
       COMMIT=$(git commit-tree "$TREE" -p HEAD \
         -m "Rescue uncommitted Replit edits ($STAMP)" \
@@ -248,9 +275,10 @@ else
   elif git push -u origin "$BACKUP_BRANCH"; then
     say "pushed: $BACKUP_BRANCH is now on GitHub and safe even if this container is wiped"
   else
-    say "WARNING: push failed (the container may not have GitHub write credentials)."
-    say "Your work is still safe locally on branch $BACKUP_BRANCH in this container."
-    say "Recover it later with: git switch $BACKUP_BRANCH"
+    say "ERROR: push failed, so the remote backup is not durable."
+    say "The local rescue branch remains at: $BACKUP_BRANCH"
+    say "The checkout was not reset. Restore GitHub write access and run again."
+    exit 1
   fi
 fi
 
