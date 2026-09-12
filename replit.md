@@ -120,6 +120,33 @@ RxFit.ai is a HealthTech SaaS landing page designed for lead capture, conversion
 - Testimonial section
 - Mobile responsive
 
+## Recovering a stuck Replit git checkout
+Replit's Git pane has no "abort merge" control, so a pull that conflicts leaves the
+workspace wedged: the pane keeps showing the conflict and no further sync is possible.
+Nothing outside the container can clear this — the git state lives on the Replit
+machine — so this is one of the emergency-fallback CLIs referred to under User
+Preferences. Normal operation still never requires it.
+
+From the Replit Shell, one line does it:
+
+```bash
+git fetch origin && git show origin/main:scripts/fix-replit-git.sh | bash
+```
+
+`scripts/fix-replit-git.sh` reaches a clean checkout without the data loss that a bare
+`git reset --hard origin/main` causes. It aborts the interrupted merge/rebase, parks
+every local commit and tracked edit on a timestamped `replit-rescue/<utc-stamp>` branch
+and pushes it to GitHub, and only then resets to `origin/main`. Add `--dry-run` to see
+the plan without changing anything.
+
+Two deliberate safety properties:
+- It never runs `git clean`, so untracked files (`.env`, scratch notes) survive the reset.
+- It never stages a credential-shaped file. A tracked-and-modified one is copied to
+  `.replit-rescue-<utc-stamp>/` on disk instead of being committed, so a rescue branch
+  pushed to GitHub cannot carry secrets.
+
+Recover rescued work afterwards with `git switch replit-rescue/<utc-stamp>`.
+
 ## User Preferences
 - The owner does NOT manually operate this site. All features and recommended tasks must be fully automated/self-operating (scheduled jobs, automatic alerts, self-healing checks) — never assume the owner will run CLIs, click dashboard buttons, or perform manual publish/maintenance steps. Manual CLIs may exist as emergency fallbacks only, with an automated primary path.
 - "RxFit Concierge" champagne-gold Lux-Industrial / Command-HUD aesthetic (supersedes the prior teal/coral palette)
