@@ -240,6 +240,14 @@ remote_oid_for() {
   printf '%s\n' "$REMOTE_RESCUE" | awk -v n="refs/heads/$1" '$2 == n { print $1; exit }'
 }
 
+# Is this commit already published under *any* rescue name? A ref pushed under a
+# fallback name is just as durable as one under its own, and durability is a
+# property of the commit, not of the name it landed on.
+remote_has_oid() {
+  printf '%s\n' "$REMOTE_RESCUE" |
+    awk -v o="$1" '$1 == o { found = 1; exit } END { exit !found }'
+}
+
 # First remote name not already taken, and not already claimed earlier in this run.
 free_remote_name() {
   local base="$1" cand="$1" n=1
@@ -380,8 +388,13 @@ while IFS= read -r b; do
   if [ "$b" = "$BACKUP_BRANCH" ] || [ "$b" = "$CONFLICT_BRANCH" ]; then
     continue
   fi
-  # Durable only when the remote ref is this exact commit.
-  if [ "$(remote_oid_for "$b")" = "$(git rev-parse "$b")" ]; then
+  # Durable when the remote holds this exact commit — under this name, or under a
+  # fallback name an earlier run had to use. Checking only the matching name made
+  # recovery non-idempotent: every later run re-published the same commit under the
+  # next free suffix and added a backup branch alongside it, so rescue refs grew
+  # without bound on a checkout that needed no rescuing at all.
+  __oid=$(git rev-parse "$b")
+  if [ "$(remote_oid_for "$b")" = "$__oid" ] || remote_has_oid "$__oid"; then
     continue
   fi
   # These refs are adopted, not created here: the name alone says nothing about
@@ -404,7 +417,7 @@ while IFS= read -r b; do
     fi
   fi
 done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
-unset __target
+unset __target __oid
 
 if [ -n "$ORPHANED" ]; then
   say "rescue branches from an earlier run that never reached GitHub:"

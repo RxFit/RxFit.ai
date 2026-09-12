@@ -606,7 +606,51 @@ test_new_branch_names_avoid_remote_collisions() {
   printf 'PASS: new rescue names avoid remote collisions instead of failing the push\n'
 }
 
+test_recovery_is_idempotent_after_a_fallback_name() {
+  local case_root="$TEST_ROOT/idempotent-fallback"
+  init_case "$case_root"
+  local my_oid
+  (
+    cd "$case_root/work"
+    git switch -c replit-rescue/COLLIDE >/dev/null 2>&1
+    printf 'another recovery\n' > other.txt
+    git add other.txt
+    git commit -m 'rescue name already on the remote' >/dev/null
+    git push origin replit-rescue/COLLIDE >/dev/null 2>&1
+    git reset --hard main >/dev/null 2>&1
+    printf 'idempotency-canary\n' > rescued.txt
+    git add rescued.txt
+    git commit -m 'my rescued work' >/dev/null
+    git switch main >/dev/null 2>&1
+    git fetch origin >/dev/null 2>&1
+  )
+  my_oid=$(git -C "$case_root/work" rev-parse replit-rescue/COLLIDE)
+
+  # First run has to publish under a fallback name, since the original is taken.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "first recovery failed"
+  local after_first
+  after_first=$(remote_rescue_refs "$case_root/work" | wc -l | tr -d ' ')
+
+  # Durability is a property of the commit, not the name it landed on. Comparing
+  # only the matching name made every later run republish the same commit under
+  # the next free suffix, growing rescue refs without bound.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "second recovery failed"
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "third recovery failed"
+
+  local after_third copies
+  after_third=$(remote_rescue_refs "$case_root/work" | wc -l | tr -d ' ')
+  test "$after_third" = "$after_first" ||
+    fail "repeat runs proliferated rescue refs ($after_first then $after_third)"
+  copies=$(remote_rescue_refs "$case_root/work" | awk -v o="$my_oid" '$1 == o' | wc -l | tr -d ' ')
+  test "$copies" = "1" || fail "rescued commit published $copies times, expected once"
+  printf 'PASS: repeat runs do not republish a commit already durable elsewhere\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_recovery_is_idempotent_after_a_fallback_name
 test_new_branch_names_avoid_remote_collisions
 test_same_name_different_commit_is_still_published
 test_unsafe_orphan_is_not_published
