@@ -230,15 +230,40 @@ while IFS= read -r -d '' f; do
   fi
 done < <(git ls-tree -r --name-only -z HEAD)
 
+# Keep the object IDs of the remote's rescue refs, not just their names. A remote
+# ref that merely shares a name is not the same commit, and the difference decides
+# both which names are free below and whether a local ref is really backed up.
+ASSIGNED=""
+REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null || true)
+
+remote_oid_for() {
+  printf '%s\n' "$REMOTE_RESCUE" | awk -v n="refs/heads/$1" '$2 == n { print $1; exit }'
+}
+
+# First remote name not already taken, and not already claimed earlier in this run.
+free_remote_name() {
+  local base="$1" cand="$1" n=1
+  while [ -n "$(remote_oid_for "$cand")" ] ||
+        case $'\n'"$ASSIGNED"$'\n' in *$'\n'"$cand"$'\n'*) true ;; *) false ;; esac; do
+    n=$((n + 1))
+    cand="$base-$n"
+  done
+  printf '%s' "$cand"
+}
+
 # Second resolution is not enough on its own: the documented response to a
 # rejected push is to re-run, and a prompt retry lands in the same second, so the
 # branch name collides, `git branch` fails and set -e ends the run mid-recovery.
-# Walk to the first free name instead.
+# The remote counts too — a name already on origin at another commit is pushable
+# only as a non-fast-forward, which fails the whole push and aborts the recovery.
+# Walk to a name free in both places.
 STAMP=$(date -u +%Y%m%d-%H%M%S)
 __n=1
 __stamp="$STAMP"
 while git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp" ||
-      git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp-conflict-state"; do
+      git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp-conflict-state" ||
+      [ -n "$(remote_oid_for "replit-rescue/$__stamp")" ] ||
+      [ -n "$(remote_oid_for "replit-rescue/$__stamp-conflict-state")" ]; do
   __n=$((__n + 1))
   __stamp="$STAMP-$__n"
 done
@@ -346,30 +371,15 @@ fi
 # branch the remote does not have, so the retry makes it durable too.
 ORPHANED=""
 UNSAFE_ORPHANS=""
-ASSIGNED=""
-# Keep the object IDs, not just the names. A remote ref that merely shares a name
-# is not this commit: two recoveries can pick the same one-second stamp, and
-# treating the name as proof of durability would skip the local ref, reset the
-# checkout, and leave its commits published nowhere.
-REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null || true)
-
-remote_oid_for() {
-  printf '%s\n' "$REMOTE_RESCUE" | awk -v n="refs/heads/$1" '$2 == n { print $1; exit }'
-}
-
-# First remote name not already taken, and not already claimed earlier in this run.
-free_remote_name() {
-  local base="$1" cand="$1" n=1
-  while [ -n "$(remote_oid_for "$cand")" ] ||
-        case $'\n'"$ASSIGNED"$'\n' in *$'\n'"$cand"$'\n'*) true ;; *) false ;; esac; do
-    n=$((n + 1))
-    cand="$base-$n"
-  done
-  printf '%s' "$cand"
-}
 
 while IFS= read -r b; do
   [ -n "$b" ] || continue
+  # This run's own refs are already in the push set by name; re-adopting them here
+  # would queue the same source twice, once bare and once renamed, and the bare
+  # one would be rejected as a non-fast-forward, failing the entire push.
+  if [ "$b" = "$BACKUP_BRANCH" ] || [ "$b" = "$CONFLICT_BRANCH" ]; then
+    continue
+  fi
   # Durable only when the remote ref is this exact commit.
   if [ "$(remote_oid_for "$b")" = "$(git rev-parse "$b")" ]; then
     continue
@@ -486,9 +496,17 @@ else
   fi
   while IFS= read -r b; do
     [ -n "$b" ] || continue
-    case " $PUSH_REFS " in *" $b "*) continue ;; esac
+    # Compare on the source ref, not the whole refspec: "x" and "x:y" push the
+    # same local ref, and queueing both sends x to two destinations in one push.
+    __src="${b%%:*}"
+    __dup=0
+    for __q in $PUSH_REFS; do
+      if [ "${__q%%:*}" = "$__src" ]; then __dup=1; break; fi
+    done
+    [ "$__dup" = "0" ] || continue
     PUSH_REFS="$PUSH_REFS $b"
   done <<< "$ORPHANED"
+  unset __src __dup __q
   PUSH_REFS="${PUSH_REFS# }"
   if [ "$DRY_RUN" = "1" ]; then
     say "would run: git push -u origin $PUSH_REFS"

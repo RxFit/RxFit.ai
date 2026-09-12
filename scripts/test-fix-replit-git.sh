@@ -549,7 +549,65 @@ test_same_name_different_commit_is_still_published() {
   printf 'PASS: same-name different-commit rescue ref published beside the remote one\n'
 }
 
+test_new_branch_names_avoid_remote_collisions() {
+  local case_root="$TEST_ROOT/remote-name-collision"
+  init_case "$case_root"
+  local decoy
+  (
+    cd "$case_root/work"
+    git switch -c decoy >/dev/null 2>&1
+    printf 'someone elses recovery\n' > decoy.txt
+    git add decoy.txt
+    git commit -m decoy >/dev/null
+    git switch main >/dev/null 2>&1
+  )
+  decoy=$(git -C "$case_root/work" rev-parse decoy)
+  (
+    cd "$case_root/work"
+    git branch -D decoy >/dev/null 2>&1
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  (
+    cd "$case_root/work"
+    printf 'remote-collision-canary\n' > safe.txt
+    git add safe.txt
+    # Occupy the names this run is about to generate, at a different commit.
+    # A window of seconds covers the gap between here and the script's own date call.
+    local n
+    for off in 0 1 2 3 4 5; do
+      n=$(date -u -d "+${off} seconds" +%Y%m%d-%H%M%S 2>/dev/null || date -u +%Y%m%d-%H%M%S)
+      git push origin "$decoy:refs/heads/replit-rescue/$n" >/dev/null 2>&1 || true
+      git push origin "$decoy:refs/heads/replit-rescue/$n-conflict-state" >/dev/null 2>&1 || true
+    done
+    git fetch origin >/dev/null 2>&1
+  )
+
+  # Choosing a name free only locally makes the push a non-fast-forward against
+  # the remote ref of the same name, which fails the whole push and aborts the
+  # recovery. The name must be free on both sides.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "a remote rescue name collision aborted the recovery"
+  test "$(git -C "$case_root/work" rev-parse HEAD)" = \
+    "$(git -C "$case_root/work" rev-parse origin/main)" ||
+    fail "checkout was not reset after a remote name collision"
+  local hits
+  hits=$( { git -C "$case_root/origin.git" rev-list --all 2>/dev/null |
+    xargs -r git -C "$case_root/origin.git" grep -I -l 'remote-collision-canary' 2>/dev/null ||
+    true; } | wc -l | tr -d ' ')
+  test "$hits" != "0" || fail "rescued work was not published under a free name"
+  # None of the pre-existing refs may have been moved off the decoy commit.
+  local moved
+  moved=$(git -C "$case_root/work" ls-remote --heads origin 'refs/heads/replit-rescue/*' |
+    awk -v d="$decoy" '$1 != d' | wc -l | tr -d ' ')
+  test "$moved" != "0" || fail "test did not actually publish anything new"
+  printf 'PASS: new rescue names avoid remote collisions instead of failing the push\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_new_branch_names_avoid_remote_collisions
 test_same_name_different_commit_is_still_published
 test_unsafe_orphan_is_not_published
 test_rebase_restores_original_branch_not_main
