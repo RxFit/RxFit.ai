@@ -455,10 +455,38 @@ test_retry_pushes_orphaned_rescue_branches() {
   printf 'PASS: retry makes an earlier stranded rescue branch durable\n'
 }
 
+test_retry_blocks_sensitive_orphaned_rescue_branch() {
+  local case_root="$TEST_ROOT/retry-sensitive-orphan"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    git switch -c replit-rescue/unsafe >/dev/null 2>&1
+    printf '{"dummy":"orphan-canary"}\n' > service-account-orphan.json
+    git add service-account-orphan.json
+    git commit -m 'local sensitive rescue branch' >/dev/null
+    git switch main >/dev/null 2>&1
+  )
+
+  # Rescue-looking refs are local state, not proof that this version of the
+  # script created or sanitized them. A retry must scan before publishing them.
+  if (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1); then
+    fail "retry accepted an unverified rescue branch with credential-shaped history"
+  fi
+  test -z "$(remote_rescue_refs "$case_root/work")" ||
+    fail "unverified sensitive rescue branch reached the remote"
+  local origin_objects
+  origin_objects=$(git -C "$case_root/origin.git" rev-list --all --objects 2>/dev/null |
+    awk '{print $2}' | grep -c 'service-account-orphan.json' || true)
+  test "$origin_objects" = "0" ||
+    fail "credential-shaped orphan path reached the origin repository"
+  printf 'PASS: retry rejects unverified sensitive rescue history\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
 test_rebase_restores_original_branch_not_main
 test_dangling_symlink_is_copied_aside
 test_retry_pushes_orphaned_rescue_branches
+test_retry_blocks_sensitive_orphaned_rescue_branch
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
 test_env_template_is_not_treated_as_sensitive

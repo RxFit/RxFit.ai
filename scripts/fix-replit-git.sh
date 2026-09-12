@@ -335,6 +335,7 @@ fi
 # losing exactly the resolution it was created to protect. Collect any local rescue
 # branch the remote does not have, so the retry makes it durable too.
 ORPHANED=""
+SENSITIVE_ORPHANED_HISTORY=""
 REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null |
   awk '{print $2}' | sed 's#^refs/heads/##' || true)
 while IFS= read -r b; do
@@ -342,8 +343,26 @@ while IFS= read -r b; do
   case $'\n'"$REMOTE_RESCUE"$'\n' in
     *$'\n'"$b"$'\n'*) continue ;;
   esac
+  # Never trust a rescue-looking local ref merely because its name matches.
+  # It may be stale, manually created, or left by an older unsafe script. Scan
+  # every commit that ref would add to the target before putting it on GitHub.
+  while IFS= read -r commit; do
+    while IFS= read -r -d '' f; do
+      if is_sensitive "$f"; then
+        SENSITIVE_ORPHANED_HISTORY="${SENSITIVE_ORPHANED_HISTORY}${b}: ${f}"$'\n'
+      fi
+    done < <(git diff-tree --root -m --no-commit-id --name-only -r -z "$commit")
+  done < <(git rev-list "$TARGET_REF".."$b")
   ORPHANED="${ORPHANED}${b}"$'\n'
 done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
+
+if [ -n "$SENSITIVE_ORPHANED_HISTORY" ]; then
+  say "ERROR: an unpushed rescue branch touches credential-shaped paths:"
+  printf '%s' "$SENSITIVE_ORPHANED_HISTORY" | sort -u | sed 's/^/    /'
+  say "No rescue branch was pushed and the checkout was not reset."
+  say "Remove the credential material from that branch history, then run this script again."
+  exit 1
+fi
 
 if [ -n "$ORPHANED" ]; then
   say "rescue branches from an earlier run that never reached GitHub:"
