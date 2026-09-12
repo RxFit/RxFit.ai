@@ -367,7 +367,98 @@ test_dry_run_does_not_prune_refs() {
   printf 'PASS: dry run leaves remote-tracking refs alone\n'
 }
 
+test_rebase_restores_original_branch_not_main() {
+  local case_root="$TEST_ROOT/rebase-branch"
+  init_case "$case_root"
+  local main_sha
+  (
+    cd "$case_root/work"
+    printf 'precious\n' > main-only.txt
+    git add main-only.txt
+    git commit -m 'unpushed work on main' >/dev/null
+    git switch -c feature >/dev/null 2>&1
+    printf 'feature\n' > safe.txt
+    git commit -am feature-change >/dev/null
+  )
+  main_sha=$(git -C "$case_root/work" rev-parse main)
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git rebase origin/main >/dev/null 2>&1) || true
+
+  # Mid-rebase HEAD is detached, so a symbolic-ref capture is empty and the reset
+  # treated it as a detached checkout — landing on `main` and force-resetting it
+  # while the operator was on `feature`.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed during a conflicted rebase"
+  test "$(git -C "$case_root/work" symbolic-ref --quiet --short HEAD)" = "feature" ||
+    fail "recovery left the checkout on the wrong branch after a rebase"
+  test "$(git -C "$case_root/work" rev-parse main)" = "$main_sha" ||
+    fail "main was force-reset during a rebase on another branch"
+  printf 'PASS: conflicted rebase returns to its own branch, main untouched\n'
+}
+
+test_dangling_symlink_is_copied_aside() {
+  local case_root="$TEST_ROOT/dangling-symlink"
+  init_case "$case_root"
+  ln -s /nonexistent/target "$case_root/work/dangling.txt"
+  remote_clone "$case_root" seed2
+  (
+    cd "$case_root/seed2"
+    printf 'remote content\n' > dangling.txt
+    git add dangling.txt
+    git commit -m 'remote tracks that path' >/dev/null
+    git push origin main >/dev/null 2>&1
+  )
+
+  # -e follows the link, so a dangling symlink reads as absent while still being
+  # destroyed by the forced checkout.
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "recovery failed on a dangling symlink obstruction"
+  local aside
+  aside=$(find "$case_root/work" -maxdepth 2 -path '*/.replit-rescue-*/dangling.txt' | head -n1)
+  test -n "$aside" || fail "dangling symlink was destroyed instead of copied aside"
+  printf 'PASS: dangling symlink obstruction copied aside\n'
+}
+
+test_retry_pushes_orphaned_rescue_branches() {
+  local case_root="$TEST_ROOT/retry-orphan"
+  init_case "$case_root"
+  (
+    cd "$case_root/work"
+    printf 'local\n' > safe.txt
+    git commit -am local-change >/dev/null
+  )
+  advance_remote "$case_root" remote
+  (cd "$case_root/work" && git fetch origin >/dev/null 2>&1 && git merge origin/main >/dev/null 2>&1) || true
+  (
+    cd "$case_root/work"
+    printf 'retry-orphan-canary\n' > safe.txt
+    git add safe.txt
+  )
+  printf '%s\n' '#!/bin/sh' 'exit 1' > "$case_root/origin.git/hooks/pre-receive"
+  chmod +x "$case_root/origin.git/hooks/pre-receive"
+
+  # First run fails closed: snapshot exists only locally.
+  if (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1); then
+    fail "recovery continued despite a rejected push"
+  fi
+  test -n "$(git -C "$case_root/work" branch --list 'replit-rescue/*-conflict-state')" ||
+    fail "no local snapshot survived the rejected push"
+
+  # The instructed retry must make that earlier snapshot durable, not just push a
+  # fresh rescue branch and reset. A prompt retry also lands in the same second,
+  # so the branch name must not collide with the one the first run created.
+  rm -f "$case_root/origin.git/hooks/pre-receive"
+  (cd "$case_root/work" && bash "$RECOVERY_SCRIPT" >/dev/null 2>&1) ||
+    fail "retry after restored access did not complete"
+  remote_rescue_refs "$case_root/work" | grep -q -- '-conflict-state' ||
+    fail "retry left the earlier conflict snapshot stranded in the container"
+  printf 'PASS: retry makes an earlier stranded rescue branch durable\n'
+}
+
 test_staged_sensitive_edit_is_not_pushed
+test_rebase_restores_original_branch_not_main
+test_dangling_symlink_is_copied_aside
+test_retry_pushes_orphaned_rescue_branches
 test_sensitive_local_commit_blocks_push_and_reset
 test_failed_push_blocks_reset
 test_env_template_is_not_treated_as_sensitive

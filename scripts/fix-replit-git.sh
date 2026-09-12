@@ -95,6 +95,23 @@ if ! git rev-parse --verify --quiet HEAD >/dev/null; then
 fi
 
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+
+# During a rebase HEAD is detached, so the symbolic-ref above is empty even though
+# `git rebase --abort` checks the original branch back out. Treating that as a
+# genuinely detached checkout makes the reset below land on `main` and force-reset
+# it while the operator was on another branch entirely. The rebase state records
+# the real branch, so read it; "detached HEAD" there means it really was detached.
+for __head_name in "$GIT_DIR/rebase-merge/head-name" "$GIT_DIR/rebase-apply/head-name"; do
+  if [ -f "$__head_name" ]; then
+    __ref=$(cat "$__head_name")
+    case "$__ref" in
+      refs/heads/*) BRANCH="${__ref#refs/heads/}" ;;
+      *)            BRANCH="" ;;
+    esac
+    break
+  fi
+done
+unset __head_name __ref
 if [ -n "$BRANCH" ]; then
   say "branch: $BRANCH"
 else
@@ -203,7 +220,21 @@ while IFS= read -r -d '' f; do
   fi
 done < <(git ls-tree -r --name-only -z HEAD)
 
+# Second resolution is not enough on its own: the documented response to a
+# rejected push is to re-run, and a prompt retry lands in the same second, so the
+# branch name collides, `git branch` fails and set -e ends the run mid-recovery.
+# Walk to the first free name instead.
 STAMP=$(date -u +%Y%m%d-%H%M%S)
+__n=1
+__stamp="$STAMP"
+while git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp" ||
+      git show-ref --verify --quiet "refs/heads/replit-rescue/$__stamp-conflict-state"; do
+  __n=$((__n + 1))
+  __stamp="$STAMP-$__n"
+done
+STAMP="$__stamp"
+unset __n __stamp
+
 BACKUP_BRANCH="replit-rescue/$STAMP"
 CONFLICT_BRANCH="replit-rescue/$STAMP-conflict-state"
 ASIDE_DIR="$REPO_ROOT/.replit-rescue-$STAMP"
@@ -297,7 +328,29 @@ if [ -n "$TRACKED_DIRTY" ]; then
   done <<< "$TRACKED_DIRTY"
 fi
 
-if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ]; then
+# A previous run may have created rescue branches and then failed to push them —
+# the fail-closed path exits before resetting, and the operator re-runs once access
+# is restored. By then the abort has happened, so that run sees nothing to back up
+# and would reset while the earlier snapshot still exists only in this container,
+# losing exactly the resolution it was created to protect. Collect any local rescue
+# branch the remote does not have, so the retry makes it durable too.
+ORPHANED=""
+REMOTE_RESCUE=$(git ls-remote --heads origin 'refs/heads/replit-rescue/*' 2>/dev/null |
+  awk '{print $2}' | sed 's#^refs/heads/##' || true)
+while IFS= read -r b; do
+  [ -n "$b" ] || continue
+  case $'\n'"$REMOTE_RESCUE"$'\n' in
+    *$'\n'"$b"$'\n'*) continue ;;
+  esac
+  ORPHANED="${ORPHANED}${b}"$'\n'
+done < <(git branch --list 'replit-rescue/*' --format='%(refname:short)')
+
+if [ -n "$ORPHANED" ]; then
+  say "rescue branches from an earlier run that never reached GitHub:"
+  printf '%s' "$ORPHANED" | sed 's/^/    /'
+fi
+
+if [ "$LOCAL_ONLY" = "0" ] && [ -z "$TRACKED_DIRTY" ] && [ "$SNAPSHOT_MADE" = "0" ] && [ -z "$ORPHANED" ]; then
   say "no local commits and no tracked edits — nothing to back up"
   BACKUP_BRANCH=""
 else
@@ -362,10 +415,19 @@ else
   fi
 
   step "pushing the rescue branch to GitHub"
-  PUSH_REFS="$BACKUP_BRANCH"
+  PUSH_REFS=""
+  if [ -n "$BACKUP_BRANCH" ]; then
+    PUSH_REFS="$BACKUP_BRANCH"
+  fi
   if [ "$SNAPSHOT_MADE" = "1" ]; then
     PUSH_REFS="$PUSH_REFS $CONFLICT_BRANCH"
   fi
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    case " $PUSH_REFS " in *" $b "*) continue ;; esac
+    PUSH_REFS="$PUSH_REFS $b"
+  done <<< "$ORPHANED"
+  PUSH_REFS="${PUSH_REFS# }"
   if [ "$DRY_RUN" = "1" ]; then
     say "would run: git push -u origin $PUSH_REFS"
   elif git push -u origin $PUSH_REFS; then
@@ -406,14 +468,16 @@ add_collision() {
 }
 
 while IFS= read -r -d '' p; do
+  # -e follows the link, so a *dangling* symlink reads as absent while still
+  # obstructing the checkout; -L catches it. Same for an obstructing ancestor.
   if [ -d "$p" ] && [ ! -L "$p" ]; then
     add_collision "$p"
-  elif [ -e "$p" ] && [ -z "${IS_TRACKED[$p]:-}" ]; then
+  elif { [ -e "$p" ] || [ -L "$p" ]; } && [ -z "${IS_TRACKED[$p]:-}" ]; then
     add_collision "$p"
   fi
   d=$(dirname "$p")
   while [ "$d" != "." ] && [ "$d" != "/" ]; do
-    if [ -f "$d" ] && [ -z "${IS_TRACKED[$d]:-}" ]; then
+    if { [ -e "$d" ] || [ -L "$d" ]; } && [ ! -d "$d" ] && [ -z "${IS_TRACKED[$d]:-}" ]; then
       add_collision "$d"
     fi
     d=$(dirname "$d")
