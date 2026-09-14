@@ -126,16 +126,20 @@ describe("owner notification senders — subjects, recipient, failure contract",
       await expect(sendCredentialAlertEmail("sheets", new Error("token revoked"))).resolves.toBe(true);
       const { to, subject } = decodeSentMessage();
       expect(to).toBe(OWNER);
-      expect(subject).toBe("🚨 RxFit.ai: Google Sheets credentials are broken");
+      // Subject = stable prefix (owner's mail filters match it) + the
+      // classified headline naming the knob to turn.
+      expect(subject).toBe(
+        "🚨 RxFit.ai: Google Sheets credentials are broken — Re-authorize the connection in Replit → Integrations",
+      );
     });
 
     it("labels every known service correctly in the subject", async () => {
       const { sendCredentialAlertEmail } = await import("./emailService");
       const expected: Record<string, string> = {
-        stripe: "🚨 RxFit.ai: Stripe credentials are broken",
-        gmail: "🚨 RxFit.ai: Gmail credentials are broken",
-        pricing: "🚨 RxFit.ai: Pricing served to buyers credentials are broken",
-        blogSsr: "🚨 RxFit.ai: Blog SSR to crawlers credentials are broken",
+        stripe: "🚨 RxFit.ai: Stripe credentials are broken — Re-authorize the connection in Replit → Integrations",
+        gmail: "🚨 RxFit.ai: Gmail credentials are broken — Re-authorize the connection in Replit → Integrations",
+        pricing: "🚨 RxFit.ai: Pricing served to buyers credentials are broken — Buyers are seeing stale or unavailable pricing",
+        blogSsr: "🚨 RxFit.ai: Blog SSR to crawlers credentials are broken — Crawlers are getting degraded blog HTML",
       };
       let call = 0;
       for (const [service, subject] of Object.entries(expected)) {

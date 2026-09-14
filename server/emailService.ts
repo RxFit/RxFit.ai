@@ -509,8 +509,14 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
     const gmail = await getUncachableGmailClient();
     const to = await getOwnerEmail();
     const message = error instanceof Error ? `${error.message}\n\n${error.stack ?? ''}` : String(error);
+    const serviceLabel = credentialServiceLabel(service);
+    const kind = classifyCredentialAlert(service, message);
+    const { headline } = credentialAlertCopy(service, serviceLabel, kind);
     const html = getCredentialAlertEmailHtml(service, message);
-    const raw = createMimeMessage(to, `🚨 RxFit.ai: ${credentialServiceLabel(service)} credentials are broken`, html);
+    // Append rather than rewrite, so existing mail filters keep matching — and
+    // so the phone notification itself names the knob to turn.
+    const subject = `🚨 RxFit.ai: ${serviceLabel} credentials are broken — ${headline}`.slice(0, 140);
+    const raw = createMimeMessage(to, subject, html);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     console.log(`[credential-check] Alert email sent to ${to} for ${service}`);
     return true;
