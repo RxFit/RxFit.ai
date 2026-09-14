@@ -117,6 +117,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Whether the running environment is expected to charge REAL cards. Test
+ * mode is legitimate in development (the Replit Connector fallback is
+ * sandbox-only), so the live-mode assertion only applies to deployed apps
+ * by default. Override explicitly with STRIPE_REQUIRE_LIVEMODE=true/false
+ * (e.g. to run the full health check against a dev deployment).
+ */
+export function expectLiveMode(): boolean {
+  const override = process.env.STRIPE_REQUIRE_LIVEMODE;
+  if (override === "true") return true;
+  if (override === "false") return false;
+  return process.env.REPLIT_DEPLOYMENT === "1";
+}
 async function checkStripe(): Promise<void> {
   // Resolve the secret key (throws if neither the STRIPE_SECRET_KEY secret nor
   // the connector can provide one)…
@@ -130,17 +143,17 @@ async function checkStripe(): Promise<void> {
   const stripe = await getUncachableStripeClient();
   const balance = await stripe.balance.retrieve();
 
-  // A TEST-mode key makes balance.retrieve() succeed while every live checkout
-  // 500s on our livemode price IDs — the monitor goes green while the site is
-  // dead. That is exactly what happens if a missing STRIPE_SECRET_KEY is
-  // "fixed" by re-authorizing the connector, which stripeClient labels
-  // "Sandbox mode".
-  if (
-    process.env.REPLIT_DEPLOYMENT === "1" &&
-    (balance as { livemode?: boolean })?.livemode === false
-  ) {
+  // …then assert the key is LIVE mode when the app is deployed. If
+  // STRIPE_SECRET_KEY is ever deleted/lost (or "fixed" by re-authorizing the
+  // connector), stripeClient silently falls back to the Replit Connector in
+  // TEST mode — balance.retrieve still succeeds, so the probes above stay
+  // green, while every live checkout 500s on our livemode price IDs and no
+  // real revenue arrives.
+  if (expectLiveMode() && isTestModeKey(key, balance?.livemode)) {
     throw new Error(
-      "Stripe credentials resolved but they are TEST-mode keys (balance.livemode=false) on the live deployment. Live checkout will 500 — the site's pinned price IDs are livemode. Set the live sk_live_… key as STRIPE_SECRET_KEY in Replit Secrets.",
+      "Stripe is running in TEST mode on the live deployment — live checkout will 500 on the site's pinned livemode price IDs and no real revenue arrives. " +
+        "The STRIPE_SECRET_KEY secret is likely missing/deleted, so stripeClient fell back to the Replit Connector (sandbox). " +
+        "Set the live key (sk_live_…) as STRIPE_SECRET_KEY in Replit Secrets to fix.",
     );
   }
 
@@ -371,4 +384,15 @@ export function startCredentialHealthCheck(): void {
   console.log("[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly");
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
+}
+
+/**
+ * Pure test-mode detection (unit-tested): a key is in test mode when its
+ * prefix says so OR the account's balance reports livemode=false. Either
+ * signal alone is enough — the prefix catches it even if a future Stripe
+ * API version drops the balance livemode flag, and the flag catches
+ * restricted keys (rk_test_…) whose prefix this doesn't enumerate.
+ */
+export function isTestModeKey(key: string, balanceLivemode: boolean | undefined): boolean {
+  return key.startsWith("sk_test_") || key.startsWith("rk_test_") || balanceLivemode === false;
 }

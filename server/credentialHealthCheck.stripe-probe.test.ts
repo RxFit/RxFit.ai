@@ -199,7 +199,7 @@ describe("stripe health check API-access probe", () => {
     expect(pricesRetrieve).not.toHaveBeenCalled();
     expect(sendCredentialAlertEmail).toHaveBeenCalledTimes(1);
     const [, error] = sendCredentialAlertEmail.mock.calls[0];
-    expect(error.message).toContain("TEST-mode keys");
+    expect(error.message).toContain("TEST mode");
     vi.unstubAllEnvs();
   });
 
@@ -224,6 +224,98 @@ describe("stripe health check API-access probe", () => {
 
     expect(products.list).not.toHaveBeenCalled();
     expect(products.retrieve).not.toHaveBeenCalled();
+    expect(sendCredentialAlertEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripe live-mode assertion (sandbox-fallback detection)", () => {
+  const savedDeployment = process.env.REPLIT_DEPLOYMENT;
+  const savedOverride = process.env.STRIPE_REQUIRE_LIVEMODE;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    delete process.env.REPLIT_DEPLOYMENT;
+    delete process.env.STRIPE_REQUIRE_LIVEMODE;
+    getStripeSecretKey.mockResolvedValue("sk_live_ok");
+    getUncachableGmailClient.mockResolvedValue({});
+    getUncachableGoogleSheetClient.mockResolvedValue({
+      spreadsheets: { get: vi.fn().mockResolvedValue({ data: {} }) },
+    });
+    sendCredentialAlertEmail.mockResolvedValue(true);
+    appendCredentialAlertToSheet.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (savedDeployment === undefined) delete process.env.REPLIT_DEPLOYMENT;
+    else process.env.REPLIT_DEPLOYMENT = savedDeployment;
+    if (savedOverride === undefined) delete process.env.STRIPE_REQUIRE_LIVEMODE;
+    else process.env.STRIPE_REQUIRE_LIVEMODE = savedOverride;
+  });
+
+  function mockStripeClient(livemode: boolean) {
+    getUncachableStripeClient.mockResolvedValue({
+      balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance", livemode }) },
+      prices: { retrieve: retrieveLivePriceFixture },
+    });
+  }
+
+  it("alerts on a deployed app when balance.retrieve reports test mode (connector fallback)", async () => {
+    // STRIPE_SECRET_KEY deleted → stripeClient falls back to the Replit
+    // Connector sandbox: the key resolves and the API read succeeds, so only
+    // the livemode flag exposes that no real revenue is arriving.
+    process.env.REPLIT_DEPLOYMENT = "1";
+    getStripeSecretKey.mockResolvedValue("sk_test_fallback");
+    mockStripeClient(false);
+
+    await freshRun();
+
+    expect(sendCredentialAlertEmail).toHaveBeenCalledTimes(1);
+    expect(sendCredentialAlertEmail).toHaveBeenCalledWith(
+      "stripe",
+      expect.objectContaining({ message: expect.stringContaining("TEST mode") }),
+    );
+  });
+
+  it("alerts on a deployed app when the key prefix is test even if livemode is true", async () => {
+    process.env.REPLIT_DEPLOYMENT = "1";
+    getStripeSecretKey.mockResolvedValue("sk_test_fallback");
+    mockStripeClient(true);
+
+    await freshRun();
+
+    expect(sendCredentialAlertEmail).toHaveBeenCalledTimes(1);
+    expect(sendCredentialAlertEmail).toHaveBeenCalledWith("stripe", expect.any(Error));
+  });
+
+  it("stays quiet on a deployed app with a live key (livemode true)", async () => {
+    process.env.REPLIT_DEPLOYMENT = "1";
+    mockStripeClient(true);
+
+    await freshRun();
+
+    expect(sendCredentialAlertEmail).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet in development even with a test-mode key (opt-out)", async () => {
+    // Not deployed: sandbox mode via the connector is the legitimate setup.
+    getStripeSecretKey.mockResolvedValue("sk_test_dev");
+    mockStripeClient(false);
+
+    await freshRun();
+
+    expect(sendCredentialAlertEmail).not.toHaveBeenCalled();
+  });
+
+  it("STRIPE_REQUIRE_LIVEMODE=false opts a deployed app out explicitly", async () => {
+    process.env.REPLIT_DEPLOYMENT = "1";
+    process.env.STRIPE_REQUIRE_LIVEMODE = "false";
+    getStripeSecretKey.mockResolvedValue("sk_test_fallback");
+    mockStripeClient(false);
+
+    await freshRun();
+
     expect(sendCredentialAlertEmail).not.toHaveBeenCalled();
   });
 });
