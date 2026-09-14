@@ -14,6 +14,7 @@ export default function SiteHeader() {
         <div className="hidden md:flex items-center gap-8 hud-label text-foreground/80">
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>
+          <Link href="/compare" className="hover:text-foreground transition-colors">Compare</Link>
           <a href="/#pricing" className="hover:text-foreground transition-colors">Pricing</a>
         </div>
         <div className="flex items-center gap-3">

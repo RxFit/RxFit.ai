@@ -269,6 +269,7 @@ function buildArticleHtml(post: GeneratedPost): string {
 
   return `
 <div class="min-h-screen bg-background text-foreground overflow-x-hidden">
+  ${buildMainNavigationHtml()}
   <article class="pt-28 pb-20 px-6">
     <div class="container mx-auto max-w-6xl">
       <nav class="text-sm text-muted-foreground/70 mb-8 flex items-center gap-2" aria-label="Breadcrumb">
@@ -310,6 +311,8 @@ function buildArticleHtml(post: GeneratedPost): string {
             <div class="text-foreground font-bold mb-1">${escapeHtml(post.author)}</div>
             <p class="text-sm text-muted-foreground leading-relaxed mb-2">${escapeHtml(post.authorBio || "")}</p>
             <a href="${escapeHtml(APP_URL)}" rel="noopener" class="text-sm text-primary">Open the RxFit web app →</a>
+            <span class="mx-2 text-muted-foreground" aria-hidden="true">·</span>
+            <a href="/compare" class="text-sm text-primary">Compare coaching options →</a>
           </div>
         </div>
         <p class="mt-10"><a href="/blog" class="text-primary underline underline-offset-2">← Back to the blog</a></p>
@@ -317,6 +320,22 @@ function buildArticleHtml(post: GeneratedPost): string {
     </div>
   </article>
 </div>`;
+}
+
+function buildMainNavigationHtml(): string {
+  return `
+  <nav class="fixed top-0 w-full z-50 bg-background border-b border-border" aria-label="Main navigation">
+    <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold tracking-tight">RxFit<span class="text-primary">.ai</span></a>
+      <div class="flex items-center gap-6 text-sm">
+        <a href="/">Home</a>
+        <a href="/blog">Blog</a>
+        <a href="/compare">Compare</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="${escapeHtml(APP_URL)}" rel="noopener">Open App</a>
+      </div>
+    </div>
+  </nav>`;
 }
 
 /**
@@ -413,6 +432,7 @@ function buildIndexPageHtml(posts: BlogIndexCard[]): string {
   const cards = posts.map(buildIndexCardHtml).join("\n");
   return `
 <div class="min-h-screen bg-background text-foreground overflow-x-hidden">
+  ${buildMainNavigationHtml()}
   <header class="relative pt-32 pb-16 px-6 overflow-hidden">
     <div class="container mx-auto max-w-4xl text-center">
       <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-border text-primary hud-label mb-6">${escapeHtml(BLOG_INDEX_HERO_BADGE)}</div>

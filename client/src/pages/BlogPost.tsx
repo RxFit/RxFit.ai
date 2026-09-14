@@ -238,6 +238,14 @@ export default function BlogPost() {
                   >
                     Open the RxFit web app <ArrowRight className="w-4 h-4" />
                   </a>
+                  <span className="mx-2 text-muted-foreground" aria-hidden="true">·</span>
+                  <Link
+                    href="/compare"
+                    className="text-sm text-primary hover:text-primary inline-flex items-center gap-1"
+                    data-testid="link-bio-compare"
+                  >
+                    Compare coaching options <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
 

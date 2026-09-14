@@ -169,7 +169,7 @@ export default function LandingPage() {
           </a>
           <div className="hidden md:flex items-center gap-8 hud-label text-foreground/80">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a>
+            <a href="#features" className="hover:text-foreground transition-colors">How It Works</a>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
             <a href="/blog" className="hover:text-foreground transition-colors" data-testid="link-nav-blog">Blog</a>
           </div>

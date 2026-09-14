@@ -137,6 +137,14 @@ describe("renderBlogIndexPage output", () => {
     expect(page).toContain("6 min read");
   });
 
+  it("renders crawler-visible main navigation to key public pages", () => {
+    expect(page).toContain('aria-label="Main navigation"');
+    expect(page).toContain('href="/"');
+    expect(page).toContain('href="/blog"');
+    expect(page).toContain('href="/compare"');
+    expect(page).toContain('href="/#pricing"');
+  });
+
   it("renders an empty grid without crashing when no posts exist", () => {
     const empty = renderBlogIndexPage([], TEMPLATE)!;
     const blog = extractJsonLd(empty).find((j: any) => j["@type"] === "Blog") as any;

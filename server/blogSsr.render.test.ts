@@ -112,6 +112,15 @@ describe("renderGeneratedPostPage output", () => {
     expect(page).toContain("What is HRV?");
   });
 
+  it("renders main navigation and a contextual link to the comparison page", () => {
+    expect(page).toContain('aria-label="Main navigation"');
+    expect(page).toContain('href="/"');
+    expect(page).toContain('href="/blog"');
+    expect(page).toContain('href="/compare"');
+    expect(page).toContain('href="/#pricing"');
+    expect(page).toContain("Compare coaching options");
+  });
+
   it("returns null when no template is available (dev fall-through)", () => {
     // No override and no dist/public/template.html in the test environment.
     expect(renderGeneratedPostPage(POST)).toBeNull();
