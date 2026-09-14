@@ -10,7 +10,7 @@ import { AUTHOR_PROFILE_URL, ORGANIZATION_ID } from "./jsonld";
  */
 export const BLOG_INDEX_TITLE = "The RxFit.ai Blog — AI Coaching, Wearables & Accountability";
 export const BLOG_INDEX_DESCRIPTION =
-  "Evidence-based guides on AI fitness coaching, reading your wearable data, and closing the accountability gap that makes most fitness apps fail.";
+  "Evidence-based guides on AI fitness coaching, reading your wearable data, and closing the accountability gap that makes most health apps fail — from RxFit.ai.";
 
 /**
  * On-page hero copy for /blog, shared by the client page (BlogIndex.tsx) and

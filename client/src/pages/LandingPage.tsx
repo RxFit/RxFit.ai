@@ -154,7 +154,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30 selection:text-primary-foreground">
       <Seo
         title="RxFit.ai — AI Health Dashboard + Human Accountability Coach"
-        description="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach."
+        description={`Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a dedicated human accountability coach — try it free for ${PLAN_PRICING.kickstart.trialDays} days.`}
         canonicalPath="/"
         image="/opengraph.jpg"
         jsonLd={[PRICING_JSONLD, SOFTWARE_APPLICATION_JSONLD, FAQ_JSONLD]}

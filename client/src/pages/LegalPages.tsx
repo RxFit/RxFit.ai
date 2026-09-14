@@ -164,7 +164,7 @@ export function ContactPage() {
     <LegalLayout
       title="Contact Us"
       seoTitle="Contact RxFit.ai Support | RxFit.ai"
-      description="Get in touch with the RxFit.ai team for account support, billing help, data privacy requests, partnership inquiries, or press."
+      description="Contact the RxFit.ai team for account support, billing help, data privacy requests, and partnership or press inquiries. We'll get back to you quickly."
       canonicalPath="/contact"
       testId="page-contact"
     >
