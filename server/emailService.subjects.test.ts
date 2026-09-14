@@ -134,8 +134,8 @@ describe("owner notification senders — subjects, recipient, failure contract",
       const expected: Record<string, string> = {
         stripe: "🚨 RxFit.ai: Stripe credentials are broken",
         gmail: "🚨 RxFit.ai: Gmail credentials are broken",
-        products: "🚨 RxFit.ai: Stripe plan tiers credentials are broken",
         pricing: "🚨 RxFit.ai: Pricing served to buyers credentials are broken",
+        blogSsr: "🚨 RxFit.ai: Blog SSR to crawlers credentials are broken",
       };
       let call = 0;
       for (const [service, subject] of Object.entries(expected)) {

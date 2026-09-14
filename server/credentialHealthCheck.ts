@@ -17,6 +17,14 @@
  *  - recovery is logged (and resets the alert state) so a future outage
  *    alerts again.
  *
+ * The Stripe check goes further than credential resolution: it also asserts,
+ * read-only, that the three pinned LIVE_PRICE_IDS still match the pricing the
+ * site advertises, and that a live deployment is not silently running
+ * test-mode keys. Both live inside the SAME `stripe` service on purpose — a
+ * separate plan-tier service would re-alert on the identical root cause,
+ * which is how one broken credential once produced two emails, the second
+ * prescribing a Stripe metadata edit that would have mischarged buyers.
+ *
  * Enabled in production automatically; in development set
  * CREDENTIAL_HEALTHCHECK=true to run it.
  */
@@ -25,13 +33,18 @@ import { getUncachableGmailClient } from "./gmailClient";
 import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
-import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
+import { PLAN_TIERS, priceIdForTier, priceMismatches, type PriceShape } from "@shared/stripe-catalog";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
 const RETRY_DELAY_MS = 15 * 1000;
 
-export type ServiceName = "stripe" | "gmail" | "sheets" | "products" | "pricing" | "blogSsr";
+// "pricing" and "blogSsr" are EVENT-DRIVEN services: they are not probed on
+// the hourly timer (there is nothing to poll — serving outcomes only exist
+// when a request is served). The /api/stripe/products route reports every
+// serving outcome via reportPricingServing, and both crawler-facing blog
+// routes report via reportBlogSsrServing.
+export type ServiceName = "stripe" | "gmail" | "sheets" | "pricing" | "blogSsr";
 
 type ServiceState = { healthy: boolean; alerted: boolean };
 
@@ -39,7 +52,6 @@ const state: Record<ServiceName, ServiceState> = {
   stripe: { healthy: true, alerted: false },
   gmail: { healthy: true, alerted: false },
   sheets: { healthy: true, alerted: false },
-  products: { healthy: true, alerted: false },
   pricing: { healthy: true, alerted: false },
   blogSsr: { healthy: true, alerted: false },
 };
@@ -56,7 +68,6 @@ const status: Record<ServiceName, ServiceStatus> = {
   stripe: { healthy: null, lastCheckedAt: null, lastError: null },
   gmail: { healthy: null, lastCheckedAt: null, lastError: null },
   sheets: { healthy: null, lastCheckedAt: null, lastError: null },
-  products: { healthy: null, lastCheckedAt: null, lastError: null },
   pricing: { healthy: null, lastCheckedAt: null, lastError: null },
   blogSsr: { healthy: null, lastCheckedAt: null, lastError: null },
 };
@@ -73,7 +84,6 @@ export function getCredentialHealthStatus(): CredentialHealthStatus {
       stripe: { ...status.stripe },
       gmail: { ...status.gmail },
       sheets: { ...status.sheets },
-      products: { ...status.products },
       pricing: { ...status.pricing },
       blogSsr: { ...status.blogSsr },
     },
@@ -118,7 +128,59 @@ async function checkStripe(): Promise<void> {
   // balance.retrieve is the cheapest authenticated read (no list, no params)
   // and works for every account/mode.
   const stripe = await getUncachableStripeClient();
-  await stripe.balance.retrieve();
+  const balance = await stripe.balance.retrieve();
+
+  // A TEST-mode key makes balance.retrieve() succeed while every live checkout
+  // 500s on our livemode price IDs — the monitor goes green while the site is
+  // dead. That is exactly what happens if a missing STRIPE_SECRET_KEY is
+  // "fixed" by re-authorizing the connector, which stripeClient labels
+  // "Sandbox mode".
+  if (
+    process.env.REPLIT_DEPLOYMENT === "1" &&
+    (balance as { livemode?: boolean })?.livemode === false
+  ) {
+    throw new Error(
+      "Stripe credentials resolved but they are TEST-mode keys (balance.livemode=false) on the live deployment. Live checkout will 500 — the site's pinned price IDs are livemode. Set the live sk_live_… key as STRIPE_SECRET_KEY in Replit Secrets.",
+    );
+  }
+
+  // …then verify the CATALOG. A working key proves nothing about the prices
+  // buyers are actually sent to.
+  await checkStripeCatalog(stripe);
+}
+
+/**
+ * Read-only agreement check between the three pinned LIVE_PRICE_IDS and the
+ * pricing the site advertises. Three prices.retrieve calls, no writes.
+ *
+ * Deliberately consults NO product metadata: zero live products carry
+ * metadata.tier, so a check keyed on it could only ever fail — which is what
+ * made the old "stripe plan tiers" alert fire hourly with a remedy that would
+ * have started mischarging buyers had anyone followed it.
+ *
+ * Folded into checkStripe rather than added as a fourth service so that one
+ * root cause (an unresolvable credential) produces exactly ONE alert email.
+ */
+async function checkStripeCatalog(stripe: any): Promise<void> {
+  const problems: string[] = [];
+  for (const tier of PLAN_TIERS) {
+    const id = priceIdForTier(tier);
+    try {
+      const price = await stripe.prices.retrieve(id);
+      for (const m of priceMismatches(tier, price as PriceShape)) {
+        problems.push(`${tier} (${id}): ${m}`);
+      }
+    } catch (error: any) {
+      problems.push(`${tier} (${id}): could not be retrieved from Stripe — ${error?.message ?? String(error)}`);
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      "Live Stripe catalog no longer matches the site's advertised pricing:\n- " +
+        problems.join("\n- ") +
+        "\nCheckout will charge the wrong amount or fail. Fix the price in the Stripe dashboard, or update LIVE_PRICE_IDS / PLAN_PRICING in shared/stripe-constants.ts and redeploy.",
+    );
+  }
 }
 
 async function checkGmail(): Promise<void> {
@@ -146,93 +208,6 @@ async function checkSheets(): Promise<void> {
   await sheets.spreadsheets.get({ spreadsheetId, fields: "spreadsheetId" });
 }
 
-/** Minimal shape of a Stripe price (with expanded product) for tier matching. */
-export type TierPriceCandidate = {
-  active?: boolean | null;
-  recurring?: { trial_period_days?: number | null } | null;
-  unit_amount?: number | null;
-  product?: { active?: boolean | null; metadata?: Record<string, string> | null } | null;
-};
-
-/**
- * Pure tier→price verification (unit-tested): given the live active prices
- * (product expanded), return a human-readable problem per PLAN_PRICING tier
- * that no longer resolves to an active recurring price on an active product
- * with the expected amount. Empty array = everything matches.
- *
- * This mirrors what SignupModalProvider does with /api/stripe/products
- * (metadata.tier → price id; checkout is disabled when a tier can't
- * resolve) — but loudly, so the owner hears about it.
- */
-export function findTierPriceProblems(prices: TierPriceCandidate[]): string[] {
-  const problems: string[] = [];
-  for (const tier of Object.keys(PLAN_PRICING) as PlanTier[]) {
-    const candidates = prices.filter(
-      (p) => p.product?.metadata?.tier === tier && p.product?.active !== false,
-    );
-    if (candidates.length === 0) {
-      const archivedOnly = prices.some((p) => p.product?.metadata?.tier === tier);
-      problems.push(
-        archivedOnly
-          ? `${tier}: product with metadata.tier="${tier}" is archived (checkout for this tier is disabled until fixed)`
-          : `${tier}: no active Stripe product has metadata.tier="${tier}" (checkout for this tier is disabled until fixed)`,
-      );
-      continue;
-    }
-    const usable = candidates.filter((p) => p.active !== false && p.recurring);
-    if (usable.length === 0) {
-      problems.push(
-        `${tier}: product resolves but has no active recurring price (found ${candidates.length} price(s), none usable)`,
-      );
-      continue;
-    }
-    const expectedAmount = PLAN_PRICING[tier].amount * 100;
-    const amountMatches = usable.filter((p) => p.unit_amount === expectedAmount);
-    if (amountMatches.length === 0) {
-      const seen = usable.map((p) => p.unit_amount).join(", ");
-      problems.push(
-        `${tier}: no active recurring price matches the site's ${PLAN_PRICING[tier].display} (expected unit_amount ${expectedAmount}, found: ${seen})`,
-      );
-      continue;
-    }
-    // If the site advertises a free trial for this tier, the live price must
-    // still carry it — otherwise buyers get charged immediately while the site
-    // promises a trial (trust/compliance problem the amount check won't catch).
-    const plan = PLAN_PRICING[tier] as { trialDays?: number };
-    const expectedTrial = plan.trialDays;
-    if (
-      expectedTrial &&
-      !amountMatches.some((p) => p.recurring?.trial_period_days === expectedTrial)
-    ) {
-      const seenTrials = amountMatches
-        .map((p) => p.recurring?.trial_period_days ?? "none")
-        .join(", ");
-      problems.push(
-        `${tier}: price amount matches but the advertised ${expectedTrial}-day free trial is missing (expected trial_period_days ${expectedTrial}, found: ${seenTrials}) — buyers would be charged immediately`,
-      );
-    }
-  }
-  return problems;
-}
-
-async function checkProducts(): Promise<void> {
-  // Verify the live Stripe catalog still matches the site's plan tiers:
-  // each PLAN_PRICING tier must resolve (via product metadata.tier) to an
-  // active recurring price with the advertised amount. If a product is
-  // renamed/archived or loses its tier metadata, the signup modal disables
-  // checkout for that tier — this check tells the owner why, loudly.
-  const stripe = await getUncachableStripeClient();
-  const prices = await stripe.prices.list({
-    active: true,
-    limit: 100,
-    expand: ["data.product"],
-  });
-  const problems = findTierPriceProblems((prices.data ?? []) as TierPriceCandidate[]);
-  if (problems.length > 0) {
-    throw new Error(`Stripe plan-tier mismatch — ${problems.join("; ")}`);
-  }
-}
-
 async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; error?: unknown }> {
   try {
     await fn();
@@ -253,7 +228,8 @@ async function checkWithRetry(fn: () => Promise<void>): Promise<{ ok: boolean; e
  * Shared outcome recorder: applies the healthy→broken transition logic,
  * updates the on-demand status snapshot, and dispatches the owner alert
  * (email → sheet fallback) on the transition. Used by the periodic
- * credential checks AND by event-driven reporters like the pricing monitor.
+ * credential checks AND by the event-driven reporters (pricing serving,
+ * blog SSR serving).
  */
 async function recordOutcome(
   name: ServiceName,
@@ -376,7 +352,6 @@ export async function runCredentialHealthCheck(): Promise<void> {
     await checkService("stripe", checkStripe);
     await checkService("gmail", checkGmail);
     await checkService("sheets", checkSheets);
-    await checkService("products", checkProducts);
   } catch (error) {
     console.error("[credential-check] Unexpected error during health check:", error);
   } finally {
@@ -393,7 +368,7 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe, Gmail & Sheets credentials plus Stripe plan-tier prices at boot and hourly");
+  console.log("[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly");
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }

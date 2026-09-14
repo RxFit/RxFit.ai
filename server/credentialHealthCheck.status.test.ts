@@ -5,7 +5,7 @@
  * details captured for the broken service only.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { healthyTierPrices } from "./credentialHealthCheck.fixtures";
+import { healthyStripeClient } from "./stripeHealthFixtures";
 
 const getStripeSecretKey = vi.fn();
 const getUncachableStripeClient = vi.fn();
@@ -30,10 +30,7 @@ describe("credential health status snapshot", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
-    getUncachableStripeClient.mockResolvedValue({
-      balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance" }) },
-      prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) },
-    });
+    getUncachableStripeClient.mockResolvedValue(healthyStripeClient());
     getUncachableGmailClient.mockResolvedValue({});
     getUncachableGoogleSheetClient.mockResolvedValue({
       spreadsheets: { get: vi.fn().mockResolvedValue({ data: {} }) },
@@ -70,8 +67,8 @@ describe("credential health status snapshot", () => {
 
   it("captures the failing service's error message while others stay healthy", async () => {
     getUncachableStripeClient.mockResolvedValue({
+      ...healthyStripeClient(),
       balance: { retrieve: vi.fn().mockRejectedValue(new Error("Invalid API Key provided")) },
-      prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) },
     });
     const mod = await freshModule();
     const run = mod.runCredentialHealthCheck();

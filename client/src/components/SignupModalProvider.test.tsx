@@ -1,23 +1,24 @@
 // @vitest-environment jsdom
 /**
  * Guards the plan → priceId wiring ABOVE the signup modal:
- *  - useSignupModal().open("committed") opens the modal showing the committed
- *    plan and submits checkout with the committed price ID fetched from
- *    /api/stripe/products (metadata.tier → prices[0].id),
- *  - when /api/stripe/products fails (network error, non-OK status, or a
- *    wrong-shape/empty response), checkout is DISABLED with a visible pricing
- *    error — there is no hardcoded fallback price ID anymore, so buyers can
- *    never check out at a stale amount,
- *  - a partial products response only enables the tiers it actually contains;
- *    missing tiers get the disabled-with-error treatment.
- * A regression here would either send buyers to checkout for the wrong plan
- * or silently charge an outdated price.
+ *  - useSignupModal().open(tier) opens the modal showing that plan and submits
+ *    checkout with that tier's pinned LIVE_PRICE_IDS entry,
+ *  - NOTHING can move that price: the provider issues no catalog fetch, so no
+ *    Stripe response can override it (and the server re-derives the price from
+ *    `plan` anyway — see server/checkoutSession.test.ts).
+ * A regression here would send buyers to checkout for the wrong plan even
+ * though SignupModal's own tests pass.
+ *
+ * The deleted cases asserted a `metadata.tier → prices[0].id` override. That
+ * mapping assumed one Stripe product per tier while the live catalog puts all
+ * three tiers on ONE product, so the override could only ever collapse every
+ * tier onto a single arbitrary price. The test encoded the bug as the contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SignupModalProvider, useSignupModal } from "./SignupModalProvider";
-import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
+import { LIVE_PRICE_IDS, PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 const originalLocation = window.location;
@@ -55,17 +56,12 @@ function jsonResponse(status: number, body: unknown) {
 }
 
 /**
- * fetch mock that routes by URL:
- *  - /api/stripe/products → the given products result (or a rejection),
- *  - /api/stripe/checkout → a successful checkout session.
+ * fetch mock that routes by URL. Only /api/stripe/checkout is expected —
+ * any other request (notably a resurrected /api/stripe/products catalog
+ * fetch) rejects loudly rather than being quietly tolerated.
  */
-function routeFetch(products: { reject: true } | { body: unknown } | { status: number; body: unknown }) {
+function routeFetch() {
   fetchMock.mockImplementation((url: string) => {
-    if (url === "/api/stripe/products") {
-      if ("reject" in products) return Promise.reject(new Error("network down"));
-      const status = "status" in products ? products.status : 200;
-      return Promise.resolve(jsonResponse(status, products.body));
-    }
     if (url === "/api/stripe/checkout") {
       return Promise.resolve(
         jsonResponse(200, { url: "https://checkout.stripe.com/c/session_abc" }),
@@ -97,23 +93,12 @@ function renderProvider(plan: PlanTier) {
   );
 }
 
-async function waitForProductsFetch() {
-  await waitFor(() => {
-    expect(
-      fetchMock.mock.calls.some(([url]) => url === "/api/stripe/products"),
-    ).toBe(true);
-  });
-}
-
-async function openModal(plan: PlanTier) {
+async function openModalAndSubmit(plan: PlanTier) {
   fireEvent.click(screen.getByTestId(`button-open-${plan}`));
+  // Modal is open when its form fields are present.
   await waitFor(() => {
     expect(screen.getByTestId("input-email")).toBeTruthy();
   });
-}
-
-async function openModalAndSubmit(plan: PlanTier) {
-  await openModal(plan);
   fireEvent.change(screen.getByTestId("input-name"), { target: { value: "Ada L" } });
   fireEvent.change(screen.getByTestId("input-email"), {
     target: { value: "ada@example.com" },
@@ -131,110 +116,42 @@ async function openModalAndSubmit(plan: PlanTier) {
   };
 }
 
-/** The modal is open with a visible pricing error and a disabled submit button. */
-async function expectCheckoutDisabledWithError(plan: PlanTier) {
-  await openModal(plan);
-  await waitFor(() => {
-    expect(screen.getByTestId("text-pricing-error")).toBeTruthy();
-  });
-  expect(
-    (screen.getByTestId("button-submit-signup") as HTMLButtonElement).disabled,
-  ).toBe(true);
-  // Belt and braces: even a programmatic submit must not reach the API.
-  fireEvent.submit(screen.getByTestId("input-email").closest("form")!);
-  await new Promise((r) => setTimeout(r, 50));
-  expect(
-    fetchMock.mock.calls.some(([url]) => url === "/api/stripe/checkout"),
-  ).toBe(false);
-}
-
 describe("SignupModalProvider plan → priceId wiring", () => {
-  it("fetched products drive checkout via metadata.tier → prices[0].id", async () => {
-    routeFetch({
-      body: {
-        data: [
-          {
-            metadata: { tier: "committed" },
-            prices: [{ id: "price_live_committed" }],
-          },
-        ],
-      },
-    });
+  it("submits the pinned price ID for each tier", async () => {
+    for (const tier of ["kickstart", "committed", "transformation"] as PlanTier[]) {
+      routeFetch();
+      renderProvider(tier);
+
+      const body = await openModalAndSubmit(tier);
+      expect(body.plan).toBe(tier);
+      expect(body.priceId).toBe(LIVE_PRICE_IDS[tier]);
+
+      cleanup();
+      fetchMock.mockReset();
+    }
+  });
+
+  it("open('committed') shows the committed plan copy", async () => {
+    routeFetch();
     renderProvider("committed");
-    await waitForProductsFetch();
 
-    const body = await openModalAndSubmit("committed");
-
-    // Modal shows the committed plan copy…
+    await openModalAndSubmit("committed");
     expect(screen.getByText(new RegExp(PLAN_PRICING.committed.name)).textContent).toContain(
       "Annual Plan",
     );
-    // …and checkout is submitted with the fetched committed price ID.
-    expect(body.plan).toBe("committed");
-    expect(body.priceId).toBe("price_live_committed");
   });
 
-  it("failed products fetch disables checkout with a visible pricing error (no hardcoded fallback)", async () => {
-    routeFetch({ reject: true });
-    renderProvider("committed");
-    await waitForProductsFetch();
-
-    await expectCheckoutDisabledWithError("committed");
-  });
-
-  it("a non-OK products response disables checkout with a visible pricing error", async () => {
-    routeFetch({ status: 500, body: { message: "Failed to list products." } });
+  it("issues no catalog fetch — nothing can change the submitted price ID", async () => {
+    // The regression that matters. The provider previously fetched
+    // /api/stripe/products and let the response override the price. Any
+    // resurrection of that path fails here.
+    routeFetch();
     renderProvider("kickstart");
-    await waitForProductsFetch();
-
-    await expectCheckoutDisabledWithError("kickstart");
-  });
-
-  it("a partial products response only enables the tiers it contains; missing tiers are disabled", async () => {
-    routeFetch({
-      body: {
-        data: [
-          {
-            metadata: { tier: "kickstart" },
-            prices: [{ id: "price_live_kickstart" }],
-          },
-          // Malformed entries are ignored, not crashed on.
-          { metadata: {}, prices: [{ id: "price_ignored" }] },
-          { metadata: { tier: "transformation" }, prices: [] },
-        ],
-      },
-    });
-    renderProvider("committed");
-    await waitForProductsFetch();
-
-    // committed was not in the response → checkout for it is disabled.
-    await expectCheckoutDisabledWithError("committed");
-  });
-
-  it("a partial products response still allows checkout for the tier it resolved", async () => {
-    routeFetch({
-      body: {
-        data: [
-          {
-            metadata: { tier: "kickstart" },
-            prices: [{ id: "price_live_kickstart" }],
-          },
-        ],
-      },
-    });
-    renderProvider("kickstart");
-    await waitForProductsFetch();
 
     const body = await openModalAndSubmit("kickstart");
-    expect(body.plan).toBe("kickstart");
-    expect(body.priceId).toBe("price_live_kickstart");
-  });
-
-  it("an unexpected products response shape disables checkout with a visible pricing error", async () => {
-    routeFetch({ body: { products: "wrong-shape" } });
-    renderProvider("kickstart");
-    await waitForProductsFetch();
-
-    await expectCheckoutDisabledWithError("kickstart");
+    expect(body.priceId).toBe(LIVE_PRICE_IDS.kickstart);
+    expect(
+      fetchMock.mock.calls.every(([url]) => url === "/api/stripe/checkout"),
+    ).toBe(true);
   });
 });

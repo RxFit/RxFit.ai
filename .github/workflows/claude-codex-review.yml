@@ -1,0 +1,108 @@
+# Claude responder for Codex code reviews
+#
+# Loop: Codex (chatgpt-codex-connector[bot]) submits a review on a PR, this
+# workflow fires once, and Claude remediates the findings and requests a fresh
+# Codex pass. Repository auto-merge is configured separately in GitHub.
+#
+# Security boundaries:
+# - Only the exact Codex connector bot may trigger automatic remediation.
+# - Manual @claude overrides require OWNER, MEMBER, or COLLABORATOR association.
+# - Authentication uses CLAUDE_CODE_OAUTH_TOKEN, not ANTHROPIC_API_KEY.
+# - Claude never invokes merge; GitHub auto-merge handles eligible PRs.
+#
+# Turn budget: the agent needs several turns per finding plus test/commit/push,
+# so the cap is generous and bounded by the job timeout rather than by turns.
+# Tool permissions are additive via `settings` so the action's own GitHub tools
+# stay available; setting --allowedTools instead would replace them.
+
+name: Claude responds to Codex review
+
+on:
+  # A submitted review is the single batch-complete event. Do not also trigger
+  # on each inline review comment because one review may contain many comments.
+  pull_request_review:
+    types: [submitted]
+  # Authorized maintainers may use a top-level @claude comment as an override.
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+# Never run two Claude passes on the same PR at once.
+concurrency:
+  group: claude-codex-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  respond:
+    if: >-
+      (github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && contains(github.event.comment.body, '@claude')
+        && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      ||
+      (github.event_name == 'pull_request_review'
+        && github.event.sender.login == 'chatgpt-codex-connector[bot]')
+    runs-on: ubuntu-latest
+    # Bounds the cost of the raised turn limit below; a remediation pass that has
+    # not finished by now is stuck rather than working.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "chatgpt-codex-connector[bot]"
+          prompt: >-
+            You are responding to a Codex (chatgpt-codex-connector) code review
+            on this pull request. Read every Codex finding (P0/P1/P2 inline
+            comments and the review summary). For each: if it is a valid
+            P0/P1/P2 issue, implement the fix on this PR's branch, run the
+            project's test suite, and commit; if it is a false positive or bad
+            advice, reply on that thread with your technical reasoning and
+            resolve it WITHOUT changing code. After processing ALL findings,
+            push your commits and post exactly ONE top-level comment containing
+            "@codex review" to request a fresh pass. HARD LIMITS: (1) never tag
+            @codex in individual thread replies, only the single top-level
+            re-review request; (2) if this is the 3rd review round and findings
+            remain unresolved, do NOT push more changes; instead post
+            a top-level comment whose first line is exactly
+            "NEEDS HUMAN DECISION", listing what is still unresolved and the
+            options, and stop; (3) NEVER merge, close, or approve the PR; merge
+            is handled separately by GitHub auto-merge.
+
+          # Additive permissions. Deliberately set here rather than via
+          # claude_args --allowedTools, which replaces the tool set wholesale and
+          # would strip the GitHub tools this action injects for replying to
+          # review threads. The prompt above requires running the test suite and
+          # committing, so denials here are what burned turns: one failing run
+          # recorded 16 permission denials before hitting the cap.
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Bash(git *)",
+                  "Bash(npm *)",
+                  "Bash(npx *)",
+                  "Bash(bash scripts/*)",
+                  "Read",
+                  "Edit",
+                  "Write",
+                  "Glob",
+                  "Grep"
+                ]
+              }
+            }
+
+          # 25 was too low for the work the prompt asks for. Two of the three runs
+          # that ever reached the agent died on it, and the second reported a
+          # *successful* result at 26 turns — finished work, failed by the cap.
+          # A multi-finding review costs several turns per finding.
+          claude_args: '--max-turns 80'

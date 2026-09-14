@@ -1,13 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import SignupModal from "./SignupModal";
-import { PLAN_PRICING, type PlanTier } from "@shared/stripe-constants";
+import { LIVE_PRICE_IDS, type PlanTier } from "@shared/stripe-constants";
 
 interface SignupModalContextValue {
   open: (plan: PlanTier) => void;
   close: () => void;
 }
-
-export type PricingStatus = "loading" | "ready" | "error";
 
 const SignupModalContext = createContext<SignupModalContextValue | null>(null);
 
@@ -19,53 +17,26 @@ export function useSignupModal(): SignupModalContextValue {
   return ctx;
 }
 
+/**
+ * The price a buyer is sent to checkout with comes from LIVE_PRICE_IDS, and the
+ * server re-derives it from `plan` regardless (see server/checkoutSession.ts).
+ *
+ * This provider used to fetch /api/stripe/products and override the pinned IDs
+ * via `product.metadata.tier -> product.prices[0].id`. That mapping assumes one
+ * Stripe product per tier; the real catalog puts all three tiers on a SINGLE
+ * product, so the override could only ever collapse every tier onto one
+ * arbitrary price (the cheapest via the DB path, the newest via the API path).
+ * It was inert only because no product carried metadata.tier — adding one would
+ * have started mischarging. Removed rather than repaired.
+ */
 export function SignupModalProvider({ children }: { children: React.ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanTier>("kickstart");
-  const [priceIds, setPriceIds] = useState<Partial<Record<PlanTier, string>>>({});
-  const [pricingStatus, setPricingStatus] = useState<PricingStatus>("loading");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/stripe/products")
-      .then((res) => {
-        if (!res.ok) throw new Error(`products fetch failed: ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const ids: Partial<Record<PlanTier, string>> = {};
-        for (const product of data.data || []) {
-          const tier = product.metadata?.tier as PlanTier | undefined;
-          if (tier && tier in PLAN_PRICING && product.prices?.[0]?.id) {
-            ids[tier] = product.prices[0].id;
-          }
-        }
-        if (Object.keys(ids).length > 0) {
-          setPriceIds(ids);
-          setPricingStatus("ready");
-        } else {
-          setPricingStatus("error");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPricingStatus("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const open = (plan: PlanTier) => {
     setSelectedPlan(plan);
     setModalOpen(true);
   };
   const close = () => setModalOpen(false);
-
-  const priceId = priceIds[selectedPlan] || null;
-  // A missing tier in an otherwise-good response is still an error for that plan.
-  const effectiveStatus: PricingStatus =
-    pricingStatus === "ready" && !priceId ? "error" : pricingStatus;
 
   return (
     <SignupModalContext.Provider value={{ open, close }}>
@@ -74,8 +45,7 @@ export function SignupModalProvider({ children }: { children: React.ReactNode })
         isOpen={modalOpen}
         onClose={close}
         plan={selectedPlan}
-        priceId={priceId}
-        pricingStatus={effectiveStatus}
+        priceId={LIVE_PRICE_IDS[selectedPlan]}
       />
     </SignupModalContext.Provider>
   );

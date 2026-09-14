@@ -5,7 +5,7 @@
  * minimal spreadsheets.get metadata read on LEADS_SPREADSHEET_ID.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { healthyTierPrices } from "./credentialHealthCheck.fixtures";
+import { healthyStripeClient } from "./stripeHealthFixtures";
 
 const getStripeSecretKey = vi.fn();
 const getUncachableStripeClient = vi.fn();
@@ -35,7 +35,7 @@ describe("sheets health check API-access probe", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     getStripeSecretKey.mockResolvedValue("sk_test_ok");
-    getUncachableStripeClient.mockResolvedValue({ balance: { retrieve: vi.fn().mockResolvedValue({ object: "balance" }) }, prices: { list: vi.fn().mockResolvedValue({ data: healthyTierPrices() }) } });
+    getUncachableStripeClient.mockResolvedValue(healthyStripeClient());
     getUncachableGmailClient.mockResolvedValue({});
     sendCredentialAlertEmail.mockResolvedValue(true);
     appendCredentialAlertToSheet.mockResolvedValue(undefined);

@@ -1,8 +1,6 @@
 import Stripe from 'stripe';
 import { dbSslConfig } from '@shared/db-ssl.mjs';
 
-let connectionSettings: any;
-
 async function getCredentials() {
   // PREFER direct API keys from Secrets (for Live mode)
   const directSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -18,7 +16,6 @@ async function getCredentials() {
 
   // FALLBACK: Replit Connector (Sandbox mode)
   console.log("[Stripe] No STRIPE_SECRET_KEY found, falling back to Replit Connector");
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
     : process.env.WEB_REPL_RENEWAL
@@ -33,15 +30,22 @@ async function getCredentials() {
   const targetEnvironment = isProduction ? 'production' : 'development';
 
   const { getConnectionSettings } = await import('./connectorSettings');
-  const connectionSettings = await getConnectionSettings('stripe', targetEnvironment);
+  const connection = await getConnectionSettings('stripe', targetEnvironment);
 
-  if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
+  // Gate on the SECRET alone. Every consumer that matters -- checkout, session
+  // retrieval, the billing portal, StripeSync -- needs only the secret key, so
+  // a connection carrying a usable secret but no publishable key must not take
+  // down all of Stripe. Optional chaining also stops a connection with no
+  // `settings` object throwing a bare TypeError into the alert email instead
+  // of this diagnostic.
+  const secret = connection?.settings?.secret;
+  if (!secret) {
     throw new Error(`Stripe ${targetEnvironment} connection not found via Connector. Set STRIPE_SECRET_KEY in Replit Secrets instead.`);
   }
 
   return {
-    publishableKey: connectionSettings.settings.publishable,
-    secretKey: connectionSettings.settings.secret,
+    publishableKey: connection?.settings?.publishable ?? '',
+    secretKey: secret,
   };
 }
 
@@ -52,6 +56,11 @@ export async function getUncachableStripeClient() {
 
 export async function getStripePublishableKey() {
   const { publishableKey } = await getCredentials();
+  // Fail loudly rather than serving `{ publishableKey: "" }`, which a browser
+  // would only surface as an opaque Stripe.js error.
+  if (!publishableKey) {
+    throw new Error('No Stripe publishable key available. Set STRIPE_PUBLISHABLE_KEY in Replit Secrets.');
+  }
   return publishableKey;
 }
 
