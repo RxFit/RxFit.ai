@@ -1,0 +1,55 @@
+# Payment Recovery Mockups
+
+Here are the visual mockups for Mark and Sapan. 
+
+The emails are generated using the live `content/dispatch_card_declined.js` template (the same empathetic, external light-theme template used for Sara Kenley) and are embedded below. The SMS messages follow GoHighLevel (GHL) best practices for deliverability and compliance.
+
+## \ud83d\udcf1 GHL SMS Mockups
+
+> [!TIP]
+> **GHL A2P 10DLC Compliance:** 
+> - **Trigger Links:** Use GHL Trigger Links for the URL to track clicks and conversions.
+> - **Opt-Out:** "Reply STOP to opt out" is mandatory to prevent carrier filtering.
+> - **Brevity:** Keep it short to ensure it fits in standard SMS segments and looks conversational.
+
+<div style="display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 40px;">
+  <!-- SMS Mark -->
+  <div style="width: 300px; background-color: #f4f4f5; border: 12px solid #18181b; border-radius: 36px; padding: 20px 10px 40px 10px; position: relative; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 24px; background-color: #18181b; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;"></div>
+    <div style="text-align: center; font-size: 0.75rem; font-weight: 600; margin-top: 10px; margin-bottom: 20px; color: #71717a;">Text Message<br><span style="font-weight: 400;">Today 10:42 AM</span></div>
+    
+    <div style="background-color: #3b82f6; color: white; padding: 12px 16px; border-radius: 20px; border-bottom-right-radius: 4px; font-size: 0.95rem; line-height: 1.4; margin-bottom: 10px; margin-left: auto; width: fit-content; max-width: 80%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+      Hi Mark, it's RxFit. It looks like your recent card payment was declined. To keep your training sessions rolling, please update your payment info here: <span style="text-decoration: underline; color: #dbeafe;">rx-fit.com/pay</span>
+      <br><br>Reply STOP to opt out.
+    </div>
+  </div>
+  
+  <!-- SMS Sapan -->
+  <div style="width: 300px; background-color: #f4f4f5; border: 12px solid #18181b; border-radius: 36px; padding: 20px 10px 40px 10px; position: relative; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 24px; background-color: #18181b; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;"></div>
+    <div style="text-align: center; font-size: 0.75rem; font-weight: 600; margin-top: 10px; margin-bottom: 20px; color: #71717a;">Text Message<br><span style="font-weight: 400;">Today 11:15 AM</span></div>
+    
+    <div style="background-color: #3b82f6; color: white; padding: 12px 16px; border-radius: 20px; border-bottom-right-radius: 4px; font-size: 0.95rem; line-height: 1.4; margin-bottom: 10px; margin-left: auto; width: fit-content; max-width: 80%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+      Hi Sapan, we tried to process your recent payment but the card on file was declined. You can securely update your card details here: <span style="text-decoration: underline; color: #dbeafe;">rx-fit.com/pay</span>
+      <br><br>Let us know if you need help! - RxFit. Reply STOP to opt out.
+    </div>
+  </div>
+</div>
+
+---
+
+## \ud83d\udce7 Email Mockups
+
+The mockups below are generated directly from the `dispatch_card_declined.js` template engine in the codebase. 
+
+````carousel
+### Email — Mark Estes
+<iframe src="mark_email.html" width="100%" height="800px" style="border: 1px solid #e2e8f0; border-radius: 12px; background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"></iframe>
+
+<!-- slide -->
+### Email — Sapan Shahani
+<iframe src="sapan_email.html" width="100%" height="800px" style="border: 1px solid #e2e8f0; border-radius: 12px; background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"></iframe>
+````
+
+*(If the emails do not render above, you can view the direct HTML files here: [Mark's Email](file:///C:/Users/Danny/.gemini/antigravity/brain/2f496903-75d3-41ae-8636-acfbade6f712/mark_email.html) | [Sapan's Email](file:///C:/Users/Danny/.gemini/antigravity/brain/2f496903-75d3-41ae-8636-acfbade6f712/sapan_email.html))*
+
