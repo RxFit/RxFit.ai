@@ -164,7 +164,7 @@ export default function ComparePage() {
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground">
       <Seo
         title="AI Health Coach vs Personal Trainer vs Fitness Apps — RxFit.ai"
-        description="Compare RxFit.ai with personal trainers and fitness apps on cost, accountability, wearable coaching, and personalization. See which fits your goals."
+        description="Compare RxFit.ai with personal trainers and fitness apps on cost, human accountability, wearable data coaching, and personalization. See which option fits your goals."
         canonicalPath="/compare"
         image="/opengraph.jpg"
         breadcrumbs={[
