@@ -270,7 +270,8 @@ function buildArticleHtml(post: GeneratedPost): string {
   return `
 <div class="min-h-screen bg-background text-foreground overflow-x-hidden">
   ${buildMainNavigationHtml()}
-  <article class="pt-28 pb-20 px-6">
+  <main id="main-content">
+    <article class="pt-28 pb-20 px-6">
     <div class="container mx-auto max-w-6xl">
       <nav class="text-sm text-muted-foreground/70 mb-8 flex items-center gap-2" aria-label="Breadcrumb">
         <a href="/" class="hover:text-primary">Home</a><span>/</span>
@@ -318,7 +319,8 @@ function buildArticleHtml(post: GeneratedPost): string {
         <p class="mt-10"><a href="/blog" class="text-primary underline underline-offset-2">← Back to the blog</a></p>
       </div>
     </div>
-  </article>
+    </article>
+  </main>
 </div>`;
 }
 
@@ -440,7 +442,7 @@ function buildIndexPageHtml(posts: BlogIndexCard[]): string {
       <p class="text-xl text-muted-foreground max-w-2xl mx-auto">${escapeHtml(BLOG_INDEX_HERO_SUBTITLE)}</p>
     </div>
   </header>
-  <main class="container mx-auto px-6 pb-24 max-w-6xl">
+  <main id="main-content" class="container mx-auto px-6 pb-24 max-w-6xl">
     <div class="${BLOG_INDEX_GRID_CLASS}">${cards}</div>
     <p class="mt-10"><a href="/" class="text-primary underline underline-offset-2">← Back to RxFit.ai</a></p>
   </main>

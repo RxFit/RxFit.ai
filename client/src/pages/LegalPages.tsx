@@ -24,7 +24,7 @@ function LegalLayout({
     <div className="min-h-screen bg-card text-foreground/80">
       <Seo title={seoTitle ?? title} description={description} canonicalPath={canonicalPath} />
       <SiteHeader />
-      <main className="pt-28 pb-20 px-6" data-testid={testId}>
+      <main id="main-content" className="pt-28 pb-20 px-6" data-testid={testId}>
         <div className="container mx-auto max-w-3xl">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-4">
             {title}

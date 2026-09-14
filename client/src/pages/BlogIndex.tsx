@@ -118,7 +118,7 @@ export default function BlogIndex() {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 pb-24 max-w-6xl">
+      <main id="main-content" className="container mx-auto px-6 pb-24 max-w-6xl">
         {filtered.length === 0 ? (
           <div className="glass-card rounded-2xl p-12 text-center max-w-2xl mx-auto" data-testid="blog-empty-state">
             <h2 className="text-2xl font-bold text-foreground mb-3">Fresh insights are on the way.</h2>

@@ -92,9 +92,9 @@ export default function BlogPost() {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <SiteHeader />
-        <div className="flex-1 flex items-center justify-center" data-testid="blog-post-loading">
+        <main id="main-content" className="flex-1 flex items-center justify-center" data-testid="blog-post-loading">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
+        </main>
         <SiteFooter />
       </div>
     );
@@ -110,13 +110,13 @@ export default function BlogPost() {
           noindex
         />
         <SiteHeader />
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <main id="main-content" className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <h1 className="text-4xl font-bold text-foreground mb-4">Post not found</h1>
           <p className="text-muted-foreground mb-8">We couldn't find the article you were looking for.</p>
           <Link href="/blog" className="btn-primary px-6 py-3 rounded-xl inline-flex items-center gap-2">
             <ArrowLeft className="w-5 h-5" /> Back to the blog
           </Link>
-        </div>
+        </main>
         <SiteFooter />
       </div>
     );
@@ -152,7 +152,8 @@ export default function BlogPost() {
         </div>
       )}
 
-      <article className="pt-28 pb-20 px-6">
+      <main id="main-content">
+        <article className="pt-28 pb-20 px-6">
         <div className="container mx-auto max-w-6xl">
           {/* Breadcrumb */}
           <nav className="text-sm text-muted-foreground/70 mb-8 flex items-center gap-2" aria-label="Breadcrumb">
@@ -297,7 +298,8 @@ export default function BlogPost() {
             </div>
           )}
         </div>
-      </article>
+        </article>
+      </main>
 
       <SiteFooter />
       <StickyFooterCta slug={fm.slug} />

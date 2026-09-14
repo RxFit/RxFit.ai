@@ -19,7 +19,7 @@ import {
 import heroDashboardImg from "../assets/hero-dashboard.webp";
 import { useSignupModal } from "@/components/SignupModalProvider";
 import SiteFooter from "@/components/SiteFooter";
-import ThemeToggle from "@/components/theme-toggle";
+import SiteHeader from "@/components/SiteHeader";
 import { Seo } from "@/lib/seo";
 import {
   FAQ_ITEMS,
@@ -160,42 +160,10 @@ export default function LandingPage() {
         jsonLd={[PRICING_JSONLD, SOFTWARE_APPLICATION_JSONLD, FAQ_JSONLD]}
       />
 
-      {/* Sticky Navbar */}
-      <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-background/80 border-b border-border">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="RxFit.ai" className="w-8 h-8 rounded-lg object-cover" />
-            <span className="text-xl font-bold tracking-tight">RxFit<span className="text-primary">.ai</span></span>
-          </a>
-          <div className="hidden md:flex items-center gap-8 hud-label text-foreground/80">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#features" className="hover:text-foreground transition-colors">How It Works</a>
-            <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-            <a href="/blog" className="hover:text-foreground transition-colors" data-testid="link-nav-blog">Blog</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <a
-              href="https://app.rxfit.ai"
-              rel="noopener"
-              className="hidden sm:inline-block text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
-              data-testid="link-nav-login"
-            >
-              Log In
-            </a>
-            <button
-              onClick={() => openSignup("kickstart")}
-              className="btn-primary px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-primary/20"
-              data-testid="button-nav-trial"
-            >
-              Start Free Trial
-            </button>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader />
 
       {/* Main content landmark — wraps hero through testimonial, outside nav and footer */}
-      <main>
+      <main id="main-content">
 
       {/* Hero Section */}
       <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 overflow-hidden">

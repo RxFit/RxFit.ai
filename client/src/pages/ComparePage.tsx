@@ -176,7 +176,7 @@ export default function ComparePage() {
 
       <SiteHeader />
 
-      <main>
+      <main id="main-content">
         {/* Hero */}
         <header className="relative pt-32 pb-16 md:pt-44 md:pb-20 px-6 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-primary/10 blur-[120px] rounded-full -z-10" />

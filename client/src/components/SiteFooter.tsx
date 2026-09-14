@@ -17,7 +17,7 @@ export default function SiteFooter() {
             </p>
           </div>
 
-          <div>
+          <nav aria-label="Product">
             <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Product</div>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li>
@@ -29,9 +29,9 @@ export default function SiteFooter() {
               <li><a href="/#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
               <li><Link href="/compare" className="hover:text-primary transition-colors" data-testid="link-footer-compare">Compare Options</Link></li>
             </ul>
-          </div>
+          </nav>
 
-          <div>
+          <nav aria-label="Resources">
             <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Resources</div>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link href="/blog" className="hover:text-primary transition-colors" data-testid="link-footer-blog">Blog</Link></li>
@@ -41,7 +41,7 @@ export default function SiteFooter() {
                 </a>
               </li>
             </ul>
-          </div>
+          </nav>
 
           <nav aria-label="Company">
             <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Company</div>
