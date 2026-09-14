@@ -140,12 +140,108 @@ export function getLeadWelcomeEmailHtml(name: string): string {
 }
 
 /**
+ * Empathetic card-declined recovery email (the "dispatch_card_declined"
+ * template from the Payment Recovery Mockups). Sent once per invoice when
+ * Stripe fires invoice.payment_failed; the CTA is a Stripe Billing Portal
+ * session URL so the customer can swap cards without a password.
+ *
+ * updateUrl must be a Stripe-hosted https URL (billing portal session). It
+ * is scheme-validated and attribute-escaped — the URL reaches the template
+ * from a live API response, and anything else would be a broken or unsafe
+ * CTA, which is worse than a loud failure in the caller.
+ */
+export function getCardDeclinedEmailHtml(name: string, updateUrl: string): string {
+  if (!/^https:\/\//.test(updateUrl)) {
+    throw new Error(`Card-declined email needs an https update-card URL (got: ${updateUrl.slice(0, 40)})`);
+  }
+  const firstName = escapeHtml(name ? name.split(' ')[0] : 'there');
+  const safeUrl = escapeHtml(updateUrl);
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#0F172A;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0F172A;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(212,175,55,0.10),rgba(212,175,55,0.03));border:1px solid rgba(212,175,55,0.25);border-radius:16px;padding:40px;">
+          <tr>
+            <td align="center" style="padding-bottom:30px;">
+              <h1 style="color:#D4AF37;font-size:28px;margin:0;">RxFit<span style="color:#F8FAFC;">.ai</span></h1>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <h2 style="color:#F8FAFC;font-size:24px;margin:0 0 20px;">Hi ${firstName}, your payment didn't go through</h2>
+              <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 20px;">
+                We tried to process your recent payment, but the card on file was declined. This happens all the time — an expired card, a bank being cautious, a new card you forgot to add — and it's quick to fix.
+              </p>
+              <p style="color:#CBD5E1;font-size:16px;line-height:1.6;margin:0 0 25px;">
+                To keep your training sessions rolling, update your payment info using the secure link below. It takes less than a minute.
+              </p>
+              <table cellpadding="0" cellspacing="0" style="margin:30px auto;">
+                <tr>
+                  <td align="center" style="background:linear-gradient(135deg,#D4AF37,#B8942C);border-radius:12px;padding:16px 40px;">
+                    <a href="${safeUrl}" style="color:#0F172A;text-decoration:none;font-size:16px;font-weight:700;">Update Payment Info</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#94A3B8;font-size:14px;line-height:1.5;margin:25px 0 0;border-top:1px solid rgba(148,163,184,0.2);padding-top:20px;">
+                This link is a secure Stripe page — we never see your card details. Questions? Just reply to this email and we'll help.<br>
+                <span style="color:#D4AF37;">— The RxFit.ai Team</span>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Payment-recovery SMS copy, following the GoHighLevel A2P 10DLC rules from
+ * the Payment Recovery Mockups: short enough for standard SMS segments,
+ * conversational, and always ending with the mandatory opt-out line.
+ * Plain text (no HTML) — the same string is what GHL sends and what the
+ * /admin preview shows.
+ */
+export function getCardDeclinedSmsText(name: string, updateUrl: string): string {
+  const firstName = (name ? name.split(' ')[0] : 'there').trim() || 'there';
+  return (
+    `Hi ${firstName}, it's RxFit. We tried to process your recent payment but the card on file was declined. ` +
+    `To keep your training sessions rolling, please update your payment info here: ${updateUrl}\n\n` +
+    `Reply STOP to opt out.`
+  );
+}
+
+/**
+ * Send the card-declined recovery email, throwing on failure. The recovery
+ * orchestrator (server/paymentRecovery.ts) needs the throw so it can release
+ * the per-invoice dedupe claim and let Stripe's next retry re-attempt.
+ */
+export async function sendCardDeclinedEmailOrThrow(email: string, name: string, updateUrl: string): Promise<void> {
+  const gmail = await getUncachableGmailClient();
+  const html = getCardDeclinedEmailHtml(name, updateUrl);
+  const raw = createMimeMessage(email, `Your RxFit.ai payment didn't go through — quick fix inside`, html);
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+  console.log(`Card-declined recovery email sent to ${email}`);
+}
+
+/**
  * Record a failed customer-facing email in the "RxFit Alerts" sheet tab so
  * the owner can re-send it manually. Best-effort: if the sheet write also
  * fails, log loudly — the customer flow must never break over notifications.
  */
 async function recordCustomerEmailFailure(
-  kind: 'welcome' | 'lead',
+  kind: 'welcome' | 'lead' | 'recovery',
   recipient: string,
   name: string,
   error: unknown,
@@ -154,7 +250,7 @@ async function recordCustomerEmailFailure(
   try {
     const { appendAlertToSheet } = await import('./sheetsService');
     await appendAlertToSheet({
-      title: `${kind === 'welcome' ? 'Welcome' : 'Lead nurture'} email FAILED to send — re-send manually to ${recipient}`,
+      title: `${kind === 'welcome' ? 'Welcome' : kind === 'recovery' ? 'Payment recovery' : 'Lead nurture'} email FAILED to send — re-send manually to ${recipient}`,
       message: `Recipient: ${recipient}${name ? ` (${name})` : ''}\nError: ${message}`,
     });
     console.log(`[email] Failure recorded in Google Sheet for ${kind} email to ${recipient}`);
@@ -666,5 +762,21 @@ export const EMAIL_TEMPLATES: Record<
   credentialAlert: {
     brand: 'alert',
     render: (p) => getCredentialAlertEmailHtml(p, p),
+  },
+  cardDeclined: {
+    brand: 'gold',
+    render: (p) => getCardDeclinedEmailHtml(p, 'https://billing.stripe.com/p/session/preview'),
+  },
+};
+
+/**
+ * Registry of SMS templates (plain text, not HTML) so the /admin preview can
+ * show the owner the exact recovery text before it goes out. Kept separate
+ * from EMAIL_TEMPLATES: the palette test counts HTML doctype declarations in
+ * this file and SMS bodies have none.
+ */
+export const SMS_TEMPLATES: Record<string, { render: (probe: string) => string }> = {
+  cardDeclined: {
+    render: (p) => getCardDeclinedSmsText(p, 'https://billing.stripe.com/p/session/preview'),
   },
 };

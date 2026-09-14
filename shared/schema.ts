@@ -36,6 +36,25 @@ export const productsSnapshots = pgTable("products_snapshots", {
   cachedAt: timestamp("cached_at").notNull(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Payment-recovery send log (dedupe for invoice.payment_failed)       */
+/* One row per Stripe invoice that triggered the card-declined        */
+/* recovery email/SMS. The unique invoice_id is the atomic claim: a   */
+/* repeated failure webhook for the same invoice conflicts and is     */
+/* skipped, so customers never get duplicate dunning messages.        */
+/* ------------------------------------------------------------------ */
+
+export const paymentRecoverySends = pgTable("payment_recovery_sends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: text("invoice_id").notNull().unique(),
+  customerId: text("customer_id"),
+  customerEmail: text("customer_email").notNull(),
+  amountDueCents: integer("amount_due_cents"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+export type PaymentRecoverySend = typeof paymentRecoverySends.$inferSelect;
+
 export type ProductsSnapshotRow = typeof productsSnapshots.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -21,8 +21,14 @@ type EmailPreview = {
   html: string;
 };
 
+type SmsPreview = {
+  name: string;
+  text: string;
+};
+
 type EmailPreviewsResponse = {
   templates: EmailPreview[];
+  sms: SmsPreview[];
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -33,6 +39,11 @@ const TEMPLATE_LABELS: Record<string, string> = {
   alertsDigest: "Weekly alerts digest",
   postFailure: "Blog publish failure",
   credentialAlert: "Credential alert",
+  cardDeclined: "Payment recovery (card declined)",
+};
+
+const SMS_LABELS: Record<string, string> = {
+  cardDeclined: "Payment recovery (card declined)",
 };
 
 type Lead = {
@@ -97,6 +108,7 @@ export default function AdminPage() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [leads, setLeads] = useState<Lead[] | null>(null);
   const [previews, setPreviews] = useState<EmailPreview[] | null>(null);
+  const [smsPreviews, setSmsPreviews] = useState<SmsPreview[] | null>(null);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -108,6 +120,7 @@ export default function AdminPage() {
     setHealth(null);
     setLeads(null);
     setPreviews(null);
+    setSmsPreviews(null);
     setAuthError(null);
   }, []);
 
@@ -124,6 +137,7 @@ export default function AdminPage() {
         setHealth(h);
         setLeads(l);
         setPreviews(p.templates);
+        setSmsPreviews(p.sms ?? []);
       } catch (e) {
         if (e instanceof Error && e.message === "unauthorized") {
           logout();
@@ -320,6 +334,33 @@ export default function AdminPage() {
                       </div>
                     );
                   })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {loading ? "Loading…" : "No data."}
+                </p>
+              )}
+            </section>
+
+            <section>
+              <h2 className="font-display text-lg font-semibold mb-1">SMS previews</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                The exact recovery text messages, rendered with sample data. Preview only — nothing is sent.
+              </p>
+              {smsPreviews && smsPreviews.length > 0 ? (
+                <div className="space-y-3">
+                  {smsPreviews.map((tpl) => (
+                    <div
+                      key={tpl.name}
+                      className="glass rounded-lg border border-border p-4"
+                      data-testid={`card-sms-${tpl.name}`}
+                    >
+                      <p className="text-sm font-medium mb-3">{SMS_LABELS[tpl.name] ?? tpl.name}</p>
+                      <div className="max-w-xs rounded-2xl rounded-br-sm bg-blue-500 text-white text-sm leading-relaxed px-4 py-3 whitespace-pre-wrap">
+                        {tpl.text}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">

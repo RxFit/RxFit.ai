@@ -14,9 +14,10 @@ import path from "path";
 import {
   createEmailPreviewsHandler,
   renderAllEmailPreviews,
+  renderAllSmsPreviews,
   SAMPLE_PROBE,
 } from "./emailPreviewRoute";
-import { EMAIL_TEMPLATES } from "./emailService";
+import { EMAIL_TEMPLATES, SMS_TEMPLATES } from "./emailService";
 
 function mockRes() {
   const res: any = {
@@ -75,13 +76,28 @@ describe("createEmailPreviewsHandler auth", () => {
 });
 
 describe("createEmailPreviewsHandler success and failure", () => {
-  it("authorized → 200 with the rendered templates", () => {
+  it("authorized → 200 with the rendered templates and SMS previews", () => {
+    const previews = [{ name: "welcome", brand: "gold" as const, html: "<html>x</html>" }];
+    const sms = [{ name: "cardDeclined", text: "Hi Sample Preview..." }];
+    const handler = createEmailPreviewsHandler({
+      renderPreviews: () => previews,
+      renderSmsPreviews: () => sms,
+    });
+    const res = mockRes();
+    handler(reqWithKey("test-admin-key"), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ templates: previews, sms });
+  });
+
+  it("falls back to the real SMS registry when no SMS renderer is injected", () => {
     const previews = [{ name: "welcome", brand: "gold" as const, html: "<html>x</html>" }];
     const handler = createEmailPreviewsHandler({ renderPreviews: () => previews });
     const res = mockRes();
     handler(reqWithKey("test-admin-key"), res);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ templates: previews });
+    expect(res.body.templates).toEqual(previews);
+    expect(Array.isArray(res.body.sms)).toBe(true);
+    expect(res.body.sms.length).toBeGreaterThan(0);
   });
 
   it("renderer throw → 500 with a generic message (no detail leak)", () => {
@@ -109,9 +125,30 @@ describe("renderAllEmailPreviews", () => {
       expect(p.html.length).toBeGreaterThan(0);
       // leadWelcome's copy is fixed (it doesn't interpolate the recipient),
       // so the probe only appears in the other templates.
-      if (p.name !== "leadWelcome") {
+      if (p.name === "leadWelcome") continue;
+      // cardDeclined greets by FIRST name, so the probe arrives truncated to
+      // its first token rather than the full "Sample Preview".
+      if (p.name === "cardDeclined") {
+        expect(p.html).toContain(SAMPLE_PROBE.split(" ")[0]);
+      } else {
         expect(p.html).toContain(SAMPLE_PROBE);
       }
+    }
+  });
+});
+
+describe("renderAllSmsPreviews", () => {
+  it("covers every SMS_TEMPLATES entry with sample-data text", () => {
+    const previews = renderAllSmsPreviews();
+    const registryNames = Object.keys(SMS_TEMPLATES).sort();
+    expect(previews.map((p) => p.name).sort()).toEqual(registryNames);
+    for (const p of previews) {
+      expect(p.text.length).toBeGreaterThan(0);
+      // SMS copy greets by FIRST name, so the probe arrives truncated to its
+      // first token ("Sample") rather than the full "Sample Preview".
+      expect(p.text).toContain(SAMPLE_PROBE.split(" ")[0]);
+      // A2P 10DLC: the mandatory opt-out line must survive any copy edit.
+      expect(p.text).toContain("Reply STOP to opt out.");
     }
   });
 });
