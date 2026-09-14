@@ -4,7 +4,12 @@
  * corrupts these shapes, this fails npm test AND npm run build.
  */
 import { describe, it, expect } from "vitest";
-import { FAQ_ITEMS, FAQ_JSONLD, PRICING_JSONLD } from "./landing-seo";
+import {
+  FAQ_ITEMS,
+  FAQ_JSONLD,
+  PRICING_JSONLD,
+  SOFTWARE_APPLICATION_JSONLD,
+} from "./landing-seo";
 import { PLAN_PRICING, TRIAL_COPY, jsonLdPrice } from "./stripe-constants";
 
 describe("landing page FAQPage JSON-LD", () => {
@@ -61,6 +66,19 @@ describe("landing page Product/Offer JSON-LD", () => {
     expect(byName["The Committed"].priceSpecification?.unitCode).toBe("ANN");
     expect(byName["The Committed"].priceSpecification?.price).toBe("490.00");
     expect(byName["The Kickstart"].priceSpecification?.price).toBe("49.00");
+  });
+});
+
+describe("landing page SoftwareApplication JSON-LD", () => {
+  it("describes the web health application and its real offers", () => {
+    expect(SOFTWARE_APPLICATION_JSONLD["@type"]).toBe("SoftwareApplication");
+    expect(SOFTWARE_APPLICATION_JSONLD.applicationCategory).toBe("HealthApplication");
+    expect(SOFTWARE_APPLICATION_JSONLD.operatingSystem).toBe("Web");
+    expect(SOFTWARE_APPLICATION_JSONLD.url).toBe("https://rxfit.ai");
+    expect(SOFTWARE_APPLICATION_JSONLD.offers).toBe(PRICING_JSONLD.offers);
+    expect(SOFTWARE_APPLICATION_JSONLD.publisher).toEqual({
+      "@id": "https://rxfit.ai/#organization",
+    });
   });
 });
 

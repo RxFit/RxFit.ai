@@ -14,7 +14,7 @@ export const COMPARE_FAQ = [
   },
   {
     q: "How is RxFit different from fitness apps like workout trackers?",
-    a: "Fitness apps collect data and serve template programs, but no human ever looks at your numbers or holds you accountable. RxFit adds a dedicated human coach on top of the AI dashboard — someone who sees your sleep, recovery, and training data and messages you throughout the week.",
+    a: "Fitness apps and workout trackers such as Strava typically record activity or serve template programs, but they do not provide a person who reviews your full picture and follows up when consistency drops. RxFit combines an AI dashboard with a dedicated human coach who sees your sleep, recovery, and training trends, helps translate them into practical adjustments, and messages you throughout the week. The difference is not just more data; it is ongoing interpretation, judgment, and accountability based on the data you already collect.",
   },
   {
     q: "How much does RxFit cost compared to a personal trainer?",
@@ -22,7 +22,7 @@ export const COMPARE_FAQ = [
   },
   {
     q: "Do I need a wearable device to use RxFit?",
-    a: "RxFit works best with a wearable or health app such as Oura, Garmin, Apple Health, or Strava, because your coach uses that data to personalize your plan. Most members already own one before joining.",
+    a: "RxFit works best with a wearable or health app such as Oura, Garmin, Apple Health, or Strava because sleep, recovery, activity, and training data give your coach more context for personalizing recommendations. Most members already use one before joining. Without connected biometric data, your coach can still work from the goals, habits, schedule, and progress information you share, but the dashboard will have less objective data to analyze and daily adjustments may be less precise.",
   },
 ];
 

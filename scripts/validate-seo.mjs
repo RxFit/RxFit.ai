@@ -178,9 +178,20 @@ function buildFaqJsonLd(items) {
 const ORGANIZATION_JSONLD = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": `${SITE_URL}/#organization`,
   name: "RxFit.ai",
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
+  logo: {
+    "@type": "ImageObject",
+    url: `${SITE_URL}/logo.png`,
+    width: 261,
+    height: 243,
+  },
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer support",
+    url: `${SITE_URL}/contact`,
+  },
   sameAs: [APP_URL],
 };
 
@@ -257,9 +268,15 @@ function validateFaq(ld, file) {
 function validateOrganization(ld, file) {
   if (!validateJsonLdSerializable(ld, "Organization", file)) return;
   if (ld["@type"] !== "Organization") err(file, "Organization @type is wrong");
+  if (!isAbsUrl(ld["@id"])) err(file, "Organization @id must be absolute https");
   if (!isNonEmptyString(ld.name)) err(file, "Organization name is missing");
   if (!isAbsUrl(ld.url)) err(file, "Organization url must be absolute https");
-  if (!isAbsUrl(ld.logo)) err(file, "Organization logo must be absolute https");
+  if (ld.logo?.["@type"] !== "ImageObject" || !isAbsUrl(ld.logo?.url))
+    err(file, "Organization logo must be an ImageObject with an absolute https url");
+  if (!Number.isInteger(ld.logo?.width) || !Number.isInteger(ld.logo?.height))
+    err(file, "Organization logo ImageObject must include integer width and height");
+  if (ld.contactPoint?.["@type"] !== "ContactPoint" || !isAbsUrl(ld.contactPoint?.url))
+    err(file, "Organization contactPoint must include an absolute https url");
   if (!Array.isArray(ld.sameAs) || !ld.sameAs.every(isAbsUrl))
     err(file, "Organization sameAs must be an array of absolute https URLs");
 }

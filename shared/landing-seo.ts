@@ -1,4 +1,5 @@
 import { SITE_URL } from "./site";
+import { ORGANIZATION_ID } from "./jsonld";
 import { PLAN_PRICING, TRIAL_COPY, jsonLdPrice } from "./stripe-constants";
 
 /**
@@ -99,4 +100,17 @@ export const PRICING_JSONLD = {
       availability: "https://schema.org/InStock",
     },
   ],
+};
+
+export const SOFTWARE_APPLICATION_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "RxFit.ai",
+  applicationCategory: "HealthApplication",
+  operatingSystem: "Web",
+  url: SITE_URL,
+  description: "AI health dashboard paired with a real human accountability coach.",
+  image: `${SITE_URL}/opengraph.jpg`,
+  offers: PRICING_JSONLD.offers,
+  publisher: { "@id": ORGANIZATION_ID },
 };

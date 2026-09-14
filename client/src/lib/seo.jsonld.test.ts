@@ -51,8 +51,8 @@ describe("computeSeo JSON-LD for a blog post", () => {
     expect(a.image).toBe(`${SITE_URL}/images/blog/test.webp`);
     expect(a.datePublished).toBe("2026-07-01");
     expect(a.dateModified).toBe("2026-07-10");
-    expect(a.author).toEqual({ "@type": "Person", name: "Coach Test" });
-    expect(a.publisher).toMatchObject({ "@type": "Organization", name: "RxFit.ai" });
+    expect(a.author).toEqual({ "@type": "Person", name: "Coach Test", url: SITE_URL });
+    expect(a.publisher).toEqual({ "@id": `${SITE_URL}/#organization` });
   });
 
   it("emits a BreadcrumbList with ordered absolute items", () => {
@@ -64,17 +64,14 @@ describe("computeSeo JSON-LD for a blog post", () => {
     expect(items[2]).toMatchObject({ position: 3, item: `${SITE_URL}/blog/test-post` });
   });
 
-  it("falls back to title as headline and Organization author when not provided", () => {
+  it("does not emit an incomplete Article when its publication date is absent", () => {
     const { jsonLd: minimal } = computeSeo({
       title: "T",
       description: "D",
       canonicalPath: "/blog/x",
       type: "article",
     });
-    const a = minimal.find((j) => j["@type"] === "Article") as Record<string, unknown>;
-    expect(a.headline).toBe("T");
-    expect(a.author).toEqual({ "@type": "Organization", name: "RxFit.ai" });
-    expect(a.image).toBe(`${SITE_URL}/opengraph.jpg`);
+    expect(minimal.some((j) => j["@type"] === "Article")).toBe(false);
   });
 
   it("emits no Article or BreadcrumbList for a plain website route", () => {

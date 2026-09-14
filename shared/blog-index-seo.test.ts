@@ -43,14 +43,8 @@ describe("buildBlogCollectionJsonLd", () => {
     expect(jsonLd.description).toBe(BLOG_INDEX_DESCRIPTION);
   });
 
-  it("includes the RxFit.ai Organization publisher with logo", () => {
-    expect(jsonLd.publisher["@type"]).toBe("Organization");
-    expect(jsonLd.publisher.name).toBe("RxFit.ai");
-    expect(jsonLd.publisher.url).toBe(SITE_URL);
-    expect(jsonLd.publisher.logo).toEqual({
-      "@type": "ImageObject",
-      url: `${SITE_URL}/logo.png`,
-    });
+  it("links the publisher to the site-wide Organization entity", () => {
+    expect(jsonLd.publisher).toEqual({ "@id": `${SITE_URL}/#organization` });
   });
 
   it("lists every post as an ordered ItemList of BlogPostings", () => {
@@ -76,7 +70,11 @@ describe("buildBlogCollectionJsonLd", () => {
     expect(posting.datePublished).toBe("2026-07-10");
     expect(posting.dateModified).toBe("2026-07-14");
     expect(posting.description).toBe("Newest post description.");
-    expect(posting.author).toEqual({ "@type": "Person", name: "RxFit Coaching Team" });
+    expect(posting.author).toEqual({
+      "@type": "Person",
+      name: "RxFit Coaching Team",
+      url: SITE_URL,
+    });
   });
 
   it("absolutizes relative hero images and omits image/dateModified when absent", () => {

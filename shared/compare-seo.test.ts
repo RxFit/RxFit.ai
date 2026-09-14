@@ -28,6 +28,14 @@ describe("compare page FAQPage JSON-LD", () => {
     });
   });
 
+  it("gives the app-comparison and wearable answers featured-snippet depth", () => {
+    for (const topic of ["fitness apps", "wearable device"]) {
+      const faq = COMPARE_FAQ.find((item) => item.q.toLowerCase().includes(topic));
+      expect(faq).toBeDefined();
+      expect(faq!.a.trim().split(/\s+/).length).toBeGreaterThanOrEqual(60);
+    }
+  });
+
   it("answers the key comparison questions: trainer replacement and cost", () => {
     const questions = COMPARE_FAQ.map((it) => it.q.toLowerCase());
     expect(questions.some((q) => q.includes("personal trainer"))).toBe(true);

@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import { SITE_DESCRIPTION } from "./site";
-import { ORGANIZATION_JSONLD, WEBSITE_JSONLD } from "../client/src/lib/seo";
+import { ORGANIZATION_JSONLD, WEBSITE_JSONLD } from "./jsonld";
 
 const root = path.resolve(__dirname, "..");
 const read = (p: string) => readFileSync(path.join(root, p), "utf-8");
@@ -35,26 +35,20 @@ describe("runtime emitters use SITE_DESCRIPTION", () => {
 });
 
 describe("source drift guards (no re-inlined literal)", () => {
-  const emitters: Array<{ file: string; wiredUses: number }> = [
-    // post head + index head, each with Organization + WebSite
-    { file: "server/blogSsr.ts", wiredUses: 4 },
-    // ORGANIZATION_JSONLD + WEBSITE_JSONLD
-    { file: "client/src/lib/seo.tsx", wiredUses: 2 },
-  ];
+  it("the shared schema module owns both descriptions", () => {
+    const src = read("shared/jsonld.ts");
+    expect(src.includes(SITE_DESCRIPTION)).toBe(false);
+    expect(src).toMatch(
+      /import\s*\{[^}]*\bSITE_DESCRIPTION\b[^}]*\}\s*from\s*"\.\/site"/,
+    );
+    expect(src.match(/description:\s*SITE_DESCRIPTION\b/g) ?? []).toHaveLength(2);
+  });
 
-  for (const { file, wiredUses } of emitters) {
-    it(`${file} imports the constant and never inlines the sentence`, () => {
+  for (const file of ["server/blogSsr.ts", "client/src/lib/seo.tsx"]) {
+    it(`${file} imports the shared schemas and never inlines the sentence`, () => {
       const src = read(file);
-      // The raw sentence must not appear anywhere in the source — all
-      // descriptions must come from the shared constant.
       expect(src.includes(SITE_DESCRIPTION)).toBe(false);
-      // The constant must actually be imported from shared/site...
-      expect(src).toMatch(
-        /import\s*\{[^}]*\bSITE_DESCRIPTION\b[^}]*\}\s*from\s*"@shared\/site"/,
-      );
-      // ...and wired into every description field it replaced.
-      const uses = src.match(/description:\s*SITE_DESCRIPTION\b/g) ?? [];
-      expect(uses).toHaveLength(wiredUses);
+      expect(src).toMatch(/from\s*"@shared\/jsonld"/);
     });
   }
 

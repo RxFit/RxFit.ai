@@ -26,10 +26,21 @@
       {
         "@context": "https://schema.org",
         "@type": "Organization",
+        "@id": "https://rxfit.ai/#organization",
         "name": "RxFit.ai",
         "url": "https://rxfit.ai",
-        "logo": "https://rxfit.ai/logo.png",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://rxfit.ai/logo.png",
+          "width": 261,
+          "height": 243
+        },
         "description": "RxFit.ai pairs an AI health dashboard with a real human coach to turn wearable data into daily, consistent action.",
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "contactType": "customer support",
+          "url": "https://rxfit.ai/contact"
+        },
         "sameAs": [
           "https://app.rxfit.ai",
           "https://twitter.com/rxfitai",

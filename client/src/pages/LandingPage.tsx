@@ -21,7 +21,12 @@ import { useSignupModal } from "@/components/SignupModalProvider";
 import SiteFooter from "@/components/SiteFooter";
 import ThemeToggle from "@/components/theme-toggle";
 import { Seo } from "@/lib/seo";
-import { FAQ_ITEMS, FAQ_JSONLD, PRICING_JSONLD } from "@shared/landing-seo";
+import {
+  FAQ_ITEMS,
+  FAQ_JSONLD,
+  PRICING_JSONLD,
+  SOFTWARE_APPLICATION_JSONLD,
+} from "@shared/landing-seo";
 import { PLAN_PRICING, TRIAL_COPY } from "@shared/stripe-constants";
 import {
   Accordion,
@@ -152,7 +157,7 @@ export default function LandingPage() {
         description="Turn your wearable data into daily, consistent action. RxFit.ai pairs an AI health dashboard with a real human accountability coach."
         canonicalPath="/"
         image="/opengraph.jpg"
-        jsonLd={[PRICING_JSONLD, FAQ_JSONLD]}
+        jsonLd={[PRICING_JSONLD, SOFTWARE_APPLICATION_JSONLD, FAQ_JSONLD]}
       />
 
       {/* Sticky Navbar */}

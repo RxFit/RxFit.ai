@@ -1,4 +1,5 @@
 import { SITE_URL } from "./site";
+import { AUTHOR_PROFILE_URL, ORGANIZATION_ID } from "./jsonld";
 
 /**
  * Blog index (/blog) SEO surfaces. The title/description feed both the meta
@@ -50,10 +51,7 @@ export function buildBlogCollectionJsonLd(posts: BlogIndexPostInput[]): Record<s
     description: BLOG_INDEX_DESCRIPTION,
     url: `${SITE_URL}/blog`,
     publisher: {
-      "@type": "Organization",
-      name: "RxFit.ai",
-      url: SITE_URL,
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+      "@id": ORGANIZATION_ID,
     },
     mainEntity: {
       "@type": "ItemList",
@@ -75,6 +73,7 @@ export function buildBlogCollectionJsonLd(posts: BlogIndexPostInput[]): Record<s
           author: {
             "@type": "Person",
             name: post.author,
+            url: AUTHOR_PROFILE_URL,
           },
         },
       })),

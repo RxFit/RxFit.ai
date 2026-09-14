@@ -1,40 +1,14 @@
 import { useEffect, useContext, createContext } from "react";
-import { SITE_URL, APP_URL, SITE_DESCRIPTION } from "@shared/site";
+import { SITE_URL, APP_URL } from "@shared/site";
+import {
+  AUTHOR_PROFILE_URL,
+  ORGANIZATION_ID,
+  ORGANIZATION_JSONLD,
+  WEBSITE_JSONLD,
+} from "@shared/jsonld";
 
 export { SITE_URL, APP_URL };
-
-/**
- * Shared Organization JSON-LD. The `sameAs` array (including app.rxfit.ai) is the
- * structured-data half of the cross-domain authority strategy — it tells search
- * and AI engines that rxfit.ai and app.rxfit.ai are one brand.
- */
-export const ORGANIZATION_JSONLD = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "RxFit.ai",
-  url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
-  description: SITE_DESCRIPTION,
-  sameAs: [
-    APP_URL,
-    "https://twitter.com/rxfitai",
-    "https://www.instagram.com/rxfitai",
-    "https://www.linkedin.com/company/rxfitai",
-  ],
-};
-
-export const WEBSITE_JSONLD = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "RxFit.ai",
-  url: SITE_URL,
-  description: SITE_DESCRIPTION,
-  publisher: {
-    "@type": "Organization",
-    name: "RxFit.ai",
-    url: SITE_URL,
-  },
-};
+export { ORGANIZATION_JSONLD, WEBSITE_JSONLD };
 
 type JsonLd = Record<string, unknown>;
 
@@ -140,7 +114,7 @@ export function computeSeo(props: SeoProps): ComputedSeo {
     });
   }
 
-  if (type === "article") {
+  if (type === "article" && article?.publishedTime) {
     const articleHeadline = schemaHeadline ?? title;
     const datePublished = article?.publishedTime;
     const dateModified = article?.modifiedTime ?? datePublished;
@@ -155,13 +129,9 @@ export function computeSeo(props: SeoProps): ComputedSeo {
       datePublished,
       dateModified,
       author: article?.author
-        ? { "@type": "Person", name: article.author }
-        : { "@type": "Organization", name: "RxFit.ai" },
-      publisher: {
-        "@type": "Organization",
-        name: "RxFit.ai",
-        logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
-      },
+        ? { "@type": "Person", name: article.author, url: AUTHOR_PROFILE_URL }
+        : { "@id": ORGANIZATION_ID },
+      publisher: { "@id": ORGANIZATION_ID },
     });
   }
 

@@ -16,7 +16,13 @@ import path from "path";
 import { marked } from "marked";
 import type { GeneratedPost } from "@shared/schema";
 import { extractToc } from "@shared/generated-blog";
-import { SITE_URL, APP_URL, SITE_DESCRIPTION } from "@shared/site";
+import { APP_URL, SITE_URL } from "@shared/site";
+import {
+  AUTHOR_PROFILE_URL,
+  ORGANIZATION_ID,
+  ORGANIZATION_JSONLD,
+  WEBSITE_JSONLD,
+} from "@shared/jsonld";
 import {
   BLOG_INDEX_TITLE,
   BLOG_INDEX_DESCRIPTION,
@@ -112,28 +118,6 @@ function buildHead(post: GeneratedPost): string {
       : `${SITE_URL}${post.heroImage}`
     : `${SITE_URL}/opengraph.jpg`;
 
-  const organization = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "RxFit.ai",
-    url: SITE_URL,
-    logo: `${SITE_URL}/logo.png`,
-    description: SITE_DESCRIPTION,
-    sameAs: [
-      APP_URL,
-      "https://twitter.com/rxfitai",
-      "https://www.instagram.com/rxfitai",
-      "https://www.linkedin.com/company/rxfitai",
-    ],
-  };
-  const website = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "RxFit.ai",
-    url: SITE_URL,
-    description: SITE_DESCRIPTION,
-    publisher: { "@type": "Organization", name: "RxFit.ai", url: SITE_URL },
-  };
   const breadcrumbs = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -153,12 +137,8 @@ function buildHead(post: GeneratedPost): string {
     mainEntityOfPage: canonical,
     datePublished: post.date,
     dateModified: post.updatedDate || post.date,
-    author: { "@type": "Person", name: post.author },
-    publisher: {
-      "@type": "Organization",
-      name: "RxFit.ai",
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
-    },
+    author: { "@type": "Person", name: post.author, url: AUTHOR_PROFILE_URL },
+    publisher: { "@id": ORGANIZATION_ID },
   };
   const faqPage =
     post.faq.length > 0
@@ -192,7 +172,7 @@ function buildHead(post: GeneratedPost): string {
       (t) => `<meta property="article:tag" content="${escapeHtml(t)}" data-seo-tag="true" />`,
     ),
   ];
-  for (const j of [organization, website, breadcrumbs, article, faqPage]) {
+  for (const j of [ORGANIZATION_JSONLD, WEBSITE_JSONLD, breadcrumbs, article, faqPage]) {
     if (!j) continue;
     out.push(`<script type="application/ld+json" data-seo-jsonld="true">${jsonLdSafe(j)}</script>`);
   }
@@ -363,28 +343,6 @@ function buildIndexHead(posts: BlogIndexCard[]): string {
   const canonical = `${SITE_URL}/blog`;
   const image = `${SITE_URL}/opengraph.jpg`;
 
-  const organization = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "RxFit.ai",
-    url: SITE_URL,
-    logo: `${SITE_URL}/logo.png`,
-    description: SITE_DESCRIPTION,
-    sameAs: [
-      APP_URL,
-      "https://twitter.com/rxfitai",
-      "https://www.instagram.com/rxfitai",
-      "https://www.linkedin.com/company/rxfitai",
-    ],
-  };
-  const website = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "RxFit.ai",
-    url: SITE_URL,
-    description: SITE_DESCRIPTION,
-    publisher: { "@type": "Organization", name: "RxFit.ai", url: SITE_URL },
-  };
   const breadcrumbs = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -408,7 +366,7 @@ function buildIndexHead(posts: BlogIndexCard[]): string {
     `<meta name="twitter:description" content="${escapeHtml(BLOG_INDEX_DESCRIPTION)}" data-seo="true" />`,
     `<meta name="twitter:image" content="${escapeHtml(image)}" data-seo="true" />`,
   ];
-  for (const j of [organization, website, breadcrumbs, collection]) {
+  for (const j of [ORGANIZATION_JSONLD, WEBSITE_JSONLD, breadcrumbs, collection]) {
     out.push(`<script type="application/ld+json" data-seo-jsonld="true">${jsonLdSafe(j)}</script>`);
   }
   return out.join("\n    ");
