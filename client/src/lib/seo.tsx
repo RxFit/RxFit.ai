@@ -87,7 +87,17 @@ export function computeSeo(props: SeoProps): ComputedSeo {
     { attr: "name", key: "twitter:title", content: title },
     { attr: "name", key: "twitter:description", content: description },
     { attr: "name", key: "twitter:image", content: absImage },
+    { attr: "name", key: "twitter:image:alt", content: `${title} — RxFit.ai` },
   ];
+
+  if (absImage === `${SITE_URL}/opengraph.jpg`) {
+    metas.splice(
+      6,
+      0,
+      { attr: "property", key: "og:image:width", content: "1280" },
+      { attr: "property", key: "og:image:height", content: "720" },
+    );
+  }
 
   if (article?.publishedTime) {
     metas.push({ attr: "property", key: "article:published_time", content: article.publishedTime });
@@ -209,6 +219,10 @@ function setMeta(attr: "name" | "property", key: string, content: string) {
   el.setAttribute("data-seo", "true");
 }
 
+function removeMeta(attr: "name" | "property", key: string) {
+  document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`)?.remove();
+}
+
 function setCanonical(href: string) {
   let el = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (!el) {
@@ -240,6 +254,10 @@ export function Seo(props: SeoProps) {
     const prevTitle = document.title;
     document.title = c.title;
     setCanonical(c.canonical);
+    const metaKeys = new Set(c.metas.map((m) => `${m.attr}:${m.key}`));
+    for (const key of ["og:image:width", "og:image:height"]) {
+      if (!metaKeys.has(`property:${key}`)) removeMeta("property", key);
+    }
     c.metas.forEach((m) => setMeta(m.attr, m.key, m.content));
     if (c.noindex) {
       setMeta("name", "robots", "noindex,nofollow");

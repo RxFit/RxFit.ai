@@ -77,6 +77,11 @@ describe("renderGeneratedPostPage output", () => {
     expect(page).toContain(
       `<meta property="og:image" content="${SITE_URL}/blog-heroes/hrv-smoke-test.webp" data-seo="true" />`,
     );
+    expect(page).not.toContain('property="og:image:width"');
+    expect(page).not.toContain('property="og:image:height"');
+    expect(page).toContain(
+      '<meta name="twitter:image:alt" content="HRV Smoke Test Post | RxFit.ai — RxFit.ai" data-seo="true" />',
+    );
   });
 
   it("injects the JSON-LD scripts (Article, BreadcrumbList, FAQPage)", () => {
@@ -134,6 +139,15 @@ describe("renderGeneratedPostPage edge cases", () => {
     );
     expect(page).toContain(
       `<meta name="twitter:image" content="${SITE_URL}/opengraph.jpg" data-seo="true" />`,
+    );
+    expect(page).toContain(
+      '<meta property="og:image:width" content="1280" data-seo="true" />',
+    );
+    expect(page).toContain(
+      '<meta property="og:image:height" content="720" data-seo="true" />',
+    );
+    expect(page).toContain(
+      '<meta name="twitter:image:alt" content="HRV Smoke Test Post | RxFit.ai — RxFit.ai" data-seo="true" />',
     );
     expect(page).not.toContain("blog-heroes");
     expect(page).not.toContain("<img"); // hero block omitted entirely

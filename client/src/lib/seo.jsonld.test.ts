@@ -80,3 +80,42 @@ describe("computeSeo JSON-LD for a blog post", () => {
     expect(site.some((j) => j["@type"] === "BreadcrumbList")).toBe(false);
   });
 });
+
+describe("computeSeo social image metadata", () => {
+  it("emits dimensions for the known fallback image and accessible Twitter alt text", () => {
+    const { metas } = computeSeo({
+      title: "Fallback Image Page",
+      description: "D",
+      canonicalPath: "/fallback",
+    });
+    const meta = Object.fromEntries(metas.map(({ key, content }) => [key, content]));
+
+    expect(meta["og:image"]).toBe(`${SITE_URL}/opengraph.jpg`);
+    expect(meta["og:image:width"]).toBe("1280");
+    expect(meta["og:image:height"]).toBe("720");
+    expect(meta["twitter:image:alt"]).toBe("Fallback Image Page — RxFit.ai");
+  });
+
+  it("emits known dimensions when the default image is passed explicitly", () => {
+    const { metas } = computeSeo({
+      title: "Explicit Default Image Page",
+      description: "D",
+      canonicalPath: "/explicit-default",
+      image: "/opengraph.jpg",
+    });
+    const meta = Object.fromEntries(metas.map(({ key, content }) => [key, content]));
+
+    expect(meta["og:image"]).toBe(`${SITE_URL}/opengraph.jpg`);
+    expect(meta["og:image:width"]).toBe("1280");
+    expect(meta["og:image:height"]).toBe("720");
+  });
+
+  it("does not claim fallback dimensions for a custom image of unknown size", () => {
+    const { metas } = computeSeo(ARTICLE_PROPS);
+    const meta = Object.fromEntries(metas.map(({ key, content }) => [key, content]));
+
+    expect(meta["og:image:width"]).toBeUndefined();
+    expect(meta["og:image:height"]).toBeUndefined();
+    expect(meta["twitter:image:alt"]).toBe("Short SEO Title | RxFit.ai — RxFit.ai");
+  });
+});

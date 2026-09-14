@@ -117,6 +117,12 @@ function buildHead(post: GeneratedPost): string {
       ? post.heroImage
       : `${SITE_URL}${post.heroImage}`
     : `${SITE_URL}/opengraph.jpg`;
+  const imageDimensions = post.heroImage
+    ? []
+    : [
+        `<meta property="og:image:width" content="1280" data-seo="true" />`,
+        `<meta property="og:image:height" content="720" data-seo="true" />`,
+      ];
 
   const breadcrumbs = {
     "@context": "https://schema.org",
@@ -162,9 +168,11 @@ function buildHead(post: GeneratedPost): string {
     `<meta property="og:url" content="${escapeHtml(canonical)}" data-seo="true" />`,
     `<meta property="og:type" content="article" data-seo="true" />`,
     `<meta property="og:image" content="${escapeHtml(image)}" data-seo="true" />`,
+    ...imageDimensions,
     `<meta name="twitter:title" content="${escapeHtml(title)}" data-seo="true" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" data-seo="true" />`,
     `<meta name="twitter:image" content="${escapeHtml(image)}" data-seo="true" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(`${title} — RxFit.ai`)}" data-seo="true" />`,
     `<meta property="article:published_time" content="${escapeHtml(post.date)}" data-seo="true" />`,
     `<meta property="article:modified_time" content="${escapeHtml(post.updatedDate || post.date)}" data-seo="true" />`,
     `<meta property="article:author" content="${escapeHtml(post.author)}" data-seo="true" />`,
@@ -362,9 +370,12 @@ function buildIndexHead(posts: BlogIndexCard[]): string {
     `<meta property="og:url" content="${escapeHtml(canonical)}" data-seo="true" />`,
     `<meta property="og:type" content="website" data-seo="true" />`,
     `<meta property="og:image" content="${escapeHtml(image)}" data-seo="true" />`,
+    `<meta property="og:image:width" content="1280" data-seo="true" />`,
+    `<meta property="og:image:height" content="720" data-seo="true" />`,
     `<meta name="twitter:title" content="${escapeHtml(BLOG_INDEX_TITLE)}" data-seo="true" />`,
     `<meta name="twitter:description" content="${escapeHtml(BLOG_INDEX_DESCRIPTION)}" data-seo="true" />`,
     `<meta name="twitter:image" content="${escapeHtml(image)}" data-seo="true" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(`${BLOG_INDEX_TITLE} — RxFit.ai`)}" data-seo="true" />`,
   ];
   for (const j of [ORGANIZATION_JSONLD, WEBSITE_JSONLD, breadcrumbs, collection]) {
     out.push(`<script type="application/ld+json" data-seo-jsonld="true">${jsonLdSafe(j)}</script>`);
