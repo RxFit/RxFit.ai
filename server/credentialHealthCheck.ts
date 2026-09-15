@@ -260,7 +260,13 @@ async function checkService(name: ServiceName, fn: () => Promise<void>): Promise
         );
       } else {
         try {
-          await appendCredentialAlertToSheet({ service: name, message });
+          // The sheet row is the owner's ONLY alert in this path, so it carries
+          // the same build stamp the email would have — otherwise the one
+          // scenario that most needs the stale-deploy tell is the one without it.
+          await appendCredentialAlertToSheet({
+            service: name,
+            message: `${message}\n\nSent by build ${describeBuild()}`,
+          });
         } catch (sheetError) {
           console.error(
             `[credential-check] BOTH alert channels failed for ${name} — email and Google Sheet fallback. Sheet error:`,
@@ -300,13 +306,15 @@ export function startCredentialHealthCheck(): void {
     return;
   }
   console.log(`[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly (build: ${describeBuild()})`);
-  // Say it at boot, in the deploy log, not 60s later in an email: on the live
-  // deployment the ONLY source of a live key is this secret. The connector
-  // fallback can never satisfy production (no production Stripe connection
-  // exists, and re-authorizing it would only yield the sandbox key).
+  // Say it at boot, in the deploy log, not 60s later in an email. This states
+  // only the fact (the direct secret is absent) — stripeClient will still try
+  // the connector's production connection, and only the Stripe check below
+  // decides whether that actually resolved. Historically it never has (the
+  // connector holds the sandbox account), which is why the remedy is named
+  // here rather than left for the alert email.
   if (process.env.REPLIT_DEPLOYMENT === "1" && !process.env.STRIPE_SECRET_KEY) {
-    console.error(
-      "[credential-check] STRIPE_SECRET_KEY is NOT set on this deployment. Live checkout will 500 and the Stripe alert will fire. Add the sk_live_… key under Replit → Secrets for the production deployment and republish.",
+    console.warn(
+      "[credential-check] STRIPE_SECRET_KEY is not set on this deployment; Stripe will fall back to the Replit connector's production connection. If the Stripe check that runs in ~60s fails, add the sk_live_… key under Replit → Secrets for the production deployment and republish (re-authorizing the connector yields the sandbox key, not a live one).",
     );
   }
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
