@@ -1,4 +1,5 @@
 import { getUncachableGmailClient } from './gmailClient';
+import { describeBuild } from './buildInfo';
 
 function escapeHtml(text: string): string {
   return text
@@ -452,6 +453,7 @@ export async function sendCredentialAlertEmail(service: string, error: unknown):
           <p style="color:#CBD5E1;font-size:15px;line-height:1.6;margin:0 0 12px;">The hourly health check FAILED for ${escapeHtml(serviceLabel)} (checked twice). ${escapeHtml(impact)}</p>
           <pre style="color:#FCA5A5;background:rgba(239,68,68,0.08);border-radius:8px;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(message.slice(0, 4000))}</pre>
           <p style="color:#64748B;font-size:13px;margin:16px 0 0;">Fix: ${escapeHtml(remedy)} You'll only get this email once per outage; recovery is logged automatically.</p>
+          <p style="color:#475569;font-size:12px;margin:16px 0 0;">Sent by build ${escapeHtml(describeBuild())}. If that is not the current commit on main, the deployment is stale — redeploy from main before acting on any advice in this email.</p>
         </td></tr>
       </table>
     </td></tr>

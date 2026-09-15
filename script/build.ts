@@ -3,6 +3,7 @@ import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 import { spawnSync } from "child_process";
 import { prerender } from "./prerender";
+import { formatBuildId } from "../server/buildInfo";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -61,6 +62,30 @@ function runSeoValidation() {
   }
 }
 
+/**
+ * Stamp the bundle with the commit it was built from. Read by
+ * server/buildInfo.ts and surfaced in every credential alert email and the
+ * internal health snapshot, so a stale deployment identifies itself. Never
+ * fails the build: a checkout without git history still gets a timestamp.
+ *
+ * "dirty" counts untracked files too, not just modified tracked ones: build
+ * inputs here are discovered by glob (content/blog/*.mdx via blogLoader,
+ * everything under client/public via Vite), so an untracked post or asset
+ * ships in the deployment while HEAD alone would claim a clean, reproducible
+ * commit. Ignored paths (node_modules, dist, .env) never count.
+ */
+function computeBuildId(): string {
+  const git = (args: string[]) => {
+    const r = spawnSync("git", args, { encoding: "utf-8" });
+    return r.status === 0 ? r.stdout.trim() : null;
+  };
+  const sha = git(["rev-parse", "--short", "HEAD"]);
+  const porcelain = sha === null ? null : git(["status", "--porcelain", "--untracked-files=all"]);
+  const id = formatBuildId({ sha, dirty: porcelain !== null && porcelain.length > 0, builtAt: new Date() });
+  console.log(`build id: ${id}`);
+  return id;
+}
+
 async function buildAll() {
   runTests();
   runSeoValidation();
@@ -89,6 +114,7 @@ async function buildAll() {
     outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
+      "process.env.RXFIT_BUILD_ID": JSON.stringify(computeBuildId()),
     },
     minify: true,
     external: externals,

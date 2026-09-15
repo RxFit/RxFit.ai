@@ -69,8 +69,12 @@ describe("credential health check alert fallback", () => {
     expect(appendCredentialAlertToSheet).toHaveBeenCalledTimes(1);
     expect(appendCredentialAlertToSheet).toHaveBeenCalledWith({
       service: "gmail",
-      message: "gmail connection missing",
+      message: expect.stringContaining("gmail connection missing"),
     });
+    // The sheet row is the only alert in this path, so it carries the build
+    // stamp the email would have.
+    const { message } = appendCredentialAlertToSheet.mock.calls[0][0];
+    expect(message).toMatch(/\nSent by build dev \(unbundled/);
   });
 
   it("catches and logs sheet fallback errors without crashing the health check", async () => {
