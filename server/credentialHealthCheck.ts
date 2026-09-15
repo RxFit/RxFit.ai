@@ -34,6 +34,7 @@ import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
 import { PLAN_TIERS, priceIdForTier, priceMismatches, type PriceShape } from "@shared/stripe-catalog";
+import { describeBuild } from "./buildInfo";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
@@ -66,11 +67,15 @@ const status: Record<ServiceName, ServiceStatus> = {
 export interface CredentialHealthStatus {
   services: Record<ServiceName, ServiceStatus>;
   checkedAt: string;
+  /** Which build is answering — a stale deploy is the first thing to rule out
+   *  when an alert's wording does not match the code on main. */
+  build: string;
 }
 
 /** Snapshot of the in-memory credential health state (deep-copied). */
 export function getCredentialHealthStatus(): CredentialHealthStatus {
   return {
+    build: describeBuild(),
     services: {
       stripe: { ...status.stripe },
       gmail: { ...status.gmail },
@@ -294,7 +299,16 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly");
+  console.log(`[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly (build: ${describeBuild()})`);
+  // Say it at boot, in the deploy log, not 60s later in an email: on the live
+  // deployment the ONLY source of a live key is this secret. The connector
+  // fallback can never satisfy production (no production Stripe connection
+  // exists, and re-authorizing it would only yield the sandbox key).
+  if (process.env.REPLIT_DEPLOYMENT === "1" && !process.env.STRIPE_SECRET_KEY) {
+    console.error(
+      "[credential-check] STRIPE_SECRET_KEY is NOT set on this deployment. Live checkout will 500 and the Stripe alert will fire. Add the sk_live_… key under Replit → Secrets for the production deployment and republish.",
+    );
+  }
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }
