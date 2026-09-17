@@ -27,7 +27,7 @@ RxFit.ai is a public-facing landing site and blog for a HealthTech SaaS product.
 - **Primary public API surface:** `server/routes.ts`
 - **Highest-risk integrations:** `server/stripeClient.ts`, `server/webhookHandlers.ts`, `server/emailService.ts`, `server/gmailClient.ts`, `server/sheetsService.ts`
 - **Persistent data model:** `shared/schema.ts`, `server/storage.ts`, `server/db.ts`
-- **Public surfaces:** landing pages, blog pages, `/api/leads`, `/api/stripe/*`, `/sitemap.xml`, `/robots.txt`
+- **Public surfaces:** landing pages, blog pages, `/api/health` (liveness only: status, build id, uptime; no data access), `/api/leads`, `/api/stripe/*`, `/sitemap.xml`, `/robots.txt`
 - **Authenticated/admin surfaces:** none implemented in this repo; any sensitive route must enforce its own protection or be treated as public
 - **Usually dev-only / lower-priority unless proven reachable:** `script/`, `server/vite.ts`, build-time MDX processing, local seeding utilities
 
