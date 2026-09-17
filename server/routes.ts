@@ -21,6 +21,7 @@ import { renderGeneratedPostPage } from "./blogSsr";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck } from "./credentialHealthCheck";
+import { healthPayload } from "./health";
 
 function parseFrontmatter(raw: string): Record<string, any> {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -40,6 +41,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Public liveness probe (UptimeRobot "rxfit prod /api/health"). Registered
+  // first so nothing can shadow it; no dependencies are touched, so a green
+  // here means only "the process answers" — see server/health.ts.
+  app.get("/api/health", (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.json(healthPayload());
+  });
 
   app.post("/api/leads", leadsRateLimit, async (req, res) => {
     try {
