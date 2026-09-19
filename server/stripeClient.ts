@@ -2,50 +2,20 @@ import Stripe from 'stripe';
 import { dbSslConfig } from '@shared/db-ssl.mjs';
 
 async function getCredentials() {
-  // PREFER direct API keys from Secrets (for Live mode)
   const directSecretKey = process.env.STRIPE_SECRET_KEY;
   const directPublishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
-  
-  if (directSecretKey) {
-    console.log("[Stripe] Using direct API keys from Secrets (Live mode)");
-    return {
-      publishableKey: directPublishableKey || '',
-      secretKey: directSecretKey,
-    };
+
+  if (!directSecretKey) {
+    throw new Error('No Stripe secret key available. Set STRIPE_SECRET_KEY in Replit Secrets.');
   }
 
-  // FALLBACK: Replit Connector (Sandbox mode)
-  console.log("[Stripe] No STRIPE_SECRET_KEY found, falling back to Replit Connector");
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('No Stripe credentials found. Set STRIPE_SECRET_KEY in Replit Secrets, or configure the Stripe Connector.');
-  }
-
-  const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
-  const targetEnvironment = isProduction ? 'production' : 'development';
-
-  const { getConnectionSettings } = await import('./connectorSettings');
-  const connection = await getConnectionSettings('stripe', targetEnvironment);
-
-  // Gate on the SECRET alone. Every consumer that matters -- checkout, session
-  // retrieval, the billing portal, StripeSync -- needs only the secret key, so
-  // a connection carrying a usable secret but no publishable key must not take
-  // down all of Stripe. Optional chaining also stops a connection with no
-  // `settings` object throwing a bare TypeError into the alert email instead
-  // of this diagnostic.
-  const secret = connection?.settings?.secret;
-  if (!secret) {
-    throw new Error(`Stripe ${targetEnvironment} connection not found via Connector. Set STRIPE_SECRET_KEY in Replit Secrets instead.`);
+  if (!directPublishableKey) {
+    throw new Error('No Stripe publishable key available. Set STRIPE_PUBLISHABLE_KEY in Replit Secrets.');
   }
 
   return {
-    publishableKey: connection?.settings?.publishable ?? '',
-    secretKey: secret,
+    publishableKey: directPublishableKey,
+    secretKey: directSecretKey,
   };
 }
 
@@ -75,7 +45,7 @@ export async function getStripeSync() {
   if (!stripeSync) {
     const { StripeSync } = await import('stripe-replit-sync');
     const secretKey = await getStripeSecretKey();
-    
+
     stripeSync = new StripeSync({
       poolConfig: {
         connectionString: process.env.DATABASE_URL!,
