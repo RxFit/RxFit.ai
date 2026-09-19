@@ -93,13 +93,41 @@ describe("buildCheckoutSessionParams", () => {
     expect(nonString).not.toHaveProperty("client_reference_id");
   });
 
-  it("does not send subscription_data — the advertised trial is not applied today", () => {
-    // Documents the known, deliberately-unfixed gap: the site promises a 7-day
-    // free trial for kickstart but nothing sets trial_period_days. If the owner
-    // decides to honour it, this expectation is what needs to flip.
+  it("adds exactly 7 days of subscription_data trial for kickstart when the price object has none", () => {
     const params = buildCheckoutSessionParams({
       tier: "kickstart", priceObj: priceFor("kickstart"), baseUrl: BASE,
     });
+    expect(params.subscription_data).toEqual({ trial_period_days: 7 });
+  });
+
+  it("does not double-apply trial for kickstart if the price already carries a 7-day trial", () => {
+    const priceWithTrial = priceFor("kickstart");
+    priceWithTrial.recurring!.trial_period_days = 7;
+    const params = buildCheckoutSessionParams({
+      tier: "kickstart", priceObj: priceWithTrial, baseUrl: BASE,
+    });
     expect(params).not.toHaveProperty("subscription_data");
+  });
+
+  it("fails closed if the kickstart price carries a conflicting non-null trial length", () => {
+    const priceWithBadTrial = priceFor("kickstart");
+    priceWithBadTrial.recurring!.trial_period_days = 14;
+    expect(() => {
+      buildCheckoutSessionParams({
+        tier: "kickstart", priceObj: priceWithBadTrial, baseUrl: BASE,
+      });
+    }).toThrow(/incompatible trial_period_days: 14/);
+  });
+
+  it("does not send subscription_data for committed or transformation", () => {
+    const committedParams = buildCheckoutSessionParams({
+      tier: "committed", priceObj: priceFor("committed"), baseUrl: BASE,
+    });
+    expect(committedParams).not.toHaveProperty("subscription_data");
+
+    const transformationParams = buildCheckoutSessionParams({
+      tier: "transformation", priceObj: priceFor("transformation"), baseUrl: BASE,
+    });
+    expect(transformationParams).not.toHaveProperty("subscription_data");
   });
 });
