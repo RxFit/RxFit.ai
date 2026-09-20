@@ -1,4 +1,4 @@
-import { priceIdForTier, type PriceShape } from "@shared/stripe-catalog";
+import { priceIdForTier, type PriceShape, trialDaysForTier } from "@shared/stripe-catalog";
 import type { PlanTier } from "@shared/stripe-constants";
 
 /**
@@ -34,6 +34,16 @@ export function buildCheckoutSessionParams(args: {
     allow_promotion_codes: true,
     mode: priceObj.recurring ? 'subscription' : 'payment',
   };
+
+  if (tier === 'kickstart') {
+    const existingTrial = priceObj.recurring?.trial_period_days;
+    const expectedTrial = trialDaysForTier('kickstart');
+    if (existingTrial === undefined || existingTrial === null) {
+      params.subscription_data = { trial_period_days: expectedTrial };
+    } else if (existingTrial !== expectedTrial) {
+      throw new Error(`Kickstart price has an incompatible trial_period_days: ${existingTrial}. Expected ${expectedTrial} or null.`);
+    }
+  }
 
   if (email && typeof email === 'string') params.customer_email = email;
   if (clientReferenceId && typeof clientReferenceId === 'string') {

@@ -51,6 +51,18 @@ describe("credential health status snapshot", () => {
     }
   });
 
+  it("names the build that produced the snapshot, so a stale deploy is visible", async () => {
+    vi.stubEnv("RXFIT_BUILD_ID", "abc1234 built 2026-09-15T00:00Z");
+    try {
+      const mod = await freshModule();
+      expect(mod.getCredentialHealthStatus().build).toBe("abc1234 built 2026-09-15T00:00Z");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const mod = await freshModule();
+    expect(mod.getCredentialHealthStatus().build).toMatch(/^dev /);
+  });
+
   it("reports healthy services with a timestamp and no error after a run", async () => {
     const mod = await freshModule();
     const run = mod.runCredentialHealthCheck();

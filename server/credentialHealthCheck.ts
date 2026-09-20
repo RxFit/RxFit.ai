@@ -34,6 +34,7 @@ import { getUncachableGoogleSheetClient } from "./sheetsClient";
 import { sendCredentialAlertEmail } from "./emailService";
 import { appendCredentialAlertToSheet } from "./sheetsService";
 import { PLAN_TIERS, priceIdForTier, priceMismatches, type PriceShape } from "@shared/stripe-catalog";
+import { describeBuild } from "./buildInfo";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 const BOOT_DELAY_MS = 45 * 1000;
@@ -75,11 +76,15 @@ const status: Record<ServiceName, ServiceStatus> = {
 export interface CredentialHealthStatus {
   services: Record<ServiceName, ServiceStatus>;
   checkedAt: string;
+  /** Which build is answering — a stale deploy is the first thing to rule out
+   *  when an alert's wording does not match the code on main. */
+  build: string;
 }
 
 /** Snapshot of the in-memory credential health state (deep-copied). */
 export function getCredentialHealthStatus(): CredentialHealthStatus {
   return {
+    build: describeBuild(),
     services: {
       stripe: { ...status.stripe },
       gmail: { ...status.gmail },
@@ -283,7 +288,13 @@ async function recordOutcome(
         );
       } else {
         try {
-          await appendCredentialAlertToSheet({ service: name, message });
+          // The sheet row is the owner's ONLY alert in this path, so it carries
+          // the same build stamp the email would have — otherwise the one
+          // scenario that most needs the stale-deploy tell is the one without it.
+          await appendCredentialAlertToSheet({
+            service: name,
+            message: `${message}\n\nSent by build ${describeBuild()}`,
+          });
         } catch (sheetError) {
           console.error(
             `[credential-check] BOTH alert channels failed for ${name} — email and Google Sheet fallback. Sheet error:`,
@@ -381,7 +392,18 @@ export function startCredentialHealthCheck(): void {
     );
     return;
   }
-  console.log("[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly");
+  console.log(`[credential-check] Enabled — verifying Stripe (credentials + live price catalog), Gmail & Sheets at boot and hourly (build: ${describeBuild()})`);
+  // Say it at boot, in the deploy log, not 60s later in an email. This states
+  // only the fact (the direct secret is absent) — stripeClient will still try
+  // the connector's production connection, and only the Stripe check below
+  // decides whether that actually resolved. Historically it never has (the
+  // connector holds the sandbox account), which is why the remedy is named
+  // here rather than left for the alert email.
+  if (process.env.REPLIT_DEPLOYMENT === "1" && !process.env.STRIPE_SECRET_KEY) {
+    console.warn(
+      "[credential-check] STRIPE_SECRET_KEY is not set on this deployment; Stripe will fall back to the Replit connector's production connection. If the Stripe check that runs in ~60s fails, add the sk_live_… key under Replit → Secrets for the production deployment and republish (re-authorizing the connector yields the sandbox key, not a live one).",
+    );
+  }
   setTimeout(() => void runCredentialHealthCheck(), BOOT_DELAY_MS);
   setInterval(() => void runCredentialHealthCheck(), CHECK_INTERVAL_MS).unref();
 }

@@ -20,6 +20,7 @@ import { createBlogIndexHandler } from "./blogIndexRoute";
 import { getHeroImageBytes } from "./heroImage";
 import { isAdminAuthorized } from "./adminAuth";
 import { getCredentialHealthStatus, runCredentialHealthCheck, reportPricingServing, reportBlogSsrServing } from "./credentialHealthCheck";
+import { healthPayload } from "./health";
 import { ProductsSnapshotStore, createDbSnapshotPersistence } from "./productsSnapshot";
 import { createProductsHandler } from "./productsRoute";
 import { createCheckoutHandler, createCheckoutRateLimit } from "./checkoutRoute";
@@ -66,6 +67,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Public liveness probe (UptimeRobot "rxfit prod /api/health"). Registered
+  // first so nothing can shadow it; no dependencies are touched, so a green
+  // here means only "the process answers" — see server/health.ts.
+  app.get("/api/health", (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.json(healthPayload());
+  });
 
   app.post("/api/leads", leadsRateLimit, async (req, res) => {
     try {
